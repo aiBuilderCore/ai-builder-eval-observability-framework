@@ -29,6 +29,9 @@
     activeSub = first === 'index.html' ? '' : first;
   }
   var isSettings = activeSub === 'settings.html';
+  // Judge Catalogue is a sub-page under evaluation/ but gets its own sidebar
+  // entry, so highlight it (and not Evaluation) when it's the current page.
+  var isCatalog = /\/evaluation\/catalog\.html$/.test(herePath);
 
   var APP_NAME = 'Enterprise Eval Observability';
 
@@ -45,6 +48,7 @@
     'simulation':          '<svg viewBox="0 0 16 16" fill="none"><path d="M2 8h2.4l1.5-4.2 2.5 8.4 1.5-4.2H14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     'evaluation':          '<svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8 13 4v3.4c0 3.2-2.1 5.6-5 6.8-2.9-1.2-5-3.6-5-6.8V4l5-2.2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.8 8 7.3 9.5 10.4 6.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     'observability':       '<svg viewBox="0 0 16 16" fill="none"><path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4Z" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="1.8" stroke="currentColor" stroke-width="1.2"/></svg>',
+    'judges':              '<svg viewBox="0 0 16 16" fill="none"><path d="M8 2.2v10.6M4.4 13.4h7.2M8 3.6 3.4 5m4.6-1.4L12.6 5M3.4 5 1.9 8.2h3L3.4 5Zm9.2 0-1.5 3.2h3L12.6 5Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     'settings':            '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M8 1.6v1.6M8 12.8v1.6M14.4 8h-1.6M3.2 8H1.6M12.5 3.5l-1.1 1.1M4.6 11.4l-1.1 1.1M12.5 12.5l-1.1-1.1M4.6 4.6 3.5 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
     'sandbox':             '<svg viewBox="0 0 16 16" fill="none"><path d="M8 1.9 13.6 5v6L8 14.1 2.4 11V5L8 1.9Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M2.4 5 8 8.1 13.6 5M8 8.1V14.1" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>',
     'team':                '<svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="6" r="2.2" stroke="currentColor" stroke-width="1.2"/><path d="M2.2 12.8c0-2.1 1.7-3.3 3.8-3.3s3.8 1.2 3.8 3.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M10.4 4.3a2.2 2.2 0 0 1 0 4.1M11 9.7c1.6.3 2.6 1.4 2.6 3.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
@@ -427,7 +431,12 @@
     var links = [navLink(SECTION_LANDING, 'dashboard', 'Dashboard', !activeSub)];
     SUB_APPS.forEach(function (s) {
       var url = new URL(s.slug + '/index.html', sectionUrl).href;
-      links.push(navLink(url, s.slug, s.label, s.slug === activeSub));
+      links.push(navLink(url, s.slug, s.label, s.slug === activeSub && !isCatalog));
+      // Judge Catalogue sits directly under Evaluation — the sync judge registry.
+      if (s.slug === 'evaluation') {
+        var catUrl = new URL('evaluation/catalog.html', sectionUrl).href;
+        links.push(navLink(catUrl, 'judges', 'Judge Catalogue', isCatalog));
+      }
     });
     var scroll = '<div class="aibc-sidebar__scroll">' + links.join('\n') + '</div>';
 

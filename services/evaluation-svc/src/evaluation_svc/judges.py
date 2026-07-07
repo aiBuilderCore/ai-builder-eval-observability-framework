@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from eeof_core.dataplane import get_table, keys
 from eeof_core.ids import new_id
-from eeof_core.models import Judge, JudgeDraft, Jury, JuryDraft
+from eeof_core.models import CORE_JUDGES, Judge, JudgeDraft, Jury, JuryDraft
 
 
 async def create_judge(tenant: str, draft: JudgeDraft) -> Judge:
@@ -70,8 +70,15 @@ async def get_jury(tenant: str, panel_id: str) -> Jury | None:
 
 
 async def ensure_builtin_judges(tenant: str) -> None:
-    """Seed the standard rubric judges the first time a tenant is used."""
+    """Seed the versioned built-in catalog the first time a tenant is used.
+
+    The catalog is the authoritative research-grounded set in
+    `eeof_core.models.judge_catalog.CORE_JUDGES`; each entry carries its full
+    card metadata (dimension, family, turn types, reference requirement, cost,
+    pattern, blurb, threshold) so `GET /judges` serves the same catalog the
+    Evaluation wizard and Judge Catalogue screen render.
+    """
     existing = {j.name for j in await list_judges(tenant)}
-    for rubric in ("helpfulness", "safety", "faithfulness", "instruction_following", "register"):
-        if rubric not in existing:
-            await create_judge(tenant, JudgeDraft(name=rubric, rubric=rubric, kind="builtin"))
+    for spec in CORE_JUDGES:
+        if spec["name"] not in existing:
+            await create_judge(tenant, JudgeDraft(**spec))

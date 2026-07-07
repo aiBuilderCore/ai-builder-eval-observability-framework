@@ -47,7 +47,7 @@ falls back to seed data when the edge is unreachable, so the UI never blanks.
 | **Persona Lab** | full CRUD (`/personas`) — gallery, create, edit, delete, versioning |
 | **Question Generation** | submit → real `qgen` job, phase-level progress, seed-set questions |
 | **Simulation** | adapter onboarding, submit → real run, run detail (tokens/stop-reasons), trace turns |
-| **Evaluation** | submit → real jury scoring, verdict sets with per-juror verdicts, run picker |
+| **Evaluation** | submit → real jury scoring, verdict sets with per-juror verdicts, run picker, live **judge catalogue** (sync registry) |
 | **Observability** | monitors, evidence packs, judge-κ calibration (control-plane) |
 
 **Illustrative (no backend source yet):** batch span-trees, OpenInference

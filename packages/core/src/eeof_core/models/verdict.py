@@ -11,10 +11,23 @@ from .common import iso
 
 class JudgeDraft(BaseModel):
     name: str  # e.g. "helpfulness" or "customjudge.acme.tone"
-    rubric: str = "helpfulness"
+    rubric: str = "helpfulness"  # dimension/rubric id scored under the hood
     kind: str = "builtin"  # builtin | byoj (bring-your-own-judge)
     prompt: str = ""
     config: dict[str, Any] = Field(default_factory=dict)
+    # Catalog card metadata — opaque body, visible card (see the evaluation spec).
+    # All optional so a bare draft (name + rubric) still validates; the built-in
+    # catalog fills them in.
+    label: str = ""  # display name, e.g. "Answer relevance"
+    dimension: str = ""  # rubric dimension the card advertises
+    family: str = "frontier-LLM"  # frontier-LLM | specialist-LLM | non-LLM
+    turn_types: list[str] = Field(default_factory=lambda: ["single", "multi"])
+    reference: str = "reference-free"  # reference-free | retrieval-context | golden | …
+    cost: str = "$$"  # rough per-call cost band ($ / $$ / $$$)
+    pattern: str = ""  # implementation pattern, e.g. "RAGAS claim decomposition"
+    blurb: str = ""  # one-line what/why for the catalog card
+    biases: list[str] = Field(default_factory=list)  # hardened-against bias tags
+    threshold: float = 0.7  # default pass/fail cutoff
 
 
 class Judge(JudgeDraft):

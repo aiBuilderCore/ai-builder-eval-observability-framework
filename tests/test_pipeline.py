@@ -92,3 +92,28 @@ async def test_worker_lifecycle_marks_ready():
     stored = await get_job(TENANT, job.job_id)
     assert stored is not None
     assert stored.state == JobState.ready
+
+
+@pytest.mark.asyncio
+async def test_builtin_judge_catalogue_is_sync_and_complete():
+    """The sync judge registry seeds the full research-grounded core catalogue,
+    each judge carrying its card metadata; re-seeding is idempotent."""
+    from eeof_core.models import CORE_JUDGES
+    from evaluation_svc.judges import ensure_builtin_judges, list_judges
+
+    await ensure_builtin_judges(TENANT)
+    await ensure_builtin_judges(TENANT)  # idempotent — no duplicates
+
+    judges = {j.name: j for j in await list_judges(TENANT)}
+    assert set(judges) == {spec["name"] for spec in CORE_JUDGES}
+
+    faith = judges["faithfulness"]
+    assert faith.kind == "builtin"
+    assert faith.dimension == "faithfulness"
+    assert faith.family == "frontier-LLM"
+    assert faith.reference == "retrieval-context"
+    assert faith.threshold == 0.75
+    assert faith.ref == "faithfulness@v1"
+    # Non-LLM judges are a first-class catalogue category (AlignScore / Detoxify).
+    assert judges["factual_consistency"].family == "non-LLM"
+    assert judges["hallucination"].family == "specialist-LLM"

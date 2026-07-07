@@ -926,6 +926,24 @@ window.EV = {
       } : null,
     };
   };
+  const titleCase = (s) =>
+    String(s || "").replace(/[_.]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  // Map an API judge (rich JudgeDraft/Judge) into the catalog-card shape the
+  // catalog + create-wizard render. Keeps the versioned `judge.<name>@vN` id so
+  // downstream lookups (EV.judgeById, submitLive) stay stable.
+  const mapJudge = (j) => ({
+    id: `judge.${j.name}@v${j.version || 1}`,
+    name: j.label || titleCase(j.name),
+    dimension: j.dimension || j.rubric || j.name,
+    turn_types: j.turn_types || ["single", "multi"],
+    reference: j.reference || "reference-free",
+    cost: j.cost || "$$",
+    pattern: j.pattern || "",
+    family: j.family || "frontier-LLM",
+    blurb: j.blurb || "",
+    biases: j.biases || [],
+    threshold: j.threshold != null ? j.threshold : 0.7,
+  });
   const mapVerdict = (v) => ({
     verdict_id: v.id, verdict_set_id: v.verdict_set_id, question_id: v.question_id,
     question_prompt: v.question_prompt, persona_name: v.persona_name, run_id: v.run_id,
@@ -937,11 +955,24 @@ window.EV = {
 
   async function hydrate() {
     try {
-      const [jobs, sets, runs] = await Promise.all([
+      const [jobs, sets, runs, judges] = await Promise.all([
         EEOF.get("/jobs").catch(() => null),
         EEOF.get("/verdict-sets").catch(() => null),
         EEOF.get("/simulation/runs").catch(() => null),
+        EEOF.get("/judges").catch(() => null),
       ]);
+      // Built-in judge catalog — sync registry. Override EV.JUDGES in place so
+      // the catalog screen and the wizard's judge picker read live cards.
+      if (Array.isArray(judges) && judges.length && Array.isArray(EV.JUDGES)) {
+        const mapped = judges
+          .filter((j) => j.kind !== "byoj")
+          .map(mapJudge)
+          .sort((a, b) => a.id.localeCompare(b.id));
+        if (mapped.length) {
+          EV.JUDGES.length = 0;
+          mapped.forEach((j) => EV.JUDGES.push(j));
+        }
+      }
       if (jobs) jobsCache = jobs.filter((j) => j.stage === "eval").map(mapJob)
         .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
       if (sets) {
