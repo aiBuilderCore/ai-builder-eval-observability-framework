@@ -172,3 +172,42 @@ def evidence_sk(pack_id: str) -> str:
 
 def evidence_gsi(tenant: str, issued_at: str) -> tuple[str, str]:
     return _t(tenant, "EVIDENCE_BY_TIME"), issued_at
+
+
+# --- Self-Heal (closed-loop remediation: incident / policy / action / quality) ---
+def heal_incident_pk(tenant: str) -> str:
+    return _t(tenant, "HEAL_INCIDENT")
+
+
+def heal_incident_sk(incident_id: str) -> str:
+    return f"HEAL_INCIDENT#{incident_id}"
+
+
+def heal_incident_gsi(tenant: str, status: str, ts: str) -> tuple[str, str]:
+    return _t(tenant, "HEAL_INCIDENT_BY_STATUS"), f"{status}#{ts}"
+
+
+def heal_policy_pk(tenant: str) -> str:
+    return _t(tenant, "HEAL_POLICY")
+
+
+def heal_policy_sk(name: str) -> str:
+    return f"HEAL_POLICY#{name}"
+
+
+def heal_action_pk(tenant: str) -> str:
+    return _t(tenant, "HEAL_ACTION")
+
+
+def heal_action_sk(action_id: str) -> str:
+    return f"HEAL_ACTION#{action_id}"
+
+
+# --- Quality rollup (per-application score + pillar aggregate for the dashboard) ---
+def quality_pk(tenant: str) -> str:
+    return _t(tenant, "QUALITY")
+
+
+def quality_sk(kind: str, name: str) -> str:
+    # kind = "app" | "pillar"
+    return f"QUALITY#{kind}#{name}"

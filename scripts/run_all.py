@@ -32,6 +32,7 @@ async def main() -> None:
     from observability_svc.app import app as observability
     from persona_svc.app import app as persona
     from qgen_svc.app import app as qgen
+    from self_heal_svc.app import app as self_heal
     from simulation_svc.app import app as simulation
 
     servers = [
@@ -40,14 +41,24 @@ async def main() -> None:
         _server(simulation, settings.simulation_svc_port),
         _server(evaluation, settings.evaluation_svc_port),
         _server(observability, settings.observability_svc_port),
+        _server(self_heal, settings.self_heal_svc_port),
         _server(agent_under_test, settings.agent_under_test_port),
         _server(orchestration, settings.api_orchestration_port),
     ]
+    # Seed one realistic end-to-end lineage per demo agent so the dashboard's
+    # derived rollups (quality / spend / incidents) have real rows to aggregate.
+    from eeof_core.seed_demo import ensure_demo_data
+
+    seeded = await ensure_demo_data(settings.dev_tenant, settings.dev_workspace)
+    if seeded.get("seeded"):
+        print(f"  seeded demo lineage: {seeded['runs']} runs · {seeded['verdicts']} verdicts "
+              f"across {seeded['verdict_sets']} agents")
+
     print(f"eeof platform up ({settings.app_env} mode, model={settings.model_provider}):")
     print(f"  edge (REST+WS): http://127.0.0.1:{settings.api_orchestration_port}/api/v1")
     print(f"  persona :{settings.persona_svc_port}  qgen :{settings.qgen_svc_port}  "
           f"sim :{settings.simulation_svc_port}  eval :{settings.evaluation_svc_port}  "
-          f"obs :{settings.observability_svc_port}")
+          f"obs :{settings.observability_svc_port}  heal :{settings.self_heal_svc_port}")
     print(f"  agent-under-test (401k, REST): http://127.0.0.1:{settings.agent_under_test_port}/chat")
     await asyncio.gather(*(s.serve() for s in servers))
 

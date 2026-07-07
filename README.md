@@ -54,9 +54,11 @@ uv run pytest                          # unit + in-process pipeline tests
 |---|---|---|
 | **[uv](https://docs.astral.sh/uv/)** | Python 3.13 workspace + deps | `curl -LsSf https://astral.sh/uv/install.sh \| sh` (bootstrap installs it if missing) |
 | **Docker** (+ compose) | only for `infra` mode (ScyllaDB / NATS / MinIO) | Docker Desktop or engine |
-| **Azure OpenAI GPT-4** deployment | only for real model output | an Azure resource + a `gpt-4` deployment |
+| **Azure OpenAI GPT-4** deployment | primary model output (optional) | an Azure resource + a `gpt-4` deployment |
+| **Groq API key** | fallback model output (optional) | free key at <https://console.groq.com/keys> |
 
-Nothing else is required for `local` mode — no database, no broker, no API key.
+Nothing else is required for `local` mode — no database, no broker, no API key
+(the model layer falls through to the offline `echo` provider).
 
 ### 1. Configure (`.env`)
 
@@ -70,17 +72,27 @@ cp .env.example .env
 Key switches:
 
 - `APP_ENV` — `local` (in-memory data plane, default) or `infra` (real backends).
-- `MODEL_PROVIDER` — `azure_openai` (**GPT-4, default**), `anthropic`, `bedrock`,
-  or `echo`. When `azure_openai` is selected but the three `AZURE_OPENAI_*` vars
-  are blank, it **falls back to `echo`** automatically, so it always boots.
+- `MODEL_PROVIDER` / `MODEL_FALLBACK` — providers form a **fallback chain**:
+  primary (`azure_openai`, **GPT-4, default**) → fallback (`groq`, default) → `echo`.
+  Any link whose credentials are absent is skipped, so with the Azure vars blank
+  and a `GROQ_API_KEY` set, **Groq becomes the effective primary**; with neither
+  set it falls through to offline `echo`. It always boots.
 
-To use real **Azure OpenAI GPT-4**, fill in:
+To use real **Azure OpenAI GPT-4** as primary, fill in:
 
 ```bash
 MODEL_PROVIDER=azure_openai
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com
 AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=gpt-4          # your deployment name
+```
+
+The **Groq fallback** (hosted open-weight, free tier) needs only a key:
+
+```bash
+MODEL_FALLBACK=groq
+GROQ_API_KEY=<your-key>                # https://console.groq.com/keys
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
 ### 2. Bring it up
@@ -130,19 +142,25 @@ APP_ENV=infra uv run python scripts/run_all.py
 
 ## Frontend (live SPA)
 
-`frontend-web/` is the five-app control center (ported from the design mocks),
+`frontend-web/` is the six-app control center (ported from the design mocks),
 served single-origin by the edge at <http://127.0.0.1:8080/>. Each app has a
 `LIVE wiring` adapter in its `app.js` that maps the API into the UI shapes and
 falls back to seed data when the edge is unreachable, so the UI never blanks.
 
 | Surface | Live against the API |
 |---|---|
-| **Dashboard** | KPIs (personas, seed sets, runs, verdicts, pass-rate, open flags) + jobs table |
+| **Dashboard** | KPIs + jobs table, plus **Quality at a glance** + **Quality by pillar** (`/observability/quality` — verdicts aggregated by agent and by judge→pillar, scales 1..N apps), **Spend by stage** (`/observability/spend` — real batch tokens + counts), and **System health** (`/self-heal/summary`) |
 | **Persona Lab** | full CRUD (`/personas`) — gallery, create, edit, delete, versioning |
 | **Question Generation** | submit → real `qgen` job, phase-level progress, seed-set questions |
 | **Simulation** | adapter onboarding, submit → real run, run detail (tokens/stop-reasons), trace turns |
 | **Evaluation** | submit → real jury scoring, verdict sets with per-juror verdicts, run picker, live **judge catalogue** (sync registry) |
 | **Observability** | monitors, evidence packs, judge-κ calibration (control-plane) |
+| **Self-Heal** | closed-loop remediation queue, policy DSL, candidate-fix + evidence, human-in-the-loop approve → async ship (`/self-heal/*`) |
+
+The dashboard's quality and spend cards are **derived, not seeded** — they roll
+up from real verdict / batch records (see [Dashboard rollups](#dashboard-rollups)),
+so a fresh boot seeds one realistic lineage per demo agent (`scripts/seed_demo.py`,
+run automatically) to give them something to aggregate.
 
 **Illustrative (no backend source yet):** batch span-trees, OpenInference
 trajectory, drift heatmaps, and the compliance-template detail — these need
@@ -150,17 +168,36 @@ span/drift features beyond the current services and keep seed data. The shared
 client is `frontend-web/_api.js` (REST + one multiplexed WebSocket). Static
 assets are served no-cache in dev so edits show up on reload.
 
+### Dashboard rollups
+
+The Control-Center quality/spend cards are computed in `eeof_core.rollups`, never
+stored as display constants:
+
+- **Application quality** — mean verdict score grouped by **agent** (run → adapter).
+- **Quality by pillar** — mean verdict score grouped by **judge → pillar**. Every
+  built-in judge maps to one of six pillars (Safety, Privacy, Reliability,
+  Explainability, Transparency, Fairness) via `JUDGE_PILLARS` in
+  `eeof_core.models.judge_catalog`.
+- **Spend by stage** — real batch **token** totals + verdict / question / persona
+  counts, priced with synthetic per-unit rates.
+
+Served at `/observability/quality` and `/observability/spend`. Because they roll
+up from the lineage, the numbers move when the pipeline runs or Self-Heal resolves
+an incident. A fresh `local` boot seeds one end-to-end lineage per demo agent so
+the cards aren't empty — see `eeof_core.seed_demo` / `scripts/seed_demo.py`.
+
 ## Services
 
 | Service | Mode | Port | Consumes | Publishes |
 |---|---|---|---|---|
-| `api-orchestration` | edge (REST + WS) | 8080 | `status.*` | `qgen.jobs`, `sim.jobs`, `eval.jobs`, `obs.jobs` |
+| `api-orchestration` | edge (REST + WS) | 8080 | `status.*` | `qgen.jobs`, `sim.jobs`, `eval.jobs`, `obs.jobs`, `heal.jobs` |
 | `persona-svc` | **sync** | 8091 | — | — |
 | `judge-registry` | **sync** (folded into evaluation-svc) | 8092¹ | — | — |
 | `qgen-svc` | **async** worker | 8093 | `qgen.jobs` | `status.qgen.*` |
 | `simulation-svc` | **async** worker + sync adapters | 8094 | `sim.jobs` | `status.sim.*`, `trace.events.*` |
 | `evaluation-svc` | **async** worker + judge registry | 8095 | `eval.jobs` | `status.eval.*` |
 | `observability-svc` | **async / streaming** + read API | 8096 | `trace.events.*`, `obs.jobs` | `status.obs.*` |
+| `self-heal-svc` | **async** worker + read API | 8098 | `heal.jobs` | `status.heal.*` |
 | `agent-under-test` | **sync** REST target (demo 401k agent) | 8097 | — | — |
 
 The `agent-under-test` service is the *target being evaluated*, not part of the
@@ -180,7 +217,7 @@ packages/core/            shared library (eeof_core)
                             judge_catalog (CORE_JUDGES incl. finance guardrails),
                             persona_catalog (CORE_PERSONAS), agent_catalog (CORE_AGENTS)
   dataplane/              table.py · bus.py · blob.py · keys.py  (in-memory | real)
-  providers/              azure_openai/GPT-4 (default) · anthropic · bedrock · echo
+  providers/              azure_openai/GPT-4 (primary) · groq (fallback) · anthropic · bedrock · echo · fallback chain
   jobs.py · worker.py     uniform Job lifecycle + BaseWorker
   messaging.py · ids.py · config.py · context.py
 services/                 the runtime services (FastAPI apps / workers),
@@ -222,16 +259,19 @@ backend is invoked over its own API:
 
 | `MODEL_PROVIDER` | Backend | Needs |
 |---|---|---|
-| `azure_openai` *(default)* | Azure OpenAI Chat Completions, **GPT-4** | `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` |
+| `azure_openai` *(default primary)* | Azure OpenAI Chat Completions, **GPT-4** | `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` |
+| `groq` *(default fallback)* | Groq OpenAI-compatible endpoint (open-weight, e.g. Llama 3.3 70B) | `GROQ_API_KEY` (+ optional `GROQ_MODEL`) |
 | `anthropic` | Anthropic Messages API | `uv sync --group llm`, `ANTHROPIC_API_KEY` |
 | `bedrock` | AWS Bedrock Converse API | `uv sync --group infra`, AWS creds, `BEDROCK_MODEL_ID` |
 | `echo` | deterministic, offline, reproducible | nothing |
 
-The default is **Azure OpenAI GPT-4**, configured entirely through `.env` (see
-`.env.example`). When its credentials are blank the provider factory transparently
-falls back to the deterministic `echo` provider, so a from-scratch checkout /
-`bootstrap.sh` still runs fully offline and reproducibly — swapping to real GPT-4
-is just filling in three env vars.
+Providers form a **fallback chain**: `get_provider()` tries the primary
+(`MODEL_PROVIDER`), then `MODEL_FALLBACK`, then `echo`, dropping any link whose
+credentials are absent and, at call time, catching a provider error to try the
+next link. The default is **Azure OpenAI GPT-4 primary, Groq fallback**: with the
+Azure vars blank and a `GROQ_API_KEY` set, calls resolve straight to Groq; with
+neither set, to offline `echo`. So a from-scratch checkout / `bootstrap.sh`
+always runs — promoting GPT-4 back to primary is just filling in three env vars.
 
 ## Running against real infra
 

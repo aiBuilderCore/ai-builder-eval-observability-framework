@@ -29,6 +29,7 @@ SERVICES = {
     "evaluation": _url(settings.evaluation_svc_port),
     "judge-registry": _url(settings.evaluation_svc_port),  # folded into evaluation-svc
     "observability": _url(settings.observability_svc_port),
+    "self-heal": _url(settings.self_heal_svc_port),
 }
 
 

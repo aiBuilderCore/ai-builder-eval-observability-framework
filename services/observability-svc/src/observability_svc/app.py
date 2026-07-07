@@ -84,3 +84,19 @@ async def evidence(pack_id: str, p: Principal = Depends(principal)) -> dict:
 @app.get("/observability/calibration")
 async def calibration(p: Principal = Depends(principal)) -> list[dict]:
     return await list_calibration(p.tenant)
+
+
+@app.get("/observability/quality")
+async def quality(p: Principal = Depends(principal)) -> dict:
+    # Application quality (verdicts by agent) + Quality by pillar (by judge→pillar).
+    from eeof_core.rollups import quality_rollup
+
+    return await quality_rollup(p.tenant)
+
+
+@app.get("/observability/spend")
+async def spend(p: Principal = Depends(principal)) -> dict:
+    # Per-stage 24h spend, derived from real token totals + record counts.
+    from eeof_core.rollups import spend_rollup
+
+    return await spend_rollup(p.tenant)

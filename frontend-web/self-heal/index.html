@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Self-Heal — Closed-loop remediation · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Self-Heal</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>06 · Self-Heal</b></span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Stage 06 · Closed loop · gate → remediate</p>
+    <h1>Self-Heal <span class="qualifier">— from flagged trace to shipped fix, automatically</span></h1>
+    <p class="subtitle">
+      When a gate or drift monitor fires, an incident opens and walks the same five-component loop:
+      diagnose the root cause, rehearse a fix in a simulated practice world, and ship it — or escalate —
+      according to a declarative remediation policy.
+    </p>
+    <div class="aibc-kpis">
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num" id="kpi-open">0</span><span class="aibc-stat__label">open incidents</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpi-auto">0</span><span class="aibc-stat__label">auto-resolved · 24h</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpi-mttr">0</span><span class="aibc-stat__label">median MTTR</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpi-policies">0</span><span class="aibc-stat__label">active policies</span></div>
+    </div>
+  </section>
+
+  <!-- ── Closed-loop architecture — five components, gate → remediate ─────── -->
+  <div class="sec-head">
+    <h2 class="sec-head__title">The closed loop</h2>
+    <span class="sec-head__hint">gate → RCA → simulate → remediate, governed by policy</span>
+  </div>
+
+  <div class="pipeline loop">
+    <div class="stage">
+      <div class="stage__top"><span class="stage__num">01</span><span class="chip chip--err">detect</span></div>
+      <p class="stage__name">Gate Engine</p>
+      <p class="stage__role">P0 / P1 / P2 threshold logic. A breached gate or drift monitor opens an incident — committed as versioned config.</p>
+    </div>
+    <div class="stage">
+      <div class="stage__top"><span class="stage__num">02</span><span class="chip chip--warn">diagnose</span></div>
+      <p class="stage__name">RCA Agent</p>
+      <p class="stage__role">LLM-driven span-tree analysis attributes the failure to a cause class and the exact span path that produced it.</p>
+    </div>
+    <div class="stage">
+      <div class="stage__top"><span class="stage__num">03</span><span class="chip chip--run">rehearse</span></div>
+      <p class="stage__name">Simulator</p>
+      <p class="stage__role">Rehearses the candidate fix against a persona-driven practice world before anything ships.</p>
+      <p class="stage__reuse">↺ reuses Persona Lab · Question Gen · Simulation</p>
+    </div>
+    <div class="stage">
+      <div class="stage__top"><span class="stage__num">04</span><span class="chip chip--ok">apply</span></div>
+      <p class="stage__name">Remediation Registry</p>
+      <p class="stage__role">A fixed vocabulary of safe actions — prompt rewrite, re-rank tune, guardrail tweak, fall-back, KB update, circuit break.</p>
+    </div>
+    <div class="stage">
+      <div class="stage__top"><span class="stage__num">05</span><span class="chip chip--idle">govern</span></div>
+      <p class="stage__name">Policy DSL</p>
+      <p class="stage__role">Confidence bands decide ship-vs-escalate: high-confidence fixes auto-apply in-band, the rest open a ticket out-of-band.</p>
+    </div>
+  </div>
+
+  <!-- ── Incident queue + policy rail ────────────────────────────────────── -->
+  <div class="sh-body">
+
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Active incident queue</h2>
+          <span class="card__link" id="queue-count">0 open</span>
+        </div>
+        <div class="sh-filter" id="queue-filter"></div>
+        <div id="queue"></div>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Remediation registry</h2>
+          <span class="card__link">6 actions</span>
+        </div>
+        <div class="spend" style="padding:0.95rem 1.15rem 1.1rem;">
+          <div class="sh-registry" id="registry"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Active policies</h2>
+          <button class="btn" type="button" id="new-policy">＋ New policy</button>
+        </div>
+        <div class="spend" style="padding:0.95rem 1.15rem 1.1rem;">
+          <div id="policies"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- Incident detail modal (populated by app.js) -->
+<div class="sh-modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+  <div class="sh-modal__dialog" id="modal-dialog"></div>
+</div>
+
+<script src="../_api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

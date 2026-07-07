@@ -28,6 +28,7 @@ class JudgeDraft(BaseModel):
     blurb: str = ""  # one-line what/why for the catalog card
     biases: list[str] = Field(default_factory=list)  # hardened-against bias tags
     threshold: float = 0.7  # default pass/fail cutoff
+    pillar: str = ""  # quality pillar this judge scores (see judge_catalog.JUDGE_PILLARS)
 
 
 class Judge(JudgeDraft):
@@ -73,6 +74,7 @@ class Verdict(BaseModel):
     persona_version: str = ""
     # UI-facing fields (verdict-set / executive-report screens).
     dimension: str = ""  # rubric dimension
+    pillar: str = ""  # quality pillar of the scoring judge (denormalised for rollups)
     verdict: str = "pass"  # pass | fail | abstain
     question_prompt: str = ""
     persona_name: str = ""

@@ -20,6 +20,7 @@ from eeof_core.jobs import get_job, list_jobs
 from eeof_core.models import (
     AdapterDraft,
     EvidenceRequest,
+    IncidentActionRequest,
     JudgeDraft,
     JuryDraft,
     MonitorDraft,
@@ -338,6 +339,76 @@ async def obs_get_evidence(pack_id: str, p: Principal = Depends(principal)):
 @api.get("/observability/calibration")
 async def obs_calibration(p: Principal = Depends(principal)):
     return await proxy("observability", "GET", "/observability/calibration", p)
+
+
+@api.get("/observability/quality")
+async def obs_quality(p: Principal = Depends(principal)):
+    # Application quality + Quality by pillar, aggregated from real verdicts.
+    return await proxy("observability", "GET", "/observability/quality", p)
+
+
+@api.get("/observability/spend")
+async def obs_spend(p: Principal = Depends(principal)):
+    # Per-stage 24h spend, derived from real token totals + record counts.
+    return await proxy("observability", "GET", "/observability/spend", p)
+
+
+# ----------------------------------------------------------------------------
+# Self-Heal — closed-loop remediation (reads sync; approve → async ship job)
+# ----------------------------------------------------------------------------
+@api.get("/self-heal/incidents")
+async def heal_incidents(status: str | None = None, p: Principal = Depends(principal)):
+    return await proxy(
+        "self-heal", "GET", "/self-heal/incidents", p,
+        params={"status": status} if status else None,
+    )
+
+
+@api.get("/self-heal/incidents/{incident_id}")
+async def heal_incident(incident_id: str, p: Principal = Depends(principal)):
+    return await proxy("self-heal", "GET", f"/self-heal/incidents/{incident_id}", p)
+
+
+@api.post("/self-heal/incidents/{incident_id}/action")
+async def heal_incident_action(
+    incident_id: str,
+    req: IncidentActionRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    p: Principal = Depends(principal),
+):
+    # Approving a candidate ships it — the visible loop-closing step runs as the
+    # async self_heal.remediate job so progress streams over the WebSocket.
+    if req.action == "approve":
+        return await submit_job(
+            p, kind="self_heal.remediate", stage="heal",
+            inputs={"incident_id": incident_id, "action": req.action},
+            idempotency_key=idempotency_key, extra_result={"incident_id": incident_id},
+        )
+    # ticket / reject mutate synchronously in the service.
+    return await proxy(
+        "self-heal", "POST", f"/self-heal/incidents/{incident_id}/action", p,
+        json=req.model_dump(),
+    )
+
+
+@api.get("/self-heal/policies")
+async def heal_policies(p: Principal = Depends(principal)):
+    return await proxy("self-heal", "GET", "/self-heal/policies", p)
+
+
+@api.get("/self-heal/registry")
+async def heal_registry(p: Principal = Depends(principal)):
+    return await proxy("self-heal", "GET", "/self-heal/registry", p)
+
+
+@api.get("/self-heal/quality")
+async def heal_quality(p: Principal = Depends(principal)):
+    return await proxy("self-heal", "GET", "/self-heal/quality", p)
+
+
+@api.get("/self-heal/summary")
+async def heal_summary(p: Principal = Depends(principal)):
+    return await proxy("self-heal", "GET", "/self-heal/summary", p)
 
 
 # ----------------------------------------------------------------------------

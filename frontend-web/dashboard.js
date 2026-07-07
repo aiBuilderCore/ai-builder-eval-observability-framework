@@ -122,7 +122,86 @@
     }).join("");
   }
 
-  if (document.readyState !== "loading") refresh();
-  else document.addEventListener("DOMContentLoaded", refresh);
+  // ── Quality at a glance + System health (live from /self-heal/*) ──────────
+  // Scales to any app count: the app list renders N rows and scrolls past 6 so
+  // the card height is identical for 1 or 10 apps; the pillar card stays a fixed
+  // six and the platform mean recomputes from whatever apps exist.
+  function band(score) {
+    return score >= 90 ? "ok" : score >= 80 ? "warn" : "err";
+  }
+  function deltaMark(d) {
+    if (d > 0) return `<em style="color:var(--ok);font-style:normal">▲${d}</em>`;
+    if (d < 0) return `<em style="color:var(--err);font-style:normal">▼${-d}</em>`;
+    return `<em style="color:var(--text-faint);font-style:normal">—</em>`;
+  }
+
+  function renderQuality(q) {
+    const apps = q.applications || [];
+    const pillars = q.pillars || [];
+    const appsHost = document.getElementById("qualityApps");
+    if (appsHost) {
+      if (!apps.length) {
+        appsHost.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:10px 2px;">No applications onboarded yet — quality scores appear here once an agent is registered.</p>`;
+      } else {
+        const rows = apps.map((a) => {
+          const b = band(a.score);
+          return `<div class="spend__row"><span class="spend__name">${a.name}</span><span class="spend__track"><span class="spend__fill" style="width:${a.score}%;background:var(--${b})"></span></span><span class="spend__val"><b style="color:var(--${b})">${a.score}</b></span></div>`;
+        }).join("");
+        // Fixed viewport so 1 app and 10 apps present the same card height.
+        const scroll = apps.length > 6
+          ? ` style="max-height:232px;overflow-y:auto"` : "";
+        appsHost.innerHTML =
+          `<div class="qa-list"${scroll}>${rows}</div>` +
+          `<div class="spend__total"><span>platform mean · overall quality · ${apps.length} app${apps.length === 1 ? "" : "s"}</span><b>${q.platform_mean}</b></div>`;
+      }
+    }
+    const pillHost = document.getElementById("qualityPillars");
+    if (pillHost && pillars.length) {
+      const weakest = pillars.reduce((m, p) => (p.score < m.score ? p : m), pillars[0]);
+      pillHost.innerHTML =
+        pillars.map((p) =>
+          `<div class="spend__row"><span class="spend__name">${p.name}</span><span class="spend__track"><span class="spend__fill" style="width:${p.score}%"></span></span><span class="spend__val">${p.score} ${deltaMark(p.delta)}</span></div>`
+        ).join("") +
+        `<div class="spend__total"><span>weakest pillar · needs attention</span><b style="color:var(--warn)">${weakest.name}</b></div>`;
+    }
+  }
+
+  function renderHealth(summary) {
+    const link = document.querySelector('#systemHealth a[href="self-heal/index.html"] .alert__title');
+    if (link && summary) {
+      const n = summary.open_incidents;
+      link.textContent = `${n} active incident${n === 1 ? "" : "s"} in self-heal`;
+    }
+    const meta = document.getElementById("healthMeta");
+    if (meta && summary) meta.textContent = `${summary.auto_resolved_24h} auto-healed · 24h`;
+  }
+
+  // Spend by stage — live from /observability/spend (token + count driven).
+  function renderSpend(spend) {
+    const host = document.getElementById("spendBody");
+    if (!host || !spend || !spend.stages) return;
+    const max = Math.max(...spend.stages.map((s) => s.amount), 0.01);
+    host.innerHTML = spend.stages.map((s) =>
+      `<div class="spend__row"><span class="spend__name">${s.label}</span><span class="spend__track"><span class="spend__fill" style="width:${Math.round((s.amount / max) * 100)}%"></span></span><span class="spend__val">$${s.amount.toFixed(2)}</span></div>`
+    ).join("") +
+      `<div class="spend__total"><span>total · llm + judges</span><b>$${spend.total.toFixed(2)}</b></div>`;
+  }
+
+  async function refreshQuality() {
+    try {
+      const [q, summary, spend] = await Promise.all([
+        EEOF.get("/observability/quality").catch(() => null),
+        EEOF.get("/self-heal/summary").catch(() => null),
+        EEOF.get("/observability/spend").catch(() => null),
+      ]);
+      if (q) renderQuality(q);
+      if (summary) renderHealth(summary);
+      if (spend) renderSpend(spend);
+    } catch {}
+  }
+
+  if (document.readyState !== "loading") { refresh(); refreshQuality(); }
+  else document.addEventListener("DOMContentLoaded", () => { refresh(); refreshQuality(); });
   setInterval(refresh, 3000);
+  setInterval(refreshQuality, 5000);
 })();

@@ -21,9 +21,27 @@ from .observability import (
     TraceEvent,
 )
 from .agent_catalog import CORE_AGENTS, agent_system_prompt, get_agent
-from .judge_catalog import CORE_JUDGES, CORE_PANELS
+from .judge_catalog import (
+    CORE_JUDGES,
+    CORE_PANELS,
+    JUDGE_PILLARS,
+    QUALITY_PILLARS,
+    pillar_for,
+)
 from .persona import Persona, PersonaDraft, bump, slug
 from .persona_catalog import CORE_PERSONAS
+from .selfheal import (
+    Fix,
+    FixChange,
+    FixMetric,
+    IncidentActionRequest,
+    IncidentTrace,
+    Policy,
+    RemediationAction,
+    SelfHealIncident,
+    SelfHealSummary,
+    TimelineStep,
+)
 from .run import Adapter, AdapterDraft, Run, RunRequest, RunState, TraceRef, Turn
 from .seedset import PersonaRef, QGenRequest, Question, SeedSet
 from .verdict import (
@@ -44,13 +62,21 @@ __all__ = [
     "CORE_JUDGES",
     "CORE_PANELS",
     "CORE_PERSONAS",
+    "JUDGE_PILLARS",
+    "QUALITY_PILLARS",
+    "pillar_for",
     "ErrorBody",
     "ErrorEnvelope",
     "EvalRequest",
     "EvidencePack",
     "EvidenceRequest",
+    "Fix",
+    "FixChange",
+    "FixMetric",
     "GateDecision",
     "Incident",
+    "IncidentActionRequest",
+    "IncidentTrace",
     "Job",
     "JobProgress",
     "JobState",
@@ -63,13 +89,18 @@ __all__ = [
     "Persona",
     "PersonaDraft",
     "PersonaRef",
+    "Policy",
     "Principal",
     "QGenRequest",
     "Question",
+    "RemediationAction",
     "Run",
     "RunRequest",
     "RunState",
     "SeedSet",
+    "SelfHealIncident",
+    "SelfHealSummary",
+    "TimelineStep",
     "TraceEvent",
     "TraceRef",
     "Turn",

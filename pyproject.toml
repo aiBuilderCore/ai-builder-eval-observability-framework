@@ -1,5 +1,5 @@
 # uv workspace root for the Enterprise Eval Observability Framework.
-# Members are the shared `core` package and the eight runtime services.
+# Members are the shared `core` package and the nine runtime services.
 [project]
 name = "eeof-monorepo"
 version = "0.1.0"
@@ -14,6 +14,7 @@ dependencies = [
     "eeof-simulation-svc",
     "eeof-evaluation-svc",
     "eeof-observability-svc",
+    "eeof-self-heal-svc",
     "eeof-agent-under-test",
 ]
 
@@ -28,6 +29,7 @@ eeof-qgen-svc = { workspace = true }
 eeof-simulation-svc = { workspace = true }
 eeof-evaluation-svc = { workspace = true }
 eeof-observability-svc = { workspace = true }
+eeof-self-heal-svc = { workspace = true }
 eeof-agent-under-test = { workspace = true }
 
 [dependency-groups]

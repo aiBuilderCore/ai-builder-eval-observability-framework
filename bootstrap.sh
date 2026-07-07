@@ -104,6 +104,9 @@ if [ "$MODE" = "infra" ]; then
 
   log "onboard 401(k) agent as a REST adapter directly into ScyllaDB"
   APP_ENV=infra uv run python scripts/onboard_agent.py
+
+  log "seed realistic demo lineage (runs + verdicts + batches) for the dashboard"
+  APP_ENV=infra uv run python scripts/seed_demo.py
 fi
 
 # ---------------------------------------------------------------------------
@@ -115,7 +118,9 @@ cat <<EOF
     mode        : $MODE
     control ctr : http://127.0.0.1:8080/            (SPA, served by the edge)
     edge API    : http://127.0.0.1:8080/api/v1
+    self-heal   : http://127.0.0.1:8080/self-heal/  (closed-loop remediation)
     401k agent  : http://127.0.0.1:8097/chat        (REST agent-under-test)
+    model       : Azure GPT-4 primary -> Groq fallback -> echo (set keys in .env)
 
   In another shell you can drive the full pipeline end-to-end:
     uv run python scripts/demo.py

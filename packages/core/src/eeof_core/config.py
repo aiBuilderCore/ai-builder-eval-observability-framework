@@ -30,17 +30,30 @@ class Settings(BaseSettings):
 
     # Model provider — every real backend is invoked over its HTTP/API surface.
     #   azure_openai -> Azure OpenAI Chat Completions (REST) — the default (GPT-4)
+    #   groq         -> Groq OpenAI-compatible Chat Completions (REST)
     #   anthropic    -> Anthropic Messages API
     #   bedrock      -> AWS Bedrock Converse API (boto3)
     #   echo         -> deterministic, offline, reproducible fallback
-    # When azure_openai is selected but its credentials are absent, the provider
-    # factory transparently falls back to `echo` so a from-scratch checkout still
-    # boots offline (see providers/__init__.py).
-    model_provider: Literal["echo", "anthropic", "bedrock", "azure_openai"] = "azure_openai"
+    # The factory builds a *fallback chain*: primary (`model_provider`) → the
+    # `model_fallback` backend → `echo`. Any backend whose credentials are absent
+    # is skipped, so a from-scratch checkout still boots (see providers/__init__.py).
+    # Default wiring: Azure OpenAI GPT-4 primary, Groq fallback. With Azure creds
+    # blank, calls resolve straight to Groq; with neither set, to offline `echo`.
+    model_provider: Literal["echo", "anthropic", "bedrock", "azure_openai", "groq"] = "azure_openai"
     model_name: str = "gpt-4"
+    # Secondary backend tried when the primary is unavailable or errors.
+    # Empty string disables fallback (primary → echo only).
+    model_fallback: Literal["", "echo", "anthropic", "bedrock", "azure_openai", "groq"] = "groq"
 
     # Anthropic
     anthropic_api_key: str = ""
+
+    # Groq — OpenAI-compatible endpoint; fastest hosted open-weight inference.
+    # Used as the default fallback for Azure OpenAI. Get a key at
+    # https://console.groq.com/keys
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_endpoint: str = "https://api.groq.com/openai/v1"
 
     # AWS Bedrock (uses the standard AWS credential chain unless keys are set here)
     bedrock_region: str = "us-east-1"
@@ -62,6 +75,10 @@ class Settings(BaseSettings):
             and self.azure_openai_deployment
         )
 
+    @property
+    def groq_ready(self) -> bool:
+        return bool(self.groq_api_key and self.groq_model)
+
     # Ports — the orchestrator is the only public edge; the rest are in-cluster.
     api_orchestration_port: int = 8080
     persona_svc_port: int = 8091
@@ -72,6 +89,8 @@ class Settings(BaseSettings):
     observability_svc_port: int = 8096
     # The demo agent-under-test (401k retirement planner) served over REST.
     agent_under_test_port: int = 8097
+    # Self-Heal — closed-loop remediation (gate → RCA → simulate → remediate).
+    self_heal_svc_port: int = 8098
 
     @property
     def agent_under_test_url(self) -> str:

@@ -16,8 +16,8 @@ STREAM_STATUS = "STATUS"
 STREAM_TRACES = "TRACES"
 
 STREAMS: dict[str, list[str]] = {
-    # obs.jobs carries evidence-pack assembly — the one Observability async job.
-    STREAM_JOBS: ["qgen.jobs", "sim.jobs", "eval.jobs", "obs.jobs"],
+    # obs.jobs = evidence-pack assembly; heal.jobs = self-heal remediation ship.
+    STREAM_JOBS: ["qgen.jobs", "sim.jobs", "eval.jobs", "obs.jobs", "heal.jobs"],
     STREAM_STATUS: ["status.>"],
     STREAM_TRACES: ["trace.events.>"],
 }
@@ -28,6 +28,7 @@ SUBMIT_SUBJECT = {
     "simulation.run": "sim.jobs",
     "evaluation.score": "eval.jobs",
     "observability.evidence": "obs.jobs",
+    "self_heal.remediate": "heal.jobs",
 }
 
 

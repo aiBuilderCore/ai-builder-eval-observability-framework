@@ -139,6 +139,51 @@
 
   </div>
 
+  <!-- ── Quality at a glance — pillar model + per-app scores ──────────────── -->
+  <!-- Both cards are repainted live by dashboard.js from /self-heal/quality and
+       scale to any app count (1..N): the app list grows/scrolls, the pillar card
+       stays a fixed six and the platform mean recomputes. Seed markup below is
+       the offline fallback. -->
+  <div class="sec-head" style="margin-top: clamp(1.75rem, 4vw, 2.75rem);">
+    <h2 class="sec-head__title">Quality at a glance</h2>
+    <span class="sec-head__hint">overall score per agent · six quality pillars · last 30d</span>
+  </div>
+
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title">Application quality</h2>
+        <span class="card__link" id="qualityAppsMeta">overall score · /100</span>
+      </div>
+      <div class="spend" id="qualityApps">
+        <div class="spend__row"><span class="spend__name">Support Agent</span><span class="spend__track"><span class="spend__fill" style="width:94%;background:var(--ok)"></span></span><span class="spend__val"><b style="color:var(--ok)">94</b></span></div>
+        <div class="spend__row"><span class="spend__name">Code Review Copilot</span><span class="spend__track"><span class="spend__fill" style="width:91%;background:var(--ok)"></span></span><span class="spend__val"><b style="color:var(--ok)">91</b></span></div>
+        <div class="spend__row"><span class="spend__name">Internal Knowledge Search</span><span class="spend__track"><span class="spend__fill" style="width:82%;background:var(--warn)"></span></span><span class="spend__val"><b style="color:var(--warn)">82</b></span></div>
+        <div class="spend__row"><span class="spend__name">RetireWell 401(k)</span><span class="spend__track"><span class="spend__fill" style="width:82%;background:var(--warn)"></span></span><span class="spend__val"><b style="color:var(--warn)">82</b></span></div>
+        <div class="spend__row"><span class="spend__name">Financial Doc Extractor</span><span class="spend__track"><span class="spend__fill" style="width:76%;background:var(--err)"></span></span><span class="spend__val"><b style="color:var(--err)">76</b></span></div>
+        <div class="spend__total"><span>platform mean · overall quality</span><b>85</b></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title">Quality by pillar</h2>
+        <span class="card__link">Δ vs fleet avg</span>
+      </div>
+      <div class="spend" id="qualityPillars">
+        <div class="spend__row"><span class="spend__name">Safety</span><span class="spend__track"><span class="spend__fill" style="width:89%"></span></span><span class="spend__val">89 <em style="color:var(--err);font-style:normal">▼2</em></span></div>
+        <div class="spend__row"><span class="spend__name">Privacy</span><span class="spend__track"><span class="spend__fill" style="width:96%"></span></span><span class="spend__val">96 <em style="color:var(--ok);font-style:normal">▲1</em></span></div>
+        <div class="spend__row"><span class="spend__name">Reliability</span><span class="spend__track"><span class="spend__fill" style="width:94%"></span></span><span class="spend__val">94 <em style="color:var(--ok);font-style:normal">▲3</em></span></div>
+        <div class="spend__row"><span class="spend__name">Explainability</span><span class="spend__track"><span class="spend__fill" style="width:90%"></span></span><span class="spend__val">90 <em style="color:var(--text-faint);font-style:normal">—</em></span></div>
+        <div class="spend__row"><span class="spend__name">Transparency</span><span class="spend__track"><span class="spend__fill" style="width:96%"></span></span><span class="spend__val">96 <em style="color:var(--ok);font-style:normal">▲1</em></span></div>
+        <div class="spend__row"><span class="spend__name">Fairness</span><span class="spend__track"><span class="spend__fill" style="width:94%"></span></span><span class="spend__val">94 <em style="color:var(--text-faint);font-style:normal">—</em></span></div>
+        <div class="spend__total"><span>weakest pillar · needs attention</span><b style="color:var(--warn)" id="qualityWeakest">Safety</b></div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ── Lineage feed + attention rail ─────────────────────────────────── -->
   <div class="grid-2" style="margin-top: clamp(1.75rem, 4vw, 2.75rem);">
 
@@ -333,10 +378,46 @@
 
       <div class="card">
         <div class="card__head">
-          <h2 class="card__title">Spend by stage · 24h</h2>
-          <span class="card__link">synthetic</span>
+          <h2 class="card__title">System health</h2>
+          <span class="card__link" id="healthMeta">self-heal</span>
         </div>
-        <div class="spend">
+        <div class="rail" id="systemHealth">
+          <a class="alert" href="self-heal/index.html">
+            <span class="alert__dot alert__dot--warn"></span>
+            <span class="alert__body">
+              <p class="alert__title">5 active incidents in self-heal</p>
+              <span class="alert__meta">closed-loop remediation · gate → remediate</span>
+            </span>
+            <span class="alert__go" aria-hidden="true">→</span>
+          </a>
+          <a class="alert" href="observability/index.html">
+            <span class="alert__dot alert__dot--ok"></span>
+            <span class="alert__body">
+              <p class="alert__title">ScyllaDB ingestion 99.9% up</p>
+              <span class="alert__meta">Evaluation pipeline healthy</span>
+            </span>
+            <span class="alert__go" aria-hidden="true">→</span>
+          </a>
+          <a class="alert" href="observability/index.html">
+            <span class="alert__dot alert__dot--warn"></span>
+            <span class="alert__body">
+              <p class="alert__title">LLM API endpoints — elevated latency</p>
+              <span class="alert__meta">Groq fallback active · Azure GPT-4 primary</span>
+            </span>
+            <span class="alert__go" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Spend by stage · 24h</h2>
+          <span class="card__link">tokens + counts</span>
+        </div>
+        <!-- Repainted live by dashboard.js from /observability/spend (real token
+             totals + verdict/question/persona counts × synthetic unit rates).
+             Seed markup below is the offline fallback. -->
+        <div class="spend" id="spendBody">
           <div class="spend__row"><span class="spend__name">Persona Lab</span><span class="spend__track"><span class="spend__fill" style="width:6%"></span></span><span class="spend__val">$0.80</span></div>
           <div class="spend__row"><span class="spend__name">Question Gen</span><span class="spend__track"><span class="spend__fill" style="width:25%"></span></span><span class="spend__val">$3.10</span></div>
           <div class="spend__row"><span class="spend__name">Simulation</span><span class="spend__track"><span class="spend__fill" style="width:56%"></span></span><span class="spend__val">$6.90</span></div>

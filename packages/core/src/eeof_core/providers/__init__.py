@@ -1,4 +1,11 @@
-"""Provider registry. `get_provider()` returns the configured backend singleton."""
+"""Provider registry. `get_provider()` returns the configured backend singleton.
+
+The backend is a *fallback chain*: the primary `MODEL_PROVIDER`, then the
+`MODEL_FALLBACK` backend, then the offline `echo` provider. Any link whose
+credentials are absent is dropped, so the chain adapts to what is configured —
+with Azure creds blank and a Groq key set, Groq becomes the effective primary and
+`echo` the safety net. A single-link chain is returned unwrapped.
+"""
 
 from __future__ import annotations
 
@@ -10,35 +17,64 @@ from .base import ModelProvider, ScoreResult
 from .echo import EchoProvider
 
 
+def _build(kind: str) -> ModelProvider | None:
+    """Construct one provider, or return None when it is not usable/configured."""
+    try:
+        if kind == "echo":
+            return EchoProvider()
+        if kind == "anthropic":
+            if not settings.anthropic_api_key:
+                return None
+            from .anthropic_provider import AnthropicProvider
+
+            return AnthropicProvider()
+        if kind == "bedrock":
+            from .bedrock import BedrockProvider
+
+            return BedrockProvider()
+        if kind == "azure_openai":
+            if not settings.azure_openai_ready:
+                return None
+            from .azure_openai import AzureOpenAIProvider
+
+            return AzureOpenAIProvider()
+        if kind == "groq":
+            if not settings.groq_ready:
+                return None
+            from .groq import GroqProvider
+
+            return GroqProvider()
+    except Exception as e:  # noqa: BLE001 — a broken optional backend must not crash boot
+        print(f"[providers] could not init '{kind}': {type(e).__name__}: {e}", file=sys.stderr)
+        return None
+    raise ValueError(f"unknown model provider: {kind}")
+
+
 @lru_cache
 def get_provider() -> ModelProvider:
-    kind = settings.model_provider
-    if kind == "echo":
-        return EchoProvider()
-    if kind == "anthropic":
-        from .anthropic_provider import AnthropicProvider
+    # Ordered, de-duplicated chain: primary → fallback → echo safety net.
+    order: list[str] = [settings.model_provider]
+    if settings.model_fallback and settings.model_fallback not in order:
+        order.append(settings.model_fallback)
+    if "echo" not in order:
+        order.append("echo")
 
-        return AnthropicProvider()
-    if kind == "bedrock":
-        from .bedrock import BedrockProvider
+    chain = [p for kind in order if (p := _build(kind)) is not None]
+    if not chain:  # nothing configured resolved — echo always constructs, but be safe
+        chain = [EchoProvider()]
 
-        return BedrockProvider()
-    if kind == "azure_openai":
-        # Default backend (GPT-4). If the deployment credentials aren't set,
-        # degrade gracefully to the deterministic echo provider so a
-        # from-scratch checkout / bootstrap still runs fully offline.
-        if not settings.azure_openai_ready:
-            print(
-                "[providers] MODEL_PROVIDER=azure_openai but AZURE_OPENAI_ENDPOINT/"
-                "_API_KEY/_DEPLOYMENT are not all set — falling back to the offline "
-                "'echo' provider. Set them in .env to use real GPT-4.",
-                file=sys.stderr,
-            )
-            return EchoProvider()
-        from .azure_openai import AzureOpenAIProvider
+    if chain[0].name != settings.model_provider:
+        print(
+            f"[providers] primary '{settings.model_provider}' unavailable — "
+            f"serving from '{chain[0].name}'.",
+            file=sys.stderr,
+        )
+    if len(chain) == 1:
+        return chain[0]
 
-        return AzureOpenAIProvider()
-    raise ValueError(f"unknown MODEL_PROVIDER: {kind}")
+    from .fallback import FallbackProvider
+
+    return FallbackProvider(chain)
 
 
 __all__ = ["ModelProvider", "ScoreResult", "EchoProvider", "get_provider"]

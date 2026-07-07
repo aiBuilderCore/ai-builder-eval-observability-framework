@@ -1,7 +1,7 @@
 # ai-builder-eval-observability-framework
 
 Runtime **implementation** of the Enterprise Eval Observability Framework — the
-eight-service pipeline behind one API Orchestration edge. This is production-shaped
+nine-service pipeline behind one API Orchestration edge. This is production-shaped
 service code; the *specs* live in the sibling `ai-builder-artifacts` repo (see
 `README.md` for the links). When behavior and spec disagree, the spec is the
 source of truth — change code to match it, or change the spec deliberately and in
@@ -11,8 +11,10 @@ lockstep.
 - Python `>=3.13`, managed as a **uv workspace** (`packages/*` + `services/*`).
 - FastAPI + uvicorn (edge REST/WS and each service), Pydantic v2 contracts.
 - Pluggable data plane: in-memory (local) or ScyllaDB Alternator + NATS JetStream
-  + MinIO (infra). Model providers: echo (default) / anthropic / bedrock /
-  azure_openai — all invoked over their API, never SDK-coupled in stage code.
+  + MinIO (infra). Model providers: azure_openai (default primary) / groq (default
+  fallback) / anthropic / bedrock / echo — all invoked over their API, never
+  SDK-coupled in stage code. `get_provider()` builds a **fallback chain**
+  (primary → `MODEL_FALLBACK` → echo), dropping any link whose creds are absent.
 
 ## Common commands
 - Sync: `uv sync --group dev` (add `--group infra` / `--group llm` for real backends).
@@ -46,6 +48,15 @@ lockstep.
   implementing the ABC and wiring the `get_*()` factory; callers never branch.
 - Model providers: `packages/core/.../providers/`. A new backend implements
   `chat`; judge `score` has a default. Register it in `providers/__init__.py`.
+  Providers resolve through a **fallback chain** (primary → `MODEL_FALLBACK` →
+  echo) built in `providers/__init__.py`.
+- Dashboard rollups: `packages/core/.../rollups.py` — `quality_rollup` /
+  `spend_rollup` aggregate real verdict/batch rows (never display constants),
+  served at `/observability/quality` + `/observability/spend`. The judge→pillar
+  map is `JUDGE_PILLARS` in `models/judge_catalog.py`.
+- Demo seed: `packages/core/.../seed_demo.py` writes one real lineage per demo
+  agent on boot (idempotent) so the derived rollups have rows to aggregate;
+  `run_all.py` calls it, `scripts/seed_demo.py` is the standalone/infra entry.
 - A service: `services/<name>/src/<pkg>/` with `app.py` (FastAPI) and, for async
   services, `worker.py` (a `BaseWorker` subclass) bound in the app lifespan.
 

@@ -1,0 +1,53 @@
+"""Fallback chain — try an ordered list of providers until one succeeds.
+
+Wraps N concrete providers (e.g. Azure OpenAI GPT-4 → Groq → echo). Each `chat`
+call walks the chain in order; if a provider raises (network error, rate limit,
+auth failure) the next one is tried. The last link is always the deterministic
+`echo` provider, so a call never hard-fails as long as the chain is non-empty.
+
+Only *ready* providers are placed in the chain (see providers/__init__.py), so a
+missing Azure deployment simply means Groq becomes the effective primary.
+"""
+
+from __future__ import annotations
+
+import sys
+
+from .base import Message, ModelProvider
+
+
+class FallbackProvider(ModelProvider):
+    def __init__(self, chain: list[ModelProvider]) -> None:
+        if not chain:
+            raise ValueError("FallbackProvider needs at least one provider")
+        self._chain = chain
+        self.name = "fallback(" + " → ".join(p.name for p in chain) + ")"
+
+    async def chat(
+        self,
+        *,
+        system: str,
+        messages: list[Message],
+        max_tokens: int = 1024,
+        temperature: float = 0.7,
+    ) -> str:
+        last_err: Exception | None = None
+        for i, provider in enumerate(self._chain):
+            try:
+                return await provider.chat(
+                    system=system,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            except Exception as e:  # noqa: BLE001 — deliberately broad: any failure falls through
+                last_err = e
+                nxt = self._chain[i + 1].name if i + 1 < len(self._chain) else "none"
+                print(
+                    f"[providers] '{provider.name}' failed ({type(e).__name__}: {e}); "
+                    f"falling back to '{nxt}'.",
+                    file=sys.stderr,
+                )
+        # Exhausted the chain (only possible if every non-echo link failed and
+        # echo was not present). Re-raise the last error for visibility.
+        raise last_err if last_err else RuntimeError("empty fallback chain")

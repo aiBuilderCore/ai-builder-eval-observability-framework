@@ -12,6 +12,7 @@ members = [
     "eeof-observability-svc",
     "eeof-persona-svc",
     "eeof-qgen-svc",
+    "eeof-self-heal-svc",
     "eeof-simulation-svc",
 ]
 
@@ -222,6 +223,7 @@ dependencies = [
     { name = "eeof-observability-svc" },
     { name = "eeof-persona-svc" },
     { name = "eeof-qgen-svc" },
+    { name = "eeof-self-heal-svc" },
     { name = "eeof-simulation-svc" },
 ]
 
@@ -249,6 +251,7 @@ requires-dist = [
     { name = "eeof-observability-svc", editable = "services/observability-svc" },
     { name = "eeof-persona-svc", editable = "services/persona-svc" },
     { name = "eeof-qgen-svc", editable = "services/qgen-svc" },
+    { name = "eeof-self-heal-svc", editable = "services/self-heal-svc" },
     { name = "eeof-simulation-svc", editable = "services/simulation-svc" },
 ]
 
@@ -303,6 +306,23 @@ requires-dist = [
 name = "eeof-qgen-svc"
 version = "0.1.0"
 source = { editable = "services/qgen-svc" }
+dependencies = [
+    { name = "eeof-core" },
+    { name = "fastapi" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "eeof-core", editable = "packages/core" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
+]
+
+[[package]]
+name = "eeof-self-heal-svc"
+version = "0.1.0"
+source = { editable = "services/self-heal-svc" }
 dependencies = [
     { name = "eeof-core" },
     { name = "fastapi" },
