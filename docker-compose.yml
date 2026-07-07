@@ -1,0 +1,39 @@
+# Production-shaped data plane for APP_ENV=infra.
+# Brings up the three backends the services dial: ScyllaDB (Alternator /
+# DynamoDB API), NATS JetStream, and MinIO (S3). The services themselves run
+# from your shell (uv run python -m <service>) with APP_ENV=infra so you can
+# iterate without rebuilding images; see README "Running against real infra".
+services:
+  scylla:
+    image: scylladb/scylla:6.2
+    command: --alternator-port=8000 --alternator-write-isolation=always --smp 1 --memory 1G
+    ports:
+      - "8000:8000"   # Alternator (DynamoDB API)
+      - "9042:9042"   # CQL
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"   # client
+      - "8222:8222"   # monitoring
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # console
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12

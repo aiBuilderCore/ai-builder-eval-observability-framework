@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Edit persona — Persona Lab · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Persona Lab</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>01 · Persona Lab</b> · Edit</span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Editing existing persona</p>
+    <h1>Edit persona <span class="qualifier">— re-cast, then bump the version</span></h1>
+    <p class="subtitle">
+      Editing is a versioned change — eval results are keyed on <code class="mono">persona_set_version</code>, so a meaningful change without a version bump silently breaks reproducibility.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--accent">Live updates</span>
+      <span class="pill">Bump patch / minor / major</span>
+    </div>
+  </section>
+
+  <form id="persona-form" class="form-grid" autocomplete="off">
+
+    <div class="form-stack">
+
+      <section class="form-section" style="border-top:0;padding-top:0;">
+        <h2><span class="num">01</span>Identity</h2>
+        <div class="row-2">
+          <div class="field">
+            <label>Display name <span class="req">*</span></label>
+            <input class="input" name="name" required />
+          </div>
+          <div class="field">
+            <label>Hue (card accent)</label>
+            <div class="hue-grid" id="hue-grid">
+              <label class="h-ochre"      data-hue="ochre"><input type="radio" name="hue" value="ochre" /></label>
+              <label class="h-sage"       data-hue="sage"><input type="radio" name="hue" value="sage" /></label>
+              <label class="h-rose"       data-hue="rose"><input type="radio" name="hue" value="rose" /></label>
+              <label class="h-olive"      data-hue="olive"><input type="radio" name="hue" value="olive" /></label>
+              <label class="h-plum"       data-hue="plum"><input type="radio" name="hue" value="plum" /></label>
+              <label class="h-rust"       data-hue="rust"><input type="radio" name="hue" value="rust" /></label>
+              <label class="h-terracotta" data-hue="terracotta"><input type="radio" name="hue" value="terracotta" /></label>
+            </div>
+          </div>
+        </div>
+        <div class="field" style="margin-top:16px;">
+          <label>Signature line</label>
+          <input class="input" name="quote" />
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h2><span class="num">02</span>Demographics</h2>
+        <div class="row-3">
+          <div class="field"><label>Role</label><input class="input" name="role" /></div>
+          <div class="field"><label>Age band</label><input class="input" name="age_band" /></div>
+          <div class="field"><label>Locale</label><input class="input" name="locale" /></div>
+        </div>
+        <div class="field" style="margin-top:16px;">
+          <label>Tech savviness</label>
+          <div class="radio-cluster" id="tech-cluster">
+            <label data-val="novice"><input type="radio" name="tech_savviness" value="novice" /><span class="lab"><b>Novice</b><small>First time touching this kind of tool. Needs hand-holding.</small></span></label>
+            <label data-val="intermediate"><input type="radio" name="tech_savviness" value="intermediate" /><span class="lab"><b>Intermediate</b><small>Comfortable with the tool, occasional gaps.</small></span></label>
+            <label data-val="advanced"><input type="radio" name="tech_savviness" value="advanced" /><span class="lab"><b>Advanced</b><small>Power user / domain expert. Will catch hallucinations.</small></span></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h2><span class="num">03</span>Tone</h2>
+        <div class="tone-track" id="tone-track">
+          <button type="button" data-val="formal">Formal</button>
+          <button type="button" data-val="casual">Casual</button>
+          <button type="button" data-val="blunt">Blunt</button>
+          <button type="button" data-val="frustrated">Frustrated</button>
+          <button type="button" data-val="playful">Playful</button>
+        </div>
+        <input type="hidden" name="tone" />
+      </section>
+
+      <section class="form-section">
+        <h2><span class="num">04</span>Goals</h2>
+        <div class="field">
+          <label>Goals (one per line)</label>
+          <textarea class="textarea long" name="goals"></textarea>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h2><span class="num">05</span>Edge-case behaviors</h2>
+        <div class="field">
+          <label>Edge-cases (one per line)</label>
+          <textarea class="textarea long" name="edge_cases"></textarea>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h2><span class="num">06</span>Tags &amp; version</h2>
+        <div class="row-2">
+          <div class="field">
+            <label>Tags</label>
+            <div class="tag-input" id="tag-input">
+              <input id="tag-entry" type="text" placeholder="enter tag, then ↵" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Version</label>
+            <input class="input mono" name="version" />
+            <span class="hint">Original was <b id="orig-version" class="mono"></b>. Use the bump buttons to follow semver.</span>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+              <button type="button" class="btn ghost" data-bump="patch" style="padding:6px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;">+ patch</button>
+              <button type="button" class="btn ghost" data-bump="minor" style="padding:6px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;">+ minor</button>
+              <button type="button" class="btn ghost" data-bump="major" style="padding:6px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;">+ major</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div style="display:flex;gap:12px;justify-content:space-between;align-items:center;padding-top:8px;">
+        <button type="button" class="btn danger" id="delete-btn">Delete persona</button>
+        <div style="display:flex;gap:12px;">
+          <a class="btn ghost" href="./index.html">Cancel</a>
+          <button class="btn primary" type="submit">Save changes →</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="preview-rail">
+      <span class="label"><b>Live preview</b> — updated card</span>
+      <article id="preview" class="persona" data-hue="terracotta" style="grid-column: unset;">
+        <span class="ribbon-stripe"></span>
+        <div class="head">
+          <div class="monogram" id="prev-mono">··</div>
+          <div style="flex:1;min-width:0;">
+            <div class="meta-line"><b id="prev-tone">—</b> · <span id="prev-locale">—</span> · v<span id="prev-version">—</span></div>
+            <h3 id="prev-name">—</h3>
+            <p class="demo" id="prev-role">—</p>
+          </div>
+        </div>
+        <p class="quote" id="prev-quote">—</p>
+        <div class="tags" id="prev-tags"></div>
+        <div class="actions">
+          <span class="stamp" id="prev-stamp">updated —</span>
+          <span class="links"><a href="#">Edit</a></span>
+        </div>
+      </article>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-3);padding:12px 14px;border:1px dashed var(--rule-dashed);border-radius:var(--r-2);background:var(--bg-tint);line-height:1.6;">
+        Edit history is not preserved in this mock. In the real product,
+        every save creates a new immutable version row keyed by
+        <code>(persona_id, version)</code>.
+      </div>
+    </aside>
+
+  </form>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / ui-mock / persona-lab / edit.html</span>
+    <span><a href="./palette.html">design tokens →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const form = document.getElementById("persona-form");
+  const tagInput = document.getElementById("tag-input");
+  const tagEntry = document.getElementById("tag-entry");
+  const hueGrid = document.getElementById("hue-grid");
+  const techCluster = document.getElementById("tech-cluster");
+  const toneTrack = document.getElementById("tone-track");
+
+  // ---- Load persona by ?id= ----
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  const persona = id ? PL.get(id) : null;
+
+  if (!persona) {
+    document.querySelector("main").innerHTML = `
+      <div class="empty" style="margin-top:80px;">
+        <p style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-deep);">Not found</p>
+        <h3>No persona matches that id.</h3>
+        <p style="margin-bottom:24px;">It may have been deleted in this browser, or the URL is wrong.</p>
+        <a class="btn primary" href="./index.html">Back to gallery</a>
+      </div>`;
+    throw new Error("persona not found");
+  }
+
+  document.getElementById("orig-version").textContent = "v" + persona.version;
+  document.title = `Edit ${persona.name} — Persona Lab`;
+
+  // Prefill scalars
+  form.elements.name.value = persona.name || "";
+  form.elements.quote.value = persona.quote || "";
+  form.elements.role.value = persona.role || "";
+  form.elements.age_band.value = persona.age_band || "";
+  form.elements.locale.value = persona.locale || "";
+  form.elements.version.value = persona.version || "0.1.0";
+
+  // Prefill radios / clusters
+  function selectRadio(host, val, attr = "data-val") {
+    host.querySelectorAll("label").forEach(lab => lab.classList.remove("checked"));
+    const lab = host.querySelector(`label[${attr}="${val}"]`);
+    if (lab) {
+      lab.classList.add("checked");
+      const input = lab.querySelector("input");
+      if (input) input.checked = true;
+    }
+  }
+  selectRadio(techCluster, persona.tech_savviness || "intermediate", "data-val");
+  selectRadio(hueGrid, persona.hue || "terracotta", "data-hue");
+
+  // Tone
+  toneTrack.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+  const tBtn = toneTrack.querySelector(`button[data-val="${persona.tone}"]`);
+  if (tBtn) tBtn.classList.add("active");
+  form.elements.tone.value = persona.tone || "casual";
+
+  // Goals / edge_cases
+  form.elements.goals.value = (persona.goals || []).join("\n");
+  form.elements.edge_cases.value = (persona.edge_cases || []).join("\n");
+
+  // Tags
+  let tags = [...(persona.tags || [])];
+  function renderTags() {
+    [...tagInput.querySelectorAll(".chip")].forEach(c => c.remove());
+    tags.forEach(t => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = `#${t} <button type="button" aria-label="remove">×</button>`;
+      chip.querySelector("button").onclick = () => { tags = tags.filter(x => x !== t); renderTags(); updatePreview(); };
+      tagInput.insertBefore(chip, tagEntry);
+    });
+  }
+  renderTags();
+
+  // Wire interactions
+  tagEntry.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const v = tagEntry.value.trim().replace(/^#/, "").toLowerCase();
+      if (v && !tags.includes(v)) tags.push(v);
+      tagEntry.value = "";
+      renderTags(); updatePreview();
+    } else if (e.key === "Backspace" && !tagEntry.value && tags.length) {
+      tags.pop(); renderTags(); updatePreview();
+    }
+  });
+
+  hueGrid.querySelectorAll("label").forEach(lab => {
+    lab.addEventListener("click", () => {
+      hueGrid.querySelectorAll("label").forEach(l => l.classList.remove("checked"));
+      lab.classList.add("checked");
+      lab.querySelector("input").checked = true;
+      updatePreview();
+    });
+  });
+  techCluster.querySelectorAll("label").forEach(lab => {
+    lab.addEventListener("click", () => {
+      techCluster.querySelectorAll("label").forEach(l => l.classList.remove("checked"));
+      lab.classList.add("checked");
+      lab.querySelector("input").checked = true;
+    });
+  });
+  toneTrack.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      toneTrack.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      form.elements.tone.value = btn.dataset.val;
+      updatePreview();
+    });
+  });
+
+  // Version bump buttons
+  document.querySelectorAll("[data-bump]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const kind = btn.dataset.bump;
+      form.elements.version.value = PL.bumpVersion(form.elements.version.value, kind);
+      updatePreview();
+    });
+  });
+
+  // ---- Preview ----
+  function updatePreview() {
+    const fd = new FormData(form);
+    const name = fd.get("name") || "Untitled Persona";
+    const tone = fd.get("tone") || "casual";
+    const role = fd.get("role") || "—";
+    const age = fd.get("age_band") || "—";
+    const loc = fd.get("locale") || "—";
+    const version = fd.get("version") || "0.1.0";
+    const quote = fd.get("quote") || "—";
+    const hue = fd.get("hue") || "terracotta";
+
+    document.getElementById("prev-mono").textContent = PL.monogramOf(name);
+    const parts = name.trim().split(/\s+/);
+    const last = parts.length > 1 ? parts.pop() : "";
+    document.getElementById("prev-name").innerHTML = parts.join(" ") + (last ? ` <em>${last}</em>` : "");
+    document.getElementById("prev-role").textContent = `${role} · ${age}`;
+    document.getElementById("prev-locale").textContent = loc;
+    document.getElementById("prev-tone").textContent = PL.TONE_LABEL[tone] || tone;
+    document.getElementById("prev-version").textContent = version;
+    document.getElementById("prev-quote").textContent = quote.startsWith('"') || quote.startsWith('"') ? quote : `"${quote}"`;
+    document.getElementById("prev-stamp").textContent = `updated ${PL.todayISO()}`;
+
+    const tagsHost = document.getElementById("prev-tags");
+    tagsHost.innerHTML = tags.length
+      ? tags.map(t => `<span class="tag">#${t}</span>`).join("")
+      : `<span class="tag" style="color:var(--ink-4);">#tag</span>`;
+
+    document.getElementById("preview").dataset.hue = hue;
+  }
+  form.addEventListener("input", updatePreview);
+  updatePreview();
+
+  // ---- Submit ----
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const newVersion = (fd.get("version") || "").trim();
+
+    if (newVersion === persona.version) {
+      const ok = await PL.confirmModal({
+        title: "Save without bumping the version?",
+        body: `Version <b>${persona.version}</b> is already published. Saving without a version bump means future eval runs keyed to <code>${persona.id}@${persona.version}</code> will silently see different behavior. Continue anyway?`,
+        confirmLabel: "Save without bump",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
+    const updated = {
+      ...persona,
+      name: (fd.get("name") || "").trim(),
+      quote: (fd.get("quote") || "").trim(),
+      role: (fd.get("role") || "").trim(),
+      age_band: (fd.get("age_band") || "").trim(),
+      locale: (fd.get("locale") || "").trim(),
+      tech_savviness: fd.get("tech_savviness") || "intermediate",
+      tone: fd.get("tone") || "casual",
+      goals: (fd.get("goals") || "").split("\n").map(s => s.trim()).filter(Boolean),
+      edge_cases: (fd.get("edge_cases") || "").split("\n").map(s => s.trim()).filter(Boolean),
+      tags: [...tags],
+      hue: fd.get("hue") || "terracotta",
+      version: newVersion || persona.version,
+      updated_at: PL.todayISO(),
+    };
+    PL.upsert(updated);
+    PL.toast(`Saved ${updated.name} (v${updated.version})`, "Persona Lab");
+    setTimeout(() => { window.location.href = "./index.html"; }, 600);
+  });
+
+  // ---- Delete ----
+  document.getElementById("delete-btn").addEventListener("click", async () => {
+    const ok = await PL.confirmModal({
+      title: `Delete ${persona.name}?`,
+      body: `This persona will be removed from the library. Future eval runs that referenced <b>${persona.id}</b> will be unable to reproduce.`,
+      confirmLabel: "Delete persona",
+      danger: true,
+    });
+    if (ok) {
+      PL.remove(persona.id);
+      PL.toast(`Deleted ${persona.name}`, "Persona Lab");
+      setTimeout(() => { window.location.href = "./index.html"; }, 500);
+    }
+  });
+</script>
+
+</body>
+</html>

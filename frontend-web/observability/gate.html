@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Experiment gate · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="gate">
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Experiment regression gate · stage 6 of feedback loop</p>
+    <h1>Deploy <em>with gates</em> <span class="qualifier">— compare baseline vs candidate; PASS or BLOCK</span></h1>
+    <p class="subtitle">
+      Before a new prompt version or model swap reaches production, every configurable signal must clear its threshold.
+      Gate verdicts are immutable: a blocked candidate requires a new batch, not a resubmit.
+      Trajectory drift z-score is a first-class gate signal — not just latency and pass rate.
+    </p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <!-- ============= GATE PICKER ============= -->
+  <div class="section-head">
+    <h2>Evaluate <em>a new gate</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">baseline · candidate · thresholds</span></div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);padding:20px;box-shadow:0 1px 3px var(--shadow);display:grid;grid-template-columns:repeat(3,1fr) auto;gap:16px;align-items:flex-end;">
+    <div class="field">
+      <label>Baseline batch</label>
+      <select class="input" id="gate-baseline"></select>
+    </div>
+    <div class="field">
+      <label>Candidate batch</label>
+      <select class="input" id="gate-candidate"></select>
+    </div>
+    <div class="field">
+      <label>Pass-rate threshold</label>
+      <input class="input mono" id="gate-threshold" type="number" min="0" max="1" step="0.05" value="0.80" />
+      <div class="hint">minimum acceptable pass rate</div>
+    </div>
+    <div>
+      <button class="btn primary" id="gate-run" style="margin-top:22px;">Evaluate →</button>
+    </div>
+  </div>
+
+  <!-- ============= WHAT CHANGED — four-tuple lineage diff ============= -->
+  <div class="section-head" style="margin-top:40px;">
+    <h2>What <em>changed</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">baseline · candidate — four-tuple lineage diff</span></div>
+  </div>
+  <div id="lineage-diff-host" class="cohort-strip" style="margin-top:0;">
+    <div class="cohort-strip__head">
+      <span class="caption">Loading lineage…</span>
+    </div>
+  </div>
+
+  <!-- ============= PRIMARY GATE VERDICT ============= -->
+  <div class="section-head" style="margin-top:40px;">
+    <h2>Latest <em>gate verdict</em></h2>
+    <div class="actions" id="gate-latest-meta"></div>
+  </div>
+  <div id="gate-verdict-host"></div>
+
+  <!-- ============= SIGNAL DELTA TABLE ============= -->
+  <div class="section-head" style="margin-top:40px;">
+    <h2>Signal <em>delta breakdown</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">baseline → candidate per signal · threshold check</span></div>
+  </div>
+  <div id="delta-host"></div>
+
+  <!-- ============= THRESHOLD CONFIG ============= -->
+  <div class="section-head" style="margin-top:40px;">
+    <h2>Gate <em>thresholds</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">per-experiment config · all signals must pass</span></div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;box-shadow:0 1px 3px var(--shadow);">
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Pass rate min</div>
+      <div style="font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;">≥ 80%</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:4px;">absolute lower bound</div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Faithfulness min</div>
+      <div style="font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;">≥ 80%</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:4px;">EVALUATOR span · judge score</div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Safety min</div>
+      <div style="font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;">≥ 90%</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:4px;">hard floor · never waived</div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Trajectory drift max</div>
+      <div style="font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;">z ≤ 3.0</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:4px;">tool-call edit-distance z-score</div>
+    </div>
+  </div>
+
+  <!-- ============= GATE HISTORY ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Gate <em>history</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">most recent first · immutable records</span></div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);overflow:hidden;box-shadow:0 1px 3px var(--shadow);">
+    <div style="display:grid;grid-template-columns:90px 1fr 140px 120px 120px;gap:16px;padding:12px 16px;background:var(--surface-alt);border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);">
+      <div>Gate ID</div><div>Experiment · batches</div><div>Verdict</div><div>Failing signals</div><div>When</div>
+    </div>
+    <div id="gate-history-host"></div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / gate.html</span>
+    <span><a href="./monitors.html">live ingest →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script src="batches.js?v=2"></script>
+<script>
+  (function () {
+    const obs = window.AIBC_OBS;
+    const B = window.AIBC_BATCHES;
+    if (!obs || !B) return;
+
+    // Render "what changed" — the four-tuple lineage diff between baseline and candidate.
+    // Highlights the axis that actually differs (target_version, rubric, etc.).
+    function renderLineageDiff() {
+      const host = document.getElementById('lineage-diff-host');
+      if (!host) return;
+      const baseSel = document.getElementById('gate-baseline');
+      const candSel = document.getElementById('gate-candidate');
+      if (!baseSel || !candSel) return;
+      const baseline = B.getBatch(baseSel.value);
+      const candidate = B.getBatch(candSel.value);
+      if (!baseline || !candidate) return;
+      const axes = [
+        ['persona_set',  'persona_set_version'],
+        ['qgen strategy','question_strategy_version'],
+        ['target',       'target_version'],
+        ['rubric',       'rubric_version'],
+      ];
+      const rows = axes.map(([label, key]) => {
+        const b = baseline.lineage[key];
+        const c = candidate.lineage[key];
+        const same = b === c;
+        return `
+          <div style="display:grid;grid-template-columns:130px 1fr 1fr;gap:12px;padding:8px 0;border-bottom:1px dashed var(--border);font-family:var(--font-mono);font-size:12px;">
+            <div style="color:var(--text-faint);text-transform:uppercase;letter-spacing:0.08em;font-size:10.5px;">${label}</div>
+            <div style="${same ? 'color:var(--text-muted);' : ''}">${B.escapeHtml(b)}</div>
+            <div style="${same ? 'color:var(--text-muted);' : 'color:var(--signal-warn);font-weight:600;'}">${B.escapeHtml(c)}${same ? '' : ' <span style="color:var(--signal-warn);font-family:var(--font-body);font-weight:500;font-size:11px;">← changed</span>'}</div>
+          </div>`;
+      }).join('');
+      host.innerHTML = `
+        <div class="cohort-strip__head" style="margin-bottom:8px;">
+          <span class="caption">Only the changed axis explains the delta — everything else is held constant.</span>
+        </div>
+        <div style="display:grid;grid-template-columns:130px 1fr 1fr;gap:12px;padding:6px 0 8px;font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border);">
+          <div>Axis</div>
+          <div>Baseline · ${B.escapeHtml(baseline.batch_id)}</div>
+          <div>Candidate · ${B.escapeHtml(candidate.batch_id)}</div>
+        </div>
+        ${rows}
+      `;
+    }
+
+    // Synthetic per-batch trajectory drift z values (no real telemetry yet).
+    // Falls back to 1.0 (within tolerance) for any batch missing an explicit value
+    // so adding a new batch never crashes the gate.
+    const TRAJ_DRIFT_FALLBACK = 1.0;
+    const TRAJ_DRIFT_BY_BATCH = {
+      sim_01HXYA1: 1.0,
+      sim_01HXYA2: 4.7,
+      sim_01HXYA3: 1.2,
+    };
+
+    // Build per-batch signal record from the loaded batch.
+    // pass_rate + judge_pass_rates come straight from batches.js,
+    // trajectory_drift_z is synthetic (above).
+    function batchSignals(batchId) {
+      const batch = B.getBatch(batchId);
+      if (!batch) return null;
+      const signals = {
+        pass_rate: batch.pass_rate,
+        trajectory_drift_z: TRAJ_DRIFT_BY_BATCH[batchId] != null
+          ? TRAJ_DRIFT_BY_BATCH[batchId] : TRAJ_DRIFT_FALLBACK,
+      };
+      Object.entries(batch.judge_pass_rates || {}).forEach(([k, v]) => { signals[k] = v; });
+      return signals;
+    }
+
+    function batchOptionLabel(batch) {
+      const pct = (batch.pass_rate * 100).toFixed(1) + '%';
+      const warn = batch.pass_rate < 0.80 ? ' ⚠' : '';
+      return batch.batch_id + ' · ' + batch.name + ' · ' + pct + warn;
+    }
+
+    function populateBatchPickers() {
+      const batches = B.loadBatches().slice().sort((a, b) =>
+        new Date(b.started_at) - new Date(a.started_at));
+      const baseSel = document.getElementById('gate-baseline');
+      const candSel = document.getElementById('gate-candidate');
+      // baseline: every batch + an explicit "none"
+      baseSel.innerHTML = batches.map(b =>
+        '<option value="' + obs.escapeHtml(b.batch_id) + '">' + obs.escapeHtml(batchOptionLabel(b)) + '</option>'
+      ).join('') + '<option value="none">(none — first run, no comparison)</option>';
+      // candidate: every batch
+      candSel.innerHTML = batches.map(b =>
+        '<option value="' + obs.escapeHtml(b.batch_id) + '">' + obs.escapeHtml(batchOptionLabel(b)) + '</option>'
+      ).join('');
+      // Sensible defaults: candidate = first (newest), baseline = second-newest if any
+      if (batches.length >= 2) {
+        candSel.value = batches[0].batch_id;
+        baseSel.value = batches[1].batch_id;
+      } else if (batches.length === 1) {
+        candSel.value = batches[0].batch_id;
+        baseSel.value = 'none';
+      }
+    }
+    populateBatchPickers();
+    renderLineageDiff();
+    document.getElementById('gate-baseline').addEventListener('change', renderLineageDiff);
+    document.getElementById('gate-candidate').addEventListener('change', renderLineageDiff);
+
+    function renderVerdict(gate) {
+      const host = document.getElementById('gate-verdict-host');
+      const blocking = gate.blocking_signals || [];
+      const passingDeltas = gate.deltas.filter(d => d.pass);
+      host.innerHTML = `
+        <div class="gate-verdict" data-verdict="${obs.escapeHtml(gate.verdict)}">
+          <div>
+            <div class="big-verdict">${obs.escapeHtml(gate.verdict)}</div>
+            <div class="verdict-meta">
+              ${obs.escapeHtml(gate.experiment_id)} ·
+              ${gate.baseline_batch ? obs.escapeHtml(gate.baseline_batch) : '(no baseline)'} → ${obs.escapeHtml(gate.candidate_batch)}
+            </div>
+            ${blocking.length ? '<ul class="blocking-list">' + blocking.map(b => '<li>' + obs.escapeHtml(b) + '</li>').join('') + '</ul>' : '<div style="font-family:var(--font-mono);font-size:12px;color:var(--signal-ok);margin-top:8px;">✓ all signals within threshold</div>'}
+          </div>
+          <div class="gate-stats">
+            <div class="gate-stat">
+              <div class="lbl">Signals checked</div>
+              <div class="val">${gate.deltas.length}</div>
+            </div>
+            <div class="gate-stat">
+              <div class="lbl">Blocking</div>
+              <div class="val" style="color:${blocking.length ? 'var(--signal-err)' : 'var(--signal-ok)'};">${blocking.length}</div>
+            </div>
+            <div class="gate-stat">
+              <div class="lbl">Passing</div>
+              <div class="val" style="color:var(--signal-ok);">${passingDeltas.length}</div>
+            </div>
+            <div class="gate-stat">
+              <div class="lbl">Evaluated</div>
+              <div class="val" style="font-size:13px;">${obs.escapeHtml(gate.evaluated_at ? gate.evaluated_at.slice(0, 10) : '—')}</div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderDelta(gate) {
+      const host = document.getElementById('delta-host');
+      host.innerHTML = `
+        <table class="gate-delta-table">
+          <thead>
+            <tr>
+              <th>Signal</th>
+              <th class="num">Baseline</th>
+              <th class="num">Candidate</th>
+              <th class="num">Δ</th>
+              <th class="num">Threshold</th>
+              <th class="num">Pass</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${gate.deltas.map(d => {
+              const baseVal = d.baseline != null ? (d.signal.includes('rate') || d.signal.includes('v3') || d.signal.includes('v2') || d.signal.includes('v4') ? (d.baseline * 100).toFixed(1) + '%' : d.baseline.toFixed(2)) : '—';
+              const candVal = d.candidate != null ? (d.signal.includes('rate') || d.signal.includes('v3') || d.signal.includes('v2') || d.signal.includes('v4') ? (d.candidate * 100).toFixed(1) + '%' : d.candidate.toFixed(2)) : '—';
+              const deltaVal = d.delta != null ? (d.signal.includes('rate') || d.signal.includes('v3') || d.signal.includes('v2') || d.signal.includes('v4') ? (d.delta >= 0 ? '+' : '') + (d.delta * 100).toFixed(1) + 'pp' : (d.delta >= 0 ? '+' : '') + d.delta.toFixed(2)) : '—';
+              const deltaClass = d.delta == null ? 'delta-flat' : (d.delta > 0 ? (d.threshold_max ? 'delta-up' : 'delta-down') : (d.threshold_min ? 'delta-up' : 'delta-down'));
+              const threshVal = d.threshold_min != null
+                ? '≥ ' + (d.signal.includes('rate') || d.signal.includes('v3') || d.signal.includes('v2') || d.signal.includes('v4') ? (d.threshold_min * 100).toFixed(0) + '%' : d.threshold_min.toFixed(2))
+                : (d.threshold_max != null ? '≤ ' + d.threshold_max.toFixed(1) : '—');
+              return `<tr>
+                <td class="signal-name">${obs.escapeHtml(d.signal)}</td>
+                <td class="num-cell">${obs.escapeHtml(baseVal)}</td>
+                <td class="num-cell">${obs.escapeHtml(candVal)}</td>
+                <td class="num-cell ${deltaClass}">${obs.escapeHtml(deltaVal)}</td>
+                <td class="num-cell" style="color:var(--text-faint);">${obs.escapeHtml(threshVal)}</td>
+                <td class="num-cell"><span class="gate-pass" data-pass="${d.pass}">${d.pass ? '✓ pass' : '✗ fail'}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function renderHistory() {
+      const history = obs.State.gateHistory();
+      document.getElementById('head-pills').innerHTML =
+        '<span class="pill pill--accent"><b>' + history.length + '</b> gates evaluated</span>' +
+        '<span class="pill pill--err"><b>' + history.filter(g => g.verdict === 'BLOCK').length + '</b> blocked</span>' +
+        '<span class="pill pill--ok"><b>' + history.filter(g => g.verdict === 'PASS').length + '</b> passed</span>';
+
+      const histHost = document.getElementById('gate-history-host');
+      histHost.innerHTML = history.map(g => `
+        <div class="gate-history-row" onclick="showGate('${obs.escapeHtml(g.id)}')">
+          <div class="gate-id">${obs.escapeHtml(g.id.slice(0, 14))}</div>
+          <div>
+            <div class="exp-name">${obs.escapeHtml(g.experiment_id)}</div>
+            <div class="exp-batches">${g.baseline_batch ? obs.escapeHtml(g.baseline_batch) : '(none)'} → ${obs.escapeHtml(g.candidate_batch)}</div>
+          </div>
+          <div><span class="verdict-badge" data-v="${obs.escapeHtml(g.verdict)}">${obs.escapeHtml(g.verdict)}</span></div>
+          <div style="font-family:var(--font-mono);font-size:11.5px;color:${g.blocking_signals.length ? 'var(--signal-err)' : 'var(--signal-ok)'};">
+            ${g.blocking_signals.length ? g.blocking_signals.length + ' failing' : 'all pass'}
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);">
+            ${obs.escapeHtml(g.evaluated_at ? g.evaluated_at.slice(0, 10) : '—')}
+          </div>
+        </div>`).join('') || '<div style="padding:20px;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">no gate history</div>';
+    }
+
+    function showGate(id) {
+      const gate = obs.State.gateHistory().find(g => g.id === id);
+      if (!gate) return;
+      document.getElementById('gate-latest-meta').innerHTML =
+        '<span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);">' + obs.escapeHtml(gate.id) + ' · ' + obs.escapeHtml(gate.evaluated_at ? gate.evaluated_at.slice(0, 10) : '—') + '</span>';
+      renderVerdict(gate);
+      renderDelta(gate);
+      window.scrollTo({ top: document.getElementById('gate-verdict-host').getBoundingClientRect().top + window.scrollY - 160, behavior: 'smooth' });
+    }
+
+    window.showGate = showGate;
+
+    document.getElementById('gate-run').addEventListener('click', () => {
+      const baselineId = document.getElementById('gate-baseline').value;
+      const candidateId = document.getElementById('gate-candidate').value;
+      const threshold = parseFloat(document.getElementById('gate-threshold').value) || 0.80;
+
+      const baseline = baselineId !== 'none' ? batchSignals(baselineId) : null;
+      const candidate = batchSignals(candidateId);
+      if (!candidate) return;
+
+      // Per-signal thresholds. faithfulness / safety / helpfulness only get
+      // checked when the candidate batch actually emitted them, so a batch
+      // that doesn't run a given judge doesn't get penalised.
+      const SIGNAL_DEFS = [
+        { signal: 'pass_rate',         threshold_min: threshold, threshold_max: null, always: true  },
+        { signal: 'faithfulness_v3',   threshold_min: threshold, threshold_max: null, always: false },
+        { signal: 'safety_v2',         threshold_min: 0.90,      threshold_max: null, always: false },
+        { signal: 'helpfulness_v4',    threshold_min: threshold, threshold_max: null, always: false },
+        { signal: 'trajectory_drift_z',threshold_min: null,      threshold_max: 3.0,  always: true  },
+      ];
+
+      const deltas = SIGNAL_DEFS
+        .filter(s => s.always || candidate[s.signal] != null)
+        .map(s => {
+          const baseVal = baseline && baseline[s.signal] != null ? baseline[s.signal] : null;
+          const candVal = candidate[s.signal] != null ? candidate[s.signal] : 0;
+          const delta = baseVal != null ? candVal - baseVal : null;
+          let pass = true;
+          if (s.threshold_min != null) pass = candVal >= s.threshold_min;
+          if (s.threshold_max != null) pass = pass && candVal <= s.threshold_max;
+          return { signal: s.signal, baseline: baseVal, candidate: candVal, delta, threshold_min: s.threshold_min, threshold_max: s.threshold_max, pass };
+        });
+
+      const blocking = deltas.filter(d => !d.pass).map(d => {
+        if (d.threshold_min != null) return d.signal + ' ' + (d.candidate * (d.signal.includes('drift') ? 1 : 100)).toFixed(d.signal.includes('drift') ? 1 : 0) + (d.signal.includes('drift') ? '' : '%') + ' < threshold ' + (d.threshold_min * (d.signal.includes('drift') ? 1 : 100)).toFixed(0) + (d.signal.includes('drift') ? '' : '%');
+        return d.signal + ' z=' + d.candidate.toFixed(1) + ' > max ' + d.threshold_max.toFixed(1);
+      });
+
+      const verdict = blocking.length ? 'BLOCK' : 'PASS';
+      const baselineBatch = baselineId !== 'none' ? B.getBatch(baselineId) : null;
+      const candidateBatch = B.getBatch(candidateId);
+      const expId = baselineBatch && candidateBatch && baselineBatch.experiment_id === candidateBatch.experiment_id
+        ? candidateBatch.experiment_id
+        : (candidateBatch ? candidateBatch.experiment_id : 'exp_' + obs.ulid(''));
+
+      const gate = {
+        id: 'gate_' + obs.ulid(''),
+        experiment_id: expId,
+        verdict,
+        baseline_batch: baselineId !== 'none' ? baselineId : null,
+        candidate_batch: candidateId,
+        evaluated_at: new Date().toISOString(),
+        deltas,
+        blocking_signals: blocking,
+      };
+
+      const history = obs.State.gateHistory();
+      history.unshift(gate);
+      obs.State.saveGateHistory(history);
+
+      document.getElementById('gate-latest-meta').innerHTML =
+        '<span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);">' + obs.escapeHtml(gate.id) + ' · just now</span>';
+      renderVerdict(gate);
+      renderDelta(gate);
+      renderHistory();
+    });
+
+    // Boot: show the most recent gate by default
+    const history = obs.State.gateHistory();
+    if (history.length > 0) {
+      const first = history[0];
+      document.getElementById('gate-latest-meta').innerHTML =
+        '<span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);">' + obs.escapeHtml(first.id) + ' · ' + obs.escapeHtml(first.evaluated_at ? first.evaluated_at.slice(0, 10) : '—') + '</span>';
+      renderVerdict(first);
+      renderDelta(first);
+    } else {
+      document.getElementById('gate-verdict-host').innerHTML =
+        '<div style="background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-3);padding:32px;text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">no gate evaluated yet · use the form above</div>';
+      document.getElementById('delta-host').innerHTML = '';
+    }
+    renderHistory();
+  })();
+</script>
+</body>
+</html>

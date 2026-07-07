@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Question Generation — New job · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Question Generation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>02 · Question Generation</b> · New job</span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a class="back-link" href="./index.html"><span class="arrow">←</span> All jobs</a>
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> New job</p>
+    <h1>Create job <span class="qualifier">— build a versioned question set</span></h1>
+    <p class="subtitle">
+      A four-step wizard. Pick the personas to condition on; rubric, prompt shapes, and scenarios all derive from your persona selection (each is overridable). Submit creates an immutable job stamped with a config hash.
+    </p>
+  </section>
+
+  <div class="steps" id="steps">
+    <div class="step active" data-step="1"><span class="num">01</span><span class="label">Persona</span></div>
+    <div class="step" data-step="2"><span class="num">02</span><span class="label">Rubric</span></div>
+    <div class="step" data-step="3"><span class="num">03</span><span class="label">Shapes, scenarios &amp; knobs</span></div>
+    <div class="step" data-step="4"><span class="num">04</span><span class="label">Preview & ship</span></div>
+  </div>
+
+  <div class="wizard-grid">
+    <form id="form" class="form-stack" autocomplete="off" onsubmit="event.preventDefault(); submitJob();">
+
+      <!-- Step 1 — Persona -->
+      <section class="wizard-step active" data-step="1">
+        <div class="form-section" style="border-top:0;padding-top:0;">
+          <h2><span class="num">01</span> Pick personas</h2>
+          <p class="sub">Each persona is a frozen perspective the LLM conditions on. Multi-select. Each selection becomes one row of the (persona × strategy × scenario) generation grid.</p>
+          <div class="pick-grid" id="persona-pick"></div>
+        </div>
+      </section>
+
+      <!-- Step 2 — Rubric (read-only, inferred from personas) -->
+      <section class="wizard-step" data-step="2">
+        <div class="form-section" style="border-top:0;padding-top:0;">
+          <h2><span class="num">02</span> Inferred rubric</h2>
+          <p class="sub">The eval dimension the seed set will stress. <b>Determined by your persona selection</b> — each persona declares a <code>primary_rubric</code> and the job uses the mode across selected personas. To stress a different dimension, change the personas in step 01.</p>
+          <div id="rubric-readonly"></div>
+        </div>
+      </section>
+
+      <!-- Step 3 — Prompt shapes (read-only by default, derived from personas) -->
+      <section class="wizard-step" data-step="3">
+        <div class="form-section" style="border-top:0;padding-top:0;">
+          <h2><span class="num">03</span> Prompt shapes</h2>
+          <p class="sub">Content-shape transforms applied during generation: ambiguate the prompt, wrap it in a jailbreak attempt (adversify), code-switch its language, or bait a hallucination. <b>Defaults are derived from each persona's <code>default_shapes</code></b> — toggle below only to add or remove. <small style="color:var(--text-faint);">Multi-turn delivery and long-context stuffing are <b>delivery</b> transforms — they live in Simulation, not here.</small></p>
+          <p id="shapes-hint" class="sub" style="margin-top:-6px;color:var(--accent);font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;display:none;"></p>
+          <div class="strategy-grid" id="strategy-pick"></div>
+
+          <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);">
+            <h3 style="font-family:var(--font-display);font-size:17px;font-weight:600;letter-spacing:-0.01em;margin:0 0 6px;">Scenarios</h3>
+            <p class="sub">A <b>scenario</b> is the prompt's surface form: <code>(length × style × difficulty)</code>. It controls the prompt's register independently of who is asking (persona) and what content trick is applied (prompt shape) — the same persona × same shape reads very differently as a 1-line chat (<i>"where's my order?"</i>) vs. a long structured email. <b>Defaults are derived from each persona's <code>default_scenarios</code></b> — toggle below to override.</p>
+            <p id="scenarios-hint" class="sub" style="margin-top:-6px;color:var(--accent);font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;display:none;"></p>
+            <div id="scenario-pick" class="scenario-grid"></div>
+          </div>
+
+          <details style="margin-top:28px;border-top:1px solid var(--border);padding-top:18px;">
+            <summary style="cursor:pointer;font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);outline:none;">Advanced knobs</summary>
+            <p class="sub" style="margin-top:14px;">Cost / quality tuning. Defaults are sane — change only when you know what you're doing.</p>
+            <div class="row-3" style="margin-top:14px;">
+              <div class="field">
+                <label>Count per cell</label>
+                <input class="input mono" id="k-count" type="number" min="1" max="50" value="2" />
+                <span class="hint">Questions per (persona × shape × scenario) cell.</span>
+              </div>
+              <div class="field">
+                <label>Evolution passes</label>
+                <input class="input mono" id="k-evo" type="number" min="0" max="5" value="1" />
+                <span class="hint">DeepEval-style rewrite rounds.</span>
+              </div>
+              <div class="field">
+                <label>Jailbreak budget</label>
+                <input class="input mono" id="k-jb" type="number" min="0" max="100" value="0" />
+                <span class="hint">Adversify only — caps cost.</span>
+              </div>
+            </div>
+            <div class="row-3" style="margin-top:14px;">
+              <div class="field">
+                <label>Novelty floor</label>
+                <input class="input mono" id="k-novelty" type="number" min="0" max="1" step="0.05" value="0.5" />
+                <span class="hint">Drop the set if novelty &lt; floor.</span>
+              </div>
+              <div class="field">
+                <label>Language</label>
+                <select class="input" id="k-lang">
+                  <option value="en">en</option>
+                  <option value="hi-en">hi-en (code-switch)</option>
+                  <option value="es-en">es-en</option>
+                </select>
+                <span class="hint">Sets up code-switch shape.</span>
+              </div>
+              <div class="field">
+                <label>Dedup threshold</label>
+                <input class="input mono" id="k-dedup" type="number" min="0" max="1" step="0.01" value="0.92" />
+                <span class="hint">Cosine-sim above which two are dupes.</span>
+              </div>
+            </div>
+            <div class="row-2" style="margin-top:14px;">
+              <div class="field">
+                <label>Target total <small style="color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;">— manual override</small></label>
+                <input class="input mono" id="k-target" type="number" min="1" step="1" placeholder="auto" />
+                <span class="hint">Leave blank to use <code>cells × count_per_cell</code>. Set a number to pin the total — generator backsolves <code>count_per_cell</code> per cell to hit it.</span>
+              </div>
+              <div class="field" style="align-self:end;">
+                <span class="hint" id="auto-calc-readout" style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);"></span>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Step 4 — Preview & ship -->
+      <section class="wizard-step" data-step="4">
+        <div class="form-section" style="border-top:0;padding-top:0;">
+          <h2><span class="num">04</span> Preview & ship</h2>
+          <p class="sub">Submit creates a queued <code>qgen_…</code> job in localStorage. The fake worker advances it through running → evolving → filtering → ready_for_review every few seconds. Manual ship from the job detail page.</p>
+
+          <div class="panel" style="margin-top:18px;">
+            <div class="panel-header"><h2>Frozen inputs</h2><span class="meta" id="hash-preview">sha256:…</span></div>
+            <dl class="kv-grid" id="preview-kv"></dl>
+          </div>
+        </div>
+      </section>
+
+      <div class="wizard-actions">
+        <button type="button" class="btn ghost" id="back" disabled>← Back</button>
+        <div class="right">
+          <a class="btn ghost" href="./index.html">Cancel</a>
+          <button type="button" class="btn primary" id="next">Next →</button>
+          <button type="submit" class="btn primary" id="submit" style="display:none;">Submit job</button>
+        </div>
+      </div>
+    </form>
+
+    <aside class="wizard-aside">
+      <h3>Live summary</h3>
+      <div class="summary" id="summary"></div>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / question-generation / create.html</span>
+    <span><a href="./index.html">← back to jobs</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  // ---------- State ----------
+  // Rubrics are derived per-persona via QG.rubricsForPersonas() — no
+  // `rubric` field. Prompt shapes and scenarios start derived from
+  // personas via QG.shapesForPersonas() / QG.scenariosForPersonas(),
+  // and flip to overridden the moment the user toggles a chip in step 03.
+  const draft = {
+    step: 1,
+    personas: [],
+    shapes: [],                  // derived until shapesOverridden flips
+    shapesOverridden: false,
+    scenarios: [],               // "length.style.difficulty" keys; derived until scenariosOverridden flips
+    scenariosOverridden: false,
+    knobs: { count_per_cell: 2, evolution_passes: 1, jailbreak_budget: 0, novelty_floor: 0.5, language: "en", dedup_threshold: 0.92, target_total: null },
+  };
+
+  // Reflect draft.shapes into the strategy-grid checkboxes + hint.
+  function paintShapes() {
+    const host = document.getElementById("strategy-pick");
+    if (!host) return;
+    [...host.children].forEach(c => {
+      const checked = draft.shapes.includes(c.dataset.id);
+      c.classList.toggle("checked", checked);
+      const input = c.querySelector("input");
+      if (input) input.checked = checked;
+    });
+    const hint = document.getElementById("shapes-hint");
+    if (!hint) return;
+    if (draft.personas.length > 0 && !draft.shapesOverridden) {
+      hint.textContent = `↳ inferred from ${draft.personas.length} persona${draft.personas.length === 1 ? "" : "s"} → ${draft.shapes.length} shape${draft.shapes.length === 1 ? "" : "s"}. toggle any to override.`;
+      hint.style.display = "";
+    } else {
+      hint.style.display = "none";
+    }
+  }
+
+  // When personas change AND the user has not overridden, recompute
+  // draft.shapes from the union of each persona's default_shapes.
+  function reapplyShapes() {
+    if (draft.shapesOverridden) return;
+    draft.shapes = QG.shapesForPersonas(draft.personas);
+    paintShapes();
+  }
+
+  // Reflect draft.scenarios into the chip toggles + inferred-hint.
+  // Same derive-with-override pattern as paintShapes.
+  function paintScenarios() {
+    const host = document.getElementById("scenario-pick");
+    if (!host) return;
+    [...host.children].forEach(c => {
+      const checked = draft.scenarios.includes(c.dataset.id);
+      c.classList.toggle("checked", checked);
+      const input = c.querySelector("input");
+      if (input) input.checked = checked;
+    });
+    const hint = document.getElementById("scenarios-hint");
+    if (!hint) return;
+    if (draft.personas.length > 0 && !draft.scenariosOverridden) {
+      hint.textContent = `↳ inferred from ${draft.personas.length} persona${draft.personas.length === 1 ? "" : "s"} → ${draft.scenarios.length} scenario${draft.scenarios.length === 1 ? "" : "s"}. toggle any to override.`;
+      hint.style.display = "";
+    } else {
+      hint.style.display = "none";
+    }
+  }
+
+  // When personas change AND the user has not overridden, recompute
+  // draft.scenarios from the union of each persona's default_scenarios.
+  function reapplyScenarios() {
+    if (draft.scenariosOverridden) return;
+    draft.scenarios = QG.scenariosForPersonas(draft.personas);
+    paintScenarios();
+  }
+
+  // Render the read-only step 02 panel: each selected persona → its
+  // primary_rubric, plus the resulting unique rubric coverage.
+  function paintRubric() {
+    const host = document.getElementById("rubric-readonly");
+    if (!host) return;
+    if (draft.personas.length === 0) {
+      host.innerHTML = `
+        <div class="empty" style="padding:32px 20px;text-align:left;">
+          <p style="font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-faint);margin:0 0 8px;">No personas selected</p>
+          <p style="margin:0;color:var(--text-muted);">Pick personas in step 01 to compute rubric coverage.</p>
+        </div>`;
+      return;
+    }
+    const rows = draft.personas.map(id => {
+      const p = QG.personaById(id);
+      const r = QG.rubricById(p?.primary_rubric);
+      return `
+        <div class="kv-grid" style="grid-template-columns: 220px 1fr; padding: 10px 0; border-top: 1px solid var(--border);">
+          <dt style="display:flex;align-items:center;gap:10px;">
+            <span class="mono-tile" style="width:28px;height:28px;border-radius:6px;background:var(--hue-${p?.hue}, var(--accent));color:#fff;font-family:var(--font-display);font-weight:600;font-size:11px;display:grid;place-items:center;">${QG.monogramOf(p?.name)}</span>
+            <span>${p?.name ?? id}</span>
+          </dt>
+          <dd>${r ? `<b>${r.label}</b> <small style="color:var(--text-faint);">v${r.version}</small> · ${r.blurb}` : '<span style="color:var(--text-faint);">—</span>'}</dd>
+        </div>`;
+    }).join("");
+    const coverage = QG.rubricsForPersonas(draft.personas);
+    const coveragePills = coverage.map(rid => {
+      const r = QG.rubricById(rid);
+      return `<span class="pill pill--accent">${r?.label ?? rid}</span>`;
+    }).join(" ");
+    host.innerHTML = `
+      <div style="margin: 0 0 6px;">${rows}</div>
+      <div style="margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);">Rubric coverage</span>
+        <span style="display:flex;gap:6px;flex-wrap:wrap;">${coveragePills}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-left:auto;">${coverage.length} unique · seed set will be ${coverage.length > 1 ? "<b style=\"color:var(--accent);font-weight:600;\">mixed-rubric</b>" : "single-rubric"}</span>
+      </div>`;
+  }
+
+  // ---------- Step 1 — persona pick ----------
+  const personaHost = document.getElementById("persona-pick");
+  QG.PERSONAS.forEach(p => {
+    const lab = document.createElement("label");
+    lab.dataset.id = p.id;
+    lab.innerHTML = `
+      <input type="checkbox" />
+      <span class="mono-tile" style="background:var(--hue-${p.hue}, var(--accent));">${QG.monogramOf(p.name)}</span>
+      <span class="body">
+        <span class="name">${p.name}</span>
+        <span class="role">${p.role}</span>
+      </span>`;
+    lab.onclick = (e) => {
+      e.preventDefault();
+      const idx = draft.personas.indexOf(p.id);
+      if (idx >= 0) draft.personas.splice(idx, 1); else draft.personas.push(p.id);
+      lab.classList.toggle("checked");
+      lab.querySelector("input").checked = draft.personas.includes(p.id);
+      paintRubric();
+      reapplyShapes();
+      reapplyScenarios();
+      renderSummary();
+    };
+    personaHost.appendChild(lab);
+  });
+
+  // ---------- Step 3 — scenario chips ----------
+  // Build a chip for every (length × style × difficulty) tuple in the
+  // catalog. The chip's data-id is the "length.style.difficulty" key.
+  // Chip click → flip override flag, toggle membership, repaint, resummarize.
+  const scenarioHost = document.getElementById("scenario-pick");
+  for (const len of QG.SCENARIO_LENGTHS) {
+    for (const style of QG.SCENARIO_STYLES) {
+      for (const diff of QG.SCENARIO_DIFFICULTY) {
+        const key = `${len}.${style}.${diff}`;
+        const lab = document.createElement("label");
+        lab.dataset.id = key;
+        lab.innerHTML = `
+          <input type="checkbox" />
+          <span>${len}</span><span class="sep">·</span>
+          <span>${style}</span><span class="sep">·</span>
+          <span>${diff}</span>`;
+        lab.onclick = (e) => {
+          e.preventDefault();
+          draft.scenariosOverridden = true;
+          const idx = draft.scenarios.indexOf(key);
+          if (idx >= 0) draft.scenarios.splice(idx, 1); else draft.scenarios.push(key);
+          paintScenarios();
+          renderSummary();
+        };
+        scenarioHost.appendChild(lab);
+      }
+    }
+  }
+
+  // ---------- Step 3 — prompt-shape pick + knobs ----------
+  const stratHost = document.getElementById("strategy-pick");
+  QG.STRATEGIES.forEach(s => {
+    const lab = document.createElement("label");
+    lab.dataset.id = s.id;
+    lab.innerHTML = `
+      <input type="checkbox" />
+      <span class="head"><span class="num">${s.num}</span><span class="name">${s.name}</span><span class="num" style="margin-left:auto;color:var(--text-faint);">v${s.version}</span></span>
+      <span class="desc">${s.blurb}</span>`;
+    lab.onclick = (e) => {
+      e.preventDefault();
+      // First user toggle in this step flips the override flag — the
+      // wizard stops auto-syncing shapes from personas after this point.
+      draft.shapesOverridden = true;
+      const idx = draft.shapes.indexOf(s.id);
+      if (idx >= 0) draft.shapes.splice(idx, 1); else draft.shapes.push(s.id);
+      paintShapes();
+      renderSummary();
+    };
+    stratHost.appendChild(lab);
+  });
+  function bindKnob(id, key, parse) {
+    const el = document.getElementById(id);
+    el.addEventListener("input", () => {
+      const v = parse(el.value);
+      if (!Number.isNaN(v)) draft.knobs[key] = v;
+      renderSummary();
+    });
+  }
+  bindKnob("k-count",   "count_per_cell",     v => parseInt(v, 10));
+  bindKnob("k-evo",     "evolution_passes",   v => parseInt(v, 10));
+  bindKnob("k-jb",      "jailbreak_budget",   v => parseInt(v, 10));
+  bindKnob("k-novelty", "novelty_floor",      v => parseFloat(v));
+  bindKnob("k-dedup",   "dedup_threshold",    v => parseFloat(v));
+  document.getElementById("k-lang").addEventListener("change", e => { draft.knobs.language = e.target.value; renderSummary(); });
+  document.getElementById("k-target").addEventListener("input", e => {
+    const v = e.target.value.trim();
+    draft.knobs.target_total = v === "" ? null : Math.max(1, parseInt(v, 10) || 0);
+    renderSummary();
+  });
+
+  // ---------- Live summary aside ----------
+  function inputsBlob() {
+    const rubric_ids = QG.rubricsForPersonas(draft.personas);
+    return {
+      persona_ids: draft.personas.slice(),
+      rubric_ids,                                       // per-persona coverage
+      rubric_id: QG.inferRubric(draft.personas),        // mode — kept for display compat
+      prompt_shapes: draft.shapes.slice(),              // QGen content transforms
+      shapes_overridden: draft.shapesOverridden,        // audit: was the default kept?
+      scenarios: draft.scenarios.slice(),               // (length × style × difficulty) keys
+      scenarios_overridden: draft.scenariosOverridden,  // audit: was the default kept?
+      ...draft.knobs,
+    };
+  }
+  function renderSummary() {
+    const host = document.getElementById("summary");
+    const personaPills = draft.personas.map(id => {
+      const p = QG.personaById(id);
+      return `<span class="pill">${p ? p.name : id}</span>`;
+    }).join("");
+    const shapePills = draft.shapes.map(id => {
+      const s = QG.STRATEGIES.find(x => x.id === id);
+      return `<span class="pill">${s ? s.name : id}</span>`;
+    }).join("");
+    const scenarioPills = draft.scenarios.map(k => `<span class="pill">${k.replace(/\./g, " · ")}</span>`).join("");
+    const rubricIds = QG.rubricsForPersonas(draft.personas);
+    const cells = (draft.personas.length || 0) * (draft.shapes.length || 0) * (draft.scenarios.length || 0);
+    const autoTotal = cells * draft.knobs.count_per_cell;
+    const override = draft.knobs.target_total;
+    const totalRow = override
+      ? `<b>${override}</b> seed prompts <small style="color:var(--text-faint);">· override (auto: ${autoTotal})</small>`
+      : `${cells} cells × ${draft.knobs.count_per_cell} = <b>${autoTotal}</b> seed prompts`;
+    const readout = document.getElementById("auto-calc-readout");
+    if (readout) {
+      if (override) {
+        readout.innerHTML = `Override pinned: <b>${override}</b> total. Auto would have been <b>${autoTotal}</b> (${cells} cells × ${draft.knobs.count_per_cell}).`;
+      } else if (cells > 0) {
+        readout.innerHTML = `Auto: <b>${autoTotal}</b> = ${cells} cells × ${draft.knobs.count_per_cell}. Pin a number to override.`;
+      } else {
+        readout.innerHTML = `Pick personas + prompt shapes + scenarios to compute the auto total.`;
+      }
+    }
+    host.innerHTML = `
+      <div class="row">
+        <span class="key">Personas (${draft.personas.length})</span>
+        <span class="val">${personaPills || '<span style="color:var(--text-faint);">—</span>'}</span>
+      </div>
+      <div class="row">
+        <span class="key">Rubric coverage <small style="color:var(--text-faint);text-transform:none;letter-spacing:0;">· per-persona</small></span>
+        <span class="val">${rubricIds.length === 0
+            ? '<span style="color:var(--text-faint);">—</span>'
+            : rubricIds.map(rid => {
+                const rr = QG.rubricById(rid);
+                return `<span class="pill">${rr ? rr.label : rid}</span>`;
+              }).join("")
+              + (rubricIds.length > 1 ? ' <small style="color:var(--accent);">mixed-rubric set</small>' : '')
+        }</span>
+      </div>
+      <div class="row">
+        <span class="key">Prompt shapes (${draft.shapes.length}) ${draft.shapes.length > 0 ? (draft.shapesOverridden ? '<small style="color:var(--accent);text-transform:none;letter-spacing:0;">· override</small>' : '<small style="color:var(--text-faint);text-transform:none;letter-spacing:0;">· inferred</small>') : ''}</span>
+        <span class="val">${shapePills || '<span style="color:var(--text-faint);">—</span>'}</span>
+      </div>
+      <div class="row">
+        <span class="key">Scenarios (${draft.scenarios.length}) ${draft.scenarios.length > 0 ? (draft.scenariosOverridden ? '<small style="color:var(--accent);text-transform:none;letter-spacing:0;">· override</small>' : '<small style="color:var(--text-faint);text-transform:none;letter-spacing:0;">· inferred</small>') : ''}</span>
+        <span class="val">${scenarioPills || '<span style="color:var(--text-faint);">—</span>'}</span>
+      </div>
+      <div class="row">
+        <span class="key">Total seed prompts</span>
+        <span class="val">${totalRow}</span>
+      </div>
+      <div class="row">
+        <span class="key">Config hash</span>
+        <span class="val" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);word-break:break-all;">${QG.configHashOf(inputsBlob()).slice(0, 30)}…</span>
+      </div>
+    `;
+    // Also drive the step-4 preview kv-grid + hash badge.
+    const kv = document.getElementById("preview-kv");
+    if (kv) {
+      kv.innerHTML = `
+        <dt>persona_ids</dt><dd>${draft.personas.map(id => `<code>${id}</code>`).join(" ") || "—"}</dd>
+        <dt>rubric_ids</dt><dd>${rubricIds.length ? rubricIds.map(rid => `<code>${rid}</code>`).join(" ") + (rubricIds.length > 1 ? ' <small style="color:var(--accent);">mixed</small>' : '') : "—"}</dd>
+        <dt>prompt_shapes</dt><dd>${draft.shapes.map(id => `<code>${id}</code>`).join(" ") || "—"}${draft.shapesOverridden ? ' <small style="color:var(--accent);">override</small>' : (draft.shapes.length ? ' <small style="color:var(--text-faint);">inferred</small>' : '')}</dd>
+        <dt>scenarios</dt><dd>${draft.scenarios.map(k => `<code>${k}</code>`).join(" ") || "—"}${draft.scenariosOverridden ? ' <small style="color:var(--accent);">override</small>' : (draft.scenarios.length ? ' <small style="color:var(--text-faint);">inferred</small>' : '')}</dd>
+        <dt>count_per_cell</dt><dd><code>${draft.knobs.count_per_cell}</code></dd>
+        <dt>target_total</dt><dd>${draft.knobs.target_total ? `<code>${draft.knobs.target_total}</code> <small style="color:var(--accent);">override · backsolves count_per_cell</small>` : `<code>auto</code> <small style="color:var(--text-faint);">= cells × count_per_cell</small>`}</dd>
+        <dt>evolution_passes</dt><dd><code>${draft.knobs.evolution_passes}</code></dd>
+        <dt>jailbreak_budget</dt><dd><code>${draft.knobs.jailbreak_budget}</code></dd>
+        <dt>novelty_floor</dt><dd><code>${draft.knobs.novelty_floor}</code></dd>
+        <dt>dedup_threshold</dt><dd><code>${draft.knobs.dedup_threshold}</code></dd>
+        <dt>language</dt><dd><code>${draft.knobs.language}</code></dd>
+      `;
+    }
+    const hashEl = document.getElementById("hash-preview");
+    if (hashEl) hashEl.textContent = QG.configHashOf(inputsBlob()).slice(0, 26) + "…";
+  }
+  renderSummary();
+  paintRubric();
+  paintShapes();
+  paintScenarios();
+
+  // ---------- Step navigation ----------
+  function setStep(n) {
+    n = Math.max(1, Math.min(4, n));
+    draft.step = n;
+    [...document.querySelectorAll(".wizard-step")].forEach(s => s.classList.toggle("active", +s.dataset.step === n));
+    [...document.querySelectorAll(".steps .step")].forEach(s => {
+      const i = +s.dataset.step;
+      s.classList.toggle("active", i === n);
+      s.classList.toggle("done", i < n);
+    });
+    document.getElementById("back").disabled = (n === 1);
+    document.getElementById("next").style.display = (n < 4) ? "" : "none";
+    document.getElementById("submit").style.display = (n === 4) ? "" : "none";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  document.getElementById("back").onclick = () => setStep(draft.step - 1);
+  document.getElementById("next").onclick = () => {
+    // gentle gating — surfaces a toast but does not block (keeps the demo flow easy)
+    if (draft.step === 1 && draft.personas.length === 0)   QG.toast("Pick at least one persona", "Step 01");
+    // step 02 is read-only (rubric inferred from personas); nothing to validate
+    if (draft.step === 3 && draft.shapes.length === 0)      QG.toast("No prompt shapes — pick personas with default_shapes, or toggle one in step 03", "Step 03");
+    if (draft.step === 3 && draft.scenarios.length === 0)   QG.toast("No scenarios — pick personas with default_scenarios, or toggle one in step 03", "Step 03");
+    setStep(draft.step + 1);
+  };
+
+  // ---------- Submit ----------
+  function submitJob() {
+    if (draft.personas.length === 0)  return QG.toast("Pick at least one persona", "Submit");
+    if (draft.shapes.length === 0)    return QG.toast("No prompt shapes resolved — add personas or toggle one in step 03", "Submit");
+    if (draft.scenarios.length === 0) return QG.toast("No scenarios resolved — add personas or toggle one in step 03", "Submit");
+
+    const inputs = inputsBlob();
+    const cells = draft.personas.length * draft.shapes.length * draft.scenarios.length;
+    // If target_total override is set, backsolve count_per_cell so the
+    // fake worker hits the requested total. Floor at 1 per cell.
+    if (inputs.target_total && cells > 0) {
+      inputs.count_per_cell = Math.max(1, Math.ceil(inputs.target_total / cells));
+    }
+    // Live path: submit a real job to the edge and watch it stream.
+    if (window.EEOF && QG.submitLive) {
+      QG.submitLive({
+        personas: draft.personas,
+        shapes: draft.shapes,
+        scenarios: draft.scenarios,
+        rubrics: QG.rubricsForPersonas(draft.personas),
+        count_per_persona: inputs.count_per_cell || 4,
+      }).then((jobId) => {
+        QG.toast(`Submitted ${jobId}`, "Question Generation");
+        setTimeout(() => location.href = `./job.html?id=${encodeURIComponent(jobId)}`, 250);
+      }).catch((err) => QG.toast(err.message, "Submit failed"));
+      return;
+    }
+    const job = {
+      job_id: QG.newJobId(),
+      seed_set_id: null,
+      created_by: "user@local",
+      created_at: QG.nowISO(),
+      completed_by: null,
+      completed_at: null,
+      config_hash: QG.configHashOf(inputs),
+      inputs,
+      state: "queued",
+      progress: { phase: "queued", cells_total: cells, cells_done: 0, questions_generated: 0, questions_kept_after_filter: 0, evolution_passes_applied: 0 },
+      output: null,
+      events: [{ ts: QG.nowISO(), state: "queued", by: "user@local" }],
+    };
+    QG.upsertJob(job);
+    QG.toast(`Submitted ${job.job_id}`, "Question Generation");
+    setTimeout(() => location.href = `./job.html?id=${encodeURIComponent(job.job_id)}`, 250);
+  }
+</script>
+
+</body>
+</html>

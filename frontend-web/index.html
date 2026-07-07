@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Enterprise Eval Observability — Control Center · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="_chrome.js"></script>
+</head>
+<body>
+
+<main class="wrap">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Control Center · pre-release · acme-corp</p>
+    <h1>Enterprise Eval Observability <span class="qualifier">— one pipeline from persona to production evidence</span></h1>
+    <p class="subtitle">
+      Design synthetic users, generate adversarial questions, simulate them against your agents, let judges score every
+      run, and keep the trace — audit-ready — all the way to the deploy gate. Five stages, one lineage.
+    </p>
+    <p class="scope-note" title="Change scope from the Workspace switcher in the sidebar">
+      <span class="scope-note__label">Workspace</span>
+      <b data-ws-name>Sandbox</b>
+      <span class="scope-note__sep">·</span>
+      <span data-ws-scope>visible to you only</span>
+    </p>
+    <div class="aibc-kpis">
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num">87%</span><span class="aibc-stat__label">eval pass rate</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">6</span><span class="aibc-stat__label">personas</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">14</span><span class="aibc-stat__label">question sets</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">38</span><span class="aibc-stat__label">sim runs</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">1,240</span><span class="aibc-stat__label">verdicts</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">4</span><span class="aibc-stat__label">open flags</span></div>
+    </div>
+  </section>
+
+  <!-- ── Pipeline flow — the four-tuple lineage, left → right ────────────── -->
+  <div class="sec-head">
+    <h2 class="sec-head__title">The pipeline</h2>
+    <span class="sec-head__hint">persona → question → run → verdict → evidence</span>
+  </div>
+
+  <div class="pipeline">
+
+    <a class="stage" href="persona-lab/index.html">
+      <div class="stage__top">
+        <span class="stage__num">01</span>
+        <span class="chip chip--ok">healthy</span>
+      </div>
+      <p class="stage__name">Persona Lab</p>
+      <p class="stage__desc">Curated synthetic users that seed every eval — the "who" behind each question.</p>
+      <div class="stage__metric">
+        <span class="stage__num-big">6</span>
+        <span class="stage__metric-label">active personas</span>
+      </div>
+      <div class="stage__foot">
+        <span class="stage__open">Open →</span>
+      </div>
+    </a>
+
+    <a class="stage" href="question-generation/index.html">
+      <div class="stage__top">
+        <span class="stage__num">02</span>
+        <span class="chip chip--run">1 running</span>
+      </div>
+      <p class="stage__name">Question Generation</p>
+      <p class="stage__desc">Turns personas + intents into adversarial question sets via rainbow-teaming strategies.</p>
+      <div class="stage__metric">
+        <span class="stage__num-big">14</span>
+        <span class="stage__metric-label">question sets</span>
+      </div>
+      <div class="stage__foot">
+        <span class="stage__open">Open →</span>
+      </div>
+    </a>
+
+    <a class="stage" href="simulation/index.html">
+      <div class="stage__top">
+        <span class="stage__num">03</span>
+        <span class="chip chip--run">2 in flight</span>
+      </div>
+      <p class="stage__name">Simulation</p>
+      <p class="stage__desc">Replays question sets against your agents over REST / MCP / A2A and captures every trace.</p>
+      <div class="stage__metric">
+        <span class="stage__num-big">38</span>
+        <span class="stage__metric-label">runs recorded</span>
+      </div>
+      <div class="stage__foot">
+        <span class="stage__open">Open →</span>
+      </div>
+    </a>
+
+    <a class="stage" href="evaluation/index.html">
+      <div class="stage__top">
+        <span class="stage__num">04</span>
+        <span class="chip chip--ok">87% pass</span>
+      </div>
+      <p class="stage__name">Evaluation</p>
+      <p class="stage__desc">Opaque judges and jury panels score every run; bring your own judge, export the exec report.</p>
+      <div class="stage__metric">
+        <span class="stage__num-big">1,240</span>
+        <span class="stage__metric-label">verdicts issued</span>
+      </div>
+      <div class="stage__foot">
+        <span class="stage__open">Open →</span>
+      </div>
+    </a>
+
+    <a class="stage" href="observability/index.html">
+      <div class="stage__top">
+        <span class="stage__num">05</span>
+        <span class="chip chip--warn">4 flags</span>
+      </div>
+      <p class="stage__name">Observability</p>
+      <p class="stage__desc">Batch traces, OpenInference span trees, judge κ calibration, drift and regulator-ready evidence packs.</p>
+      <div class="stage__metric">
+        <span class="stage__num-big">9 <em>batches</em></span>
+        <span class="stage__metric-label">under watch</span>
+      </div>
+      <div class="stage__foot">
+        <span class="stage__open">Open →</span>
+      </div>
+    </a>
+
+  </div>
+
+  <!-- ── Lineage feed + attention rail ─────────────────────────────────── -->
+  <div class="grid-2" style="margin-top: clamp(1.75rem, 4vw, 2.75rem);">
+
+    <div class="card jobs">
+      <div class="card__head">
+        <h2 class="card__title">Jobs</h2>
+        <div class="jobs__ctl">
+          <span class="jobs__count" id="jobsCount">14 latest</span>
+          <span class="jselect">
+            <select id="jobFilter" aria-label="Filter jobs by stage">
+              <option value="all">All stages</option>
+              <option value="persona-lab">Persona Lab</option>
+              <option value="question-generation">Question Generation</option>
+              <option value="simulation">Simulation</option>
+              <option value="evaluation">Evaluation</option>
+              <option value="observability">Observability</option>
+            </select>
+          </span>
+        </div>
+      </div>
+      <table class="ltable jtable">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Stage</th>
+            <th class="hide-sm">Detail</th>
+            <th class="hide-md jtime-h">Started</th>
+            <th class="num">Result</th>
+            <th>State</th>
+          </tr>
+        </thead>
+        <tbody id="jobsBody">
+          <tr data-stage="question-generation">
+            <td class="mono">QG-8f2</td>
+            <td><span class="jtag">Question Gen</span></td>
+            <td class="hide-sm jdetail">jailbreak-rainbow <span>·</span> Priya</td>
+            <td class="hide-md jtime">2m ago</td>
+            <td class="num">62%</td>
+            <td><span class="chip chip--run">running</span></td>
+          </tr>
+          <tr data-stage="simulation">
+            <td class="mono">SIM-2f9</td>
+            <td><span class="jtag">Simulation</span></td>
+            <td class="hide-sm jdetail">Priya <span>·</span> refund-edge-cases <span>→</span> orders-agent</td>
+            <td class="hide-md jtime">4m ago</td>
+            <td class="num">92%</td>
+            <td><span class="chip chip--ok">passed</span></td>
+          </tr>
+          <tr data-stage="evaluation">
+            <td class="mono">EVAL-71c</td>
+            <td><span class="jtag">Evaluation</span></td>
+            <td class="hide-sm jdetail">jury panel <span>·</span> finance-copilot</td>
+            <td class="hide-md jtime">8m ago</td>
+            <td class="num">71%</td>
+            <td><span class="chip chip--warn">below bar</span></td>
+          </tr>
+          <tr data-stage="observability">
+            <td class="mono">OBS-4a0</td>
+            <td><span class="jtag">Observability</span></td>
+            <td class="hide-sm jdetail">batch b-2291 <span>·</span> trace ingest</td>
+            <td class="hide-md jtime">11m ago</td>
+            <td class="num">9 <em>batches</em></td>
+            <td><span class="chip chip--run">watching</span></td>
+          </tr>
+          <tr data-stage="simulation">
+            <td class="mono">SIM-2f8</td>
+            <td><span class="jtag">Simulation</span></td>
+            <td class="hide-sm jdetail">Marcus <span>·</span> hallucination-probe <span>→</span> finance-copilot</td>
+            <td class="hide-md jtime">14m ago</td>
+            <td class="num">71%</td>
+            <td><span class="chip chip--warn">below bar</span></td>
+          </tr>
+          <tr data-stage="question-generation">
+            <td class="mono">QG-8f1</td>
+            <td><span class="jtag">Question Gen</span></td>
+            <td class="hide-sm jdetail">tool-misuse set <span>·</span> Aiko</td>
+            <td class="hide-md jtime">19m ago</td>
+            <td class="num">40 <em>items</em></td>
+            <td><span class="chip chip--ok">complete</span></td>
+          </tr>
+          <tr data-stage="persona-lab">
+            <td class="mono">PL-19</td>
+            <td><span class="jtag">Persona Lab</span></td>
+            <td class="hide-sm jdetail">persona “Dana” <span>·</span> revised</td>
+            <td class="hide-md jtime">23m ago</td>
+            <td class="num">v3</td>
+            <td><span class="chip chip--ok">saved</span></td>
+          </tr>
+          <tr data-stage="evaluation">
+            <td class="mono">EVAL-71b</td>
+            <td><span class="jtag">Evaluation</span></td>
+            <td class="hide-sm jdetail">opaque judge <span>·</span> orders-agent</td>
+            <td class="hide-md jtime">27m ago</td>
+            <td class="num">96%</td>
+            <td><span class="chip chip--ok">passed</span></td>
+          </tr>
+          <tr data-stage="simulation">
+            <td class="mono">SIM-2f7</td>
+            <td><span class="jtag">Simulation</span></td>
+            <td class="hide-sm jdetail">Dana <span>·</span> jailbreak-rainbow <span>→</span> support-swarm</td>
+            <td class="hide-md jtime">31m ago</td>
+            <td class="num">—</td>
+            <td><span class="chip chip--err">blocked</span></td>
+          </tr>
+          <tr data-stage="observability">
+            <td class="mono">OBS-49f</td>
+            <td><span class="jtag">Observability</span></td>
+            <td class="hide-sm jdetail">κ calibration <span>·</span> Helpfulness</td>
+            <td class="hide-md jtime">38m ago</td>
+            <td class="num">κ 0.52</td>
+            <td><span class="chip chip--warn">drift</span></td>
+          </tr>
+          <tr data-stage="question-generation">
+            <td class="mono">QG-8f0</td>
+            <td><span class="jtag">Question Gen</span></td>
+            <td class="hide-sm jdetail">pii-leak-probe <span>·</span> Aiko</td>
+            <td class="hide-md jtime">44m ago</td>
+            <td class="num">28 <em>items</em></td>
+            <td><span class="chip chip--ok">complete</span></td>
+          </tr>
+          <tr data-stage="simulation">
+            <td class="mono">SIM-2f6</td>
+            <td><span class="jtag">Simulation</span></td>
+            <td class="hide-sm jdetail">Priya <span>·</span> tool-misuse <span>→</span> orders-agent</td>
+            <td class="hide-md jtime">52m ago</td>
+            <td class="num">62%</td>
+            <td><span class="chip chip--run">running</span></td>
+          </tr>
+          <tr data-stage="evaluation">
+            <td class="mono">EVAL-71a</td>
+            <td><span class="jtag">Evaluation</span></td>
+            <td class="hide-sm jdetail">exec report <span>·</span> v0.9.3 gate</td>
+            <td class="hide-md jtime">1h ago</td>
+            <td class="num">gate</td>
+            <td><span class="chip chip--err">blocked</span></td>
+          </tr>
+          <tr data-stage="persona-lab">
+            <td class="mono">PL-18</td>
+            <td><span class="jtag">Persona Lab</span></td>
+            <td class="hide-sm jdetail">persona “Aiko” <span>·</span> created</td>
+            <td class="hide-md jtime">1h ago</td>
+            <td class="num">v1</td>
+            <td><span class="chip chip--ok">saved</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="jobs__empty" id="jobsEmpty" hidden>No jobs for this stage in the last 24h.</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Needs attention</h2>
+          <span class="card__link">4 open</span>
+        </div>
+        <div class="rail">
+          <a class="alert" href="observability/gate.html">
+            <span class="alert__dot alert__dot--err"></span>
+            <span class="alert__body">
+              <p class="alert__title">Deploy gate BLOCKED — candidate v0.9.3</p>
+              <span class="alert__meta">eval pass 71% &lt; 85% threshold</span>
+            </span>
+            <span class="alert__go" aria-hidden="true">→</span>
+          </a>
+          <a class="alert" href="observability/calibration.html">
+            <span class="alert__dot alert__dot--warn"></span>
+            <span class="alert__body">
+              <p class="alert__title">Judge κ drift on Helpfulness</p>
+              <span class="alert__meta">κ 0.61 → 0.52 vs baseline · acme-corp</span>
+            </span>
+            <span class="alert__go" aria-hidden="true">→</span>
+          </a>
+          <a class="alert" href="observability/trajectory.html">
+            <span class="alert__dot alert__dot--warn"></span>
+            <span class="alert__body">
+              <p class="alert__title">Trajectory drift in support-swarm</p>
+              <span class="alert__meta">3 delegations diverged from golden path</span>
+            </span>
+            <span class="alert__go" aria-hidden="true">→</span>
+          </a>
+          <a class="alert" href="question-generation/index.html">
+            <span class="alert__dot alert__dot--run"></span>
+            <span class="alert__body">
+              <p class="alert__title">Rainbow-teaming job running</p>
+              <span class="alert__meta">jailbreak-rainbow · 62% complete</span>
+            </span>
+            <span class="alert__go" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Spend by stage · 24h</h2>
+          <span class="card__link">synthetic</span>
+        </div>
+        <div class="spend">
+          <div class="spend__row"><span class="spend__name">Persona Lab</span><span class="spend__track"><span class="spend__fill" style="width:6%"></span></span><span class="spend__val">$0.80</span></div>
+          <div class="spend__row"><span class="spend__name">Question Gen</span><span class="spend__track"><span class="spend__fill" style="width:25%"></span></span><span class="spend__val">$3.10</span></div>
+          <div class="spend__row"><span class="spend__name">Simulation</span><span class="spend__track"><span class="spend__fill" style="width:56%"></span></span><span class="spend__val">$6.90</span></div>
+          <div class="spend__row"><span class="spend__name">Evaluation</span><span class="spend__track"><span class="spend__fill" style="width:74%"></span></span><span class="spend__val">$9.20</span></div>
+          <div class="spend__row"><span class="spend__name">Observability</span><span class="spend__track"><span class="spend__fill" style="width:100%"></span></span><span class="spend__val">$12.40</span></div>
+          <div class="spend__total"><span>total · llm + judges</span><b>$32.40</b></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+  // Jobs filter — narrow the unified job feed to one stage. Default "all" shows
+  // the latest jobs across every stage (already ordered newest-first in markup).
+  (function () {
+    var sel   = document.getElementById('jobFilter');
+    var body  = document.getElementById('jobsBody');
+    var count = document.getElementById('jobsCount');
+    var empty = document.getElementById('jobsEmpty');
+    if (!sel || !body) return;
+    var rows = Array.prototype.slice.call(body.querySelectorAll('tr'));
+    function apply() {
+      var v = sel.value, shown = 0;
+      rows.forEach(function (r) {
+        var match = v === 'all' || r.getAttribute('data-stage') === v;
+        r.hidden = !match;
+        if (match) shown++;
+      });
+      if (count) count.textContent = shown + (v === 'all' ? ' latest' : ' shown');
+      if (empty) empty.hidden = shown > 0;
+    }
+    sel.addEventListener('change', apply);
+    apply();
+  })();
+</script>
+
+<script src="_api.js"></script>
+<script src="dashboard.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Create persona — Persona Lab · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Persona Lab</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>01 · Persona Lab</b> · Create</span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> New synthetic user</p>
+    <h1>Create persona <span class="qualifier">— cast a character</span></h1>
+    <p class="subtitle">
+      A persona is a small, deliberate fiction. The more specifically it misbehaves, the more useful it is for grading.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--accent">Saved on submit</span>
+    </div>
+  </section>
+
+  <form id="persona-form" class="form-grid" autocomplete="off">
+
+    <!-- LEFT: form -->
+    <div class="form-stack">
+
+      <!-- 01 Identity -->
+      <section class="form-section" style="border-top:0;padding-top:0;">
+        <h2><span class="num">01</span>Identity</h2>
+        <p class="sub">Give the persona a memorable, alliterative name — it makes them easier to talk about across runs.</p>
+        <div class="row-2">
+          <div class="field">
+            <label>Display name <span class="req">*</span></label>
+            <input class="input" name="name" placeholder="e.g. Onboarding Olivia" required />
+          </div>
+          <div class="field">
+            <label>Hue (card accent)</label>
+            <div class="hue-grid" id="hue-grid">
+              <label class="h-ochre"      data-hue="ochre"><input type="radio" name="hue" value="ochre" /></label>
+              <label class="h-sage"       data-hue="sage"><input type="radio" name="hue" value="sage" /></label>
+              <label class="h-rose"       data-hue="rose"><input type="radio" name="hue" value="rose" /></label>
+              <label class="h-olive"      data-hue="olive"><input type="radio" name="hue" value="olive" /></label>
+              <label class="h-plum"       data-hue="plum"><input type="radio" name="hue" value="plum" /></label>
+              <label class="h-rust"       data-hue="rust"><input type="radio" name="hue" value="rust" /></label>
+              <label class="h-terracotta" data-hue="terracotta"><input type="radio" name="hue" value="terracotta" checked /></label>
+            </div>
+          </div>
+        </div>
+        <div class="field" style="margin-top:16px;">
+          <label>Signature line <span class="hint" style="display:inline;color:var(--ink-3);">— a one-line quote in the persona's voice</span></label>
+          <input class="input" name="quote" placeholder='e.g. "Skip the preamble — give me the answer in three lines max."' />
+        </div>
+      </section>
+
+      <!-- 02 Demographics -->
+      <section class="form-section">
+        <h2><span class="num">02</span>Demographics</h2>
+        <p class="sub">Synthetic, and clearly so — fake names, broad bands. Never reuse anything that resembles a real customer profile.</p>
+        <div class="row-3">
+          <div class="field">
+            <label>Role</label>
+            <input class="input" name="role" placeholder="e.g. Field sales lead" />
+          </div>
+          <div class="field">
+            <label>Age band</label>
+            <input class="input" name="age_band" placeholder="e.g. 32–38" />
+          </div>
+          <div class="field">
+            <label>Locale</label>
+            <input class="input" name="locale" placeholder="e.g. London, UK" />
+          </div>
+        </div>
+        <div class="field" style="margin-top:16px;">
+          <label>Tech savviness</label>
+          <div class="radio-cluster" id="tech-cluster">
+            <label data-val="novice"><input type="radio" name="tech_savviness" value="novice" /><span class="lab"><b>Novice</b><small>First time touching this kind of tool. Needs hand-holding.</small></span></label>
+            <label data-val="intermediate"><input type="radio" name="tech_savviness" value="intermediate" checked /><span class="lab"><b>Intermediate</b><small>Comfortable with the tool, occasional gaps.</small></span></label>
+            <label data-val="advanced"><input type="radio" name="tech_savviness" value="advanced" /><span class="lab"><b>Advanced</b><small>Power user / domain expert. Will catch hallucinations.</small></span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 Tone -->
+      <section class="form-section">
+        <h2><span class="num">03</span>Tone</h2>
+        <p class="sub">How does this persona <em>sound</em>? Tone shapes the question-generation strategy and how strict the judges should be on register.</p>
+        <div class="tone-track" id="tone-track">
+          <button type="button" data-val="formal">Formal</button>
+          <button type="button" data-val="casual" class="active">Casual</button>
+          <button type="button" data-val="blunt">Blunt</button>
+          <button type="button" data-val="frustrated">Frustrated</button>
+          <button type="button" data-val="playful">Playful</button>
+        </div>
+        <input type="hidden" name="tone" value="casual" />
+      </section>
+
+      <!-- 04 Goals -->
+      <section class="form-section">
+        <h2><span class="num">04</span>Goals</h2>
+        <p class="sub">What is the persona trying to accomplish? Plain language. One bullet per goal.</p>
+        <div class="field">
+          <label>Goals (one per line)</label>
+          <textarea class="textarea long" name="goals" placeholder="Get the smallest correct answer in the shortest possible response.&#10;Move on to the next call."></textarea>
+        </div>
+      </section>
+
+      <!-- 05 Edge-cases -->
+      <section class="form-section">
+        <h2><span class="num">05</span>Edge-case behaviors</h2>
+        <p class="sub">The reason this persona earns its keep. The more specifically they misbehave, the more useful they are.</p>
+        <div class="field">
+          <label>Edge-cases (one per line)</label>
+          <textarea class="textarea long" name="edge_cases" placeholder="Asks the same question twice in different words across turns.&#10;Drops mid-conversation if a single response exceeds ~200 words."></textarea>
+        </div>
+      </section>
+
+      <!-- 06 Tags & version -->
+      <section class="form-section">
+        <h2><span class="num">06</span>Tags &amp; version</h2>
+        <p class="sub">Tags drive filtering and rubric routing. Versioning is required — bumping it on a meaningful change keeps eval runs reproducible.</p>
+        <div class="row-2">
+          <div class="field">
+            <label>Tags</label>
+            <div class="tag-input" id="tag-input">
+              <input id="tag-entry" type="text" placeholder="enter tag, then ↵" />
+            </div>
+            <span class="hint">Suggested: onboarding · adversarial · multi-turn · long-context · multilingual · ambiguous</span>
+          </div>
+          <div class="field">
+            <label>Version</label>
+            <input class="input mono" name="version" value="0.1.0" placeholder="0.1.0" />
+            <span class="hint">Semver. Bump <b>major</b> on behavioral rewrite, <b>minor</b> on additions, <b>patch</b> on copy fixes.</span>
+          </div>
+        </div>
+      </section>
+
+      <div style="display:flex;gap:12px;justify-content:flex-end;padding-top:8px;">
+        <a class="btn ghost" href="./index.html">Cancel</a>
+        <button class="btn primary" type="submit">Save persona →</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: live preview -->
+    <aside class="preview-rail">
+      <span class="label"><b>Live preview</b> — what the gallery card will look like</span>
+      <article id="preview" class="persona" data-hue="terracotta" style="grid-column: unset;">
+        <span class="ribbon-stripe"></span>
+        <div class="head">
+          <div class="monogram" id="prev-mono">··</div>
+          <div style="flex:1;min-width:0;">
+            <div class="meta-line"><b id="prev-tone">Casual</b> · <span id="prev-locale">—</span> · v<span id="prev-version">0.1.0</span></div>
+            <h3 id="prev-name">Untitled <em>Persona</em></h3>
+            <p class="demo" id="prev-role">Role · Age band</p>
+          </div>
+        </div>
+        <p class="quote" id="prev-quote">"A signature line in the persona's voice will appear here."</p>
+        <div class="tags" id="prev-tags"></div>
+        <div class="actions">
+          <span class="stamp">draft · not yet saved</span>
+          <span class="links"><a href="#">Edit</a></span>
+        </div>
+      </article>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-3);padding:12px 14px;border:1px dashed var(--rule-dashed);border-radius:var(--r-2);background:var(--bg-tint);line-height:1.6;">
+        Synthetic data only. Personas are stored in your browser's localStorage, scoped to this mock — clearing site data wipes the library.
+      </div>
+    </aside>
+
+  </form>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / ui-mock / persona-lab / create.html</span>
+    <span><a href="./palette.html">design tokens →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const form = document.getElementById("persona-form");
+  const tagInput = document.getElementById("tag-input");
+  const tagEntry = document.getElementById("tag-entry");
+  const hueGrid = document.getElementById("hue-grid");
+  const techCluster = document.getElementById("tech-cluster");
+  const toneTrack = document.getElementById("tone-track");
+
+  let tags = [];
+
+  // ---- Tag chips ----
+  function renderTags() {
+    [...tagInput.querySelectorAll(".chip")].forEach(c => c.remove());
+    tags.forEach(t => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = `#${t} <button type="button" aria-label="remove">×</button>`;
+      chip.querySelector("button").onclick = () => { tags = tags.filter(x => x !== t); renderTags(); updatePreview(); };
+      tagInput.insertBefore(chip, tagEntry);
+    });
+  }
+  tagEntry.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const v = tagEntry.value.trim().replace(/^#/, "").toLowerCase();
+      if (v && !tags.includes(v)) tags.push(v);
+      tagEntry.value = "";
+      renderTags();
+      updatePreview();
+    } else if (e.key === "Backspace" && !tagEntry.value && tags.length) {
+      tags.pop(); renderTags(); updatePreview();
+    }
+  });
+
+  // ---- Hue radio (custom outline) ----
+  hueGrid.querySelectorAll("label").forEach(lab => {
+    lab.addEventListener("click", () => {
+      hueGrid.querySelectorAll("label").forEach(l => l.classList.remove("checked"));
+      lab.classList.add("checked");
+      lab.querySelector("input").checked = true;
+      updatePreview();
+    });
+  });
+  hueGrid.querySelector('label[data-hue="terracotta"]').classList.add("checked");
+
+  // ---- Tech radio cluster ----
+  techCluster.querySelectorAll("label").forEach(lab => {
+    lab.addEventListener("click", () => {
+      techCluster.querySelectorAll("label").forEach(l => l.classList.remove("checked"));
+      lab.classList.add("checked");
+      lab.querySelector("input").checked = true;
+    });
+  });
+  techCluster.querySelector('label[data-val="intermediate"]').classList.add("checked");
+
+  // ---- Tone track ----
+  toneTrack.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      toneTrack.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      form.elements.tone.value = btn.dataset.val;
+      updatePreview();
+    });
+  });
+
+  // ---- Live preview ----
+  function updatePreview() {
+    const fd = new FormData(form);
+    const name = fd.get("name") || "Untitled Persona";
+    const tone = fd.get("tone") || "casual";
+    const role = fd.get("role") || "Role";
+    const age = fd.get("age_band") || "Age band";
+    const loc = fd.get("locale") || "—";
+    const version = fd.get("version") || "0.1.0";
+    const quote = fd.get("quote") || `"A signature line in the persona's voice will appear here."`;
+    const hue = fd.get("hue") || "terracotta";
+
+    document.getElementById("prev-mono").textContent = PL.monogramOf(name);
+    const parts = name.trim().split(/\s+/);
+    const last = parts.length > 1 ? parts.pop() : "";
+    document.getElementById("prev-name").innerHTML = parts.join(" ") + (last ? ` <em>${last}</em>` : ` <em>·</em>`);
+    document.getElementById("prev-role").textContent = `${role} · ${age}`;
+    document.getElementById("prev-locale").textContent = loc;
+    document.getElementById("prev-tone").textContent = PL.TONE_LABEL[tone] || tone;
+    document.getElementById("prev-version").textContent = version;
+    document.getElementById("prev-quote").textContent = quote.startsWith('"') || quote.startsWith('"') ? quote : `"${quote}"`;
+
+    const tagsHost = document.getElementById("prev-tags");
+    tagsHost.innerHTML = tags.length
+      ? tags.map(t => `<span class="tag">#${t}</span>`).join("")
+      : `<span class="tag" style="color:var(--ink-4);">#tag</span>`;
+
+    document.getElementById("preview").dataset.hue = hue;
+  }
+  form.addEventListener("input", updatePreview);
+  updatePreview();
+
+  // ---- Submit ----
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const name = (fd.get("name") || "").trim();
+    if (!name) { PL.toast("Name is required", "Persona Lab"); return; }
+
+    const persona = {
+      id: PL.newId(name),
+      name,
+      quote: (fd.get("quote") || "").trim(),
+      role: (fd.get("role") || "").trim(),
+      age_band: (fd.get("age_band") || "").trim(),
+      locale: (fd.get("locale") || "").trim(),
+      tech_savviness: fd.get("tech_savviness") || "intermediate",
+      tone: fd.get("tone") || "casual",
+      goals: (fd.get("goals") || "").split("\n").map(s => s.trim()).filter(Boolean),
+      edge_cases: (fd.get("edge_cases") || "").split("\n").map(s => s.trim()).filter(Boolean),
+      tags: [...tags],
+      hue: fd.get("hue") || "terracotta",
+      version: (fd.get("version") || "0.1.0").trim(),
+      created_at: PL.todayISO(),
+      updated_at: PL.todayISO(),
+    };
+    PL.upsert(persona);
+    PL.toast(`Saved ${persona.name} (v${persona.version})`, "Persona Lab");
+    setTimeout(() => { window.location.href = "./index.html"; }, 600);
+  });
+</script>
+
+</body>
+</html>

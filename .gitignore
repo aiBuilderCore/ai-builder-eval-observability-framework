@@ -1,12 +1,24 @@
+# OS / editors
 .DS_Store
-node_modules/
+.idea/
+.vscode/
+
+# Python
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Env (keep the example)
 .env
 .env.*
 !.env.example
-.idea/
-.vscode/
-dist/
-build/
+
+# Local blob store (runtime data written by LocalBlob)
+.eeof-blobs/

@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark">
+<title>Design Tokens — Question Generation palette · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>/* aibc-theme-toggle: applied */
+
+  :root {
+    --bg: #f9f8f5;
+    --surface: #ffffff;
+    --surface-alt: #f2f0ed;
+    --surface-soft: #eeece8;
+    --text: #171717;
+    --text-muted: #5a5a5a;
+    --text-faint: #858585;
+    --border: rgba(176, 168, 155, 0.45);
+    --border-strong: rgba(176, 168, 155, 0.70);
+    --accent: #7c3aed;
+    --accent-hover: #6d28d9;
+    --accent-soft: #ede9fe;
+    --shadow: rgba(23, 23, 23, 0.06);
+    --code-bg: #1a1a1a;
+    --code-text: #ebebeb;
+
+    --font-body: 'Geist', 'Inter', -apple-system, sans-serif;
+    --font-heading: 'Space Grotesk', 'Geist', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121212;
+      --surface: #1a1a1a;
+      --surface-alt: #212121;
+      --surface-soft: #292929;
+      --text: #ebebeb;
+      --text-muted: #b3b3b3;
+      --text-faint: #858585;
+      --border: rgba(102, 102, 102, 0.25);
+      --border-strong: rgba(102, 102, 102, 0.45);
+      --accent: #a78bfa;
+      --accent-hover: #c4b5fd;
+      --accent-soft: rgba(167, 139, 250, 0.12);
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+  }
+:root[data-theme="dark"] {
+      --bg: #121212;
+      --surface: #1a1a1a;
+      --surface-alt: #212121;
+      --surface-soft: #292929;
+      --text: #ebebeb;
+      --text-muted: #b3b3b3;
+      --text-faint: #858585;
+      --border: rgba(102, 102, 102, 0.25);
+      --border-strong: rgba(102, 102, 102, 0.45);
+      --accent: #a78bfa;
+      --accent-hover: #c4b5fd;
+      --accent-soft: rgba(167, 139, 250, 0.12);
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+
+
+  
+* { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--accent); color: #ffffff; }
+
+  /* back bar */
+  .mock-back {
+    position: sticky; top: 0; z-index: 30;
+    height: 56px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+  }
+  .mock-back__link {
+    max-width: 1240px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 40px;
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.08em;
+    font-size: 13px;
+    color: var(--text-muted);
+    transition: color 0.15s ease;
+  }
+  .mock-back__link:hover { color: var(--accent); }
+  .mock-back__arrow { font-size: 16px; }
+
+  .frame { max-width: 1240px; margin: 0 auto; padding: 0 40px; }
+
+  header.top {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 56px; z-index: 20;
+  }
+  header.top .row {
+    display: flex; align-items: center; justify-content: space-between; height: 64px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: var(--accent);
+  }
+  .brand-text {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .brand-text em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .product-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .product-name b { color: var(--accent); font-weight: 600; }
+  .product-name a { color: inherit; text-decoration: none; transition: color 0.15s ease; }
+  .product-name a:hover { color: var(--accent); }
+
+  /* page-head (Option B header) */
+  .page-head { padding: 20px 0 18px; max-width: 100%; }
+  .page-head .eyebrow {
+    font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 12px;
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .page-head .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .page-head h1 {
+    font-family: var(--font-heading, 'Space Grotesk', sans-serif);
+    font-size: clamp(24px, 2.6vw, 32px);
+    font-weight: 700; letter-spacing: -0.025em; line-height: 1.2;
+    margin: 0 0 0.6rem 0; color: var(--text);
+  }
+  .page-head h1 .qualifier { color: var(--text-muted); font-weight: 500; }
+  .page-head p.subtitle {
+    font-family: var(--font-body, 'Geist', sans-serif);
+    font-size: 15px; line-height: 1.65;
+    color: var(--text-muted); margin: 0; max-width: 60ch;
+  }
+  .page-head .meta-pills {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1rem;
+  }
+  .page-head .meta-pills .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface-alt); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.25rem 0.75rem;
+    font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-size: 11px; letter-spacing: 0.04em; color: var(--text-muted);
+  }
+  .page-head .meta-pills .pill b { color: var(--text); font-weight: 600; }
+  .page-head .meta-pills .pill--accent {
+    background: var(--accent-soft); border-color: transparent; color: var(--accent);
+  }
+  .page-head .meta-pills .pill--accent b { color: var(--accent); }
+  nav.crumbs {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  nav.crumbs a:hover { color: var(--accent); }
+  nav.crumbs span { color: var(--border-strong); margin: 0 8px; }
+
+  .subnav { border-bottom: 1px solid var(--border); background: var(--bg); }
+  .subnav .row { display: flex; align-items: center; justify-content: space-between; height: 52px; }
+  .subnav .tabs { display: flex; gap: 4px; }
+  .subnav .tabs a {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: var(--text-muted);
+  }
+  .subnav .tabs a:hover { color: var(--accent); background: var(--accent-soft); }
+  .subnav .tabs a.active { color: var(--accent); background: var(--accent-soft); }
+  .subnav .meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+  }
+  .subnav .meta b { color: var(--text); font-weight: 600; }
+
+  /* hero */
+  .hero {
+    padding: 88px 0 24px;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: end;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  h1.title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: clamp(48px, 6vw, 84px);
+    line-height: 1.0;
+    letter-spacing: -0.025em;
+    margin: 0;
+    color: var(--text);
+  }
+  h1.title em { font-style: normal; color: var(--accent); }
+  .lede {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 19px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    max-width: 50ch;
+  }
+  .lede em { font-style: normal; color: var(--text); font-weight: 600; }
+  .meta-strip {
+    display: flex; flex-direction: column; gap: 4px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px; margin-top: 18px;
+  }
+  .meta-strip .row {
+    display: flex; justify-content: space-between;
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--text-faint); letter-spacing: 0.04em;
+  }
+  .meta-strip .row b { font-weight: 500; color: var(--text); }
+
+  /* section heads */
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 80px 0 8px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-head h2 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--text);
+  }
+  .section-head h2 em { font-style: normal; color: var(--accent); }
+  .section-head .num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  .section-lede {
+    font-family: var(--font-body);
+    font-size: 17px;
+    color: var(--text-muted);
+    max-width: 60ch;
+    margin: 18px 0 0;
+    line-height: 1.65;
+  }
+  .section-lede em { font-style: normal; color: var(--text); font-weight: 600; }
+
+  /* swatch wall */
+  .swatch-wall {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 32px 0 0;
+  }
+  .swatch {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    padding: 28px 20px 20px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: var(--sw-bg);
+    color: var(--sw-ink, #ffffff);
+  }
+  .swatch .name {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 22px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .swatch .tokens {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    opacity: 0.85;
+    line-height: 1.7;
+  }
+  .swatch.light { --sw-ink: var(--text); }
+  .swatch.s1 { --sw-bg: var(--accent); }
+  .swatch.s2 { --sw-bg: var(--accent-hover); }
+  .swatch.s3 { --sw-bg: var(--surface); }
+  .swatch.s3.light { --sw-ink: var(--text); border-color: var(--border-strong); }
+  .swatch.s4 { --sw-bg: var(--accent-soft); }
+  .swatch.s4.light { --sw-ink: var(--accent); }
+
+  /* component grid */
+  .components-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .demo-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    padding: 22px;
+  }
+  .demo-card h4 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 0 0 8px;
+    letter-spacing: -0.015em;
+    color: var(--text);
+  }
+  .demo-card h4 em { font-style: normal; color: var(--accent); }
+  .demo-card p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 10px 0 0;
+    line-height: 1.6;
+  }
+
+  /* type specimens */
+  .specimen {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    padding: 40px 40px 32px;
+    margin-top: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .specimen::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: var(--accent);
+  }
+  .specimen .meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    display: flex;
+    gap: 18px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .specimen .display {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: clamp(48px, 7vw, 96px);
+    line-height: 1.0;
+    letter-spacing: -0.025em;
+    color: var(--text);
+  }
+  .specimen .display em { font-style: normal; color: var(--accent); }
+  .specimen .pangram {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin-top: 14px;
+    max-width: 60ch;
+  }
+  .specimen.body .display {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(40px, 5.5vw, 72px);
+    letter-spacing: -0.02em;
+  }
+  .specimen.mono .display {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: clamp(32px, 4.5vw, 56px);
+    letter-spacing: 0;
+  }
+  .specimen.mono .pangram {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* strategy chips */
+  .strategy-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 18px;
+  }
+  .strategy {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    background: var(--surface);
+    padding: 18px;
+  }
+  .strategy .name {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--text);
+    letter-spacing: -0.015em;
+    margin-bottom: 6px;
+  }
+  .strategy .desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .strategy .tag {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+  }
+
+  /* token table */
+  .token-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 18px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface);
+  }
+  .token-table th, .token-table td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+  }
+  .token-table th {
+    background: var(--surface-alt);
+    font-family: var(--font-heading);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .token-table td {
+    border-top: 1px solid var(--border);
+    color: var(--text);
+  }
+  .token-table td .dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-right: 8px;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+
+  /* button + input + code samples */
+  .btn {
+    font-family: var(--font-heading);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .btn--primary { background: var(--accent); color: #ffffff; }
+  .btn--primary:hover { background: var(--accent-hover); }
+  .btn--secondary { background: transparent; color: var(--text); border-color: var(--border); }
+  .btn--secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .pill {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+  .pill--neutral {
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  .input-demo {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--text);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input-demo:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  code, .code-inline {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.1rem 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    color: var(--text);
+  }
+
+  footer.foot {
+    margin: 96px 0 48px;
+    padding-top: 26px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+  }
+  footer.foot a { color: var(--text-muted); }
+  footer.foot a:hover { color: var(--accent); }
+
+  @media (max-width: 880px) {
+    .hero { grid-template-columns: 1fr; padding: 56px 0 16px; }
+    .swatch-wall { grid-template-columns: 1fr 1fr; }
+    .strategy-grid, .components-grid { grid-template-columns: 1fr; }
+    h1.title { font-size: clamp(40px, 9vw, 64px); }
+  }
+</style>
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Question Gen</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>02 · Question Generation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Design tokens · Question Generation</p>
+    <h1>Question Generation Palette <span class="qualifier">— unified house style</span></h1>
+    <p class="subtitle">
+      The same AIBuilderCore tokens applied to the Question Generation surface — warm cream backdrop, violet accent, Geist + Space Grotesk typography, with light and dark themes auto-switching via prefers-color-scheme.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--accent"><b>--accent</b> #7c3aed</span>
+      <span class="pill"><b>--bg</b> #f9f8f5</span>
+      <span class="pill">Space Grotesk</span>
+      <span class="pill">Geist</span>
+    </div>
+  </section>
+
+  <div class="section-head">
+    <h2><em>Colour</em>.</h2>
+    <span class="num">01 · primary</span>
+  </div>
+  <p class="section-lede">A single bright accent — <em>violet</em> — anchors the entire system. Surfaces are layered cream tones; ink is near-black; borders are a warm grey at low opacity. Dark mode flips to deep neutrals with a softened violet that retains contrast.</p>
+
+  <div class="swatch-wall">
+    <div class="swatch s1"><div class="name">Violet<br/>— the accent.</div><div class="tokens">--accent · #7c3aed<br/>used on: focus, eyebrow, primary buttons</div></div>
+    <div class="swatch s2"><div class="name">Violet hover</div><div class="tokens">--accent-hover<br/>#6d28d9</div></div>
+    <div class="swatch s3 light"><div class="name">Surface</div><div class="tokens">--surface · #ffffff<br/>cards, specimens</div></div>
+    <div class="swatch s4 light"><div class="name">Accent soft</div><div class="tokens">--accent-soft<br/>#ede9fe</div></div>
+  </div>
+
+  <div class="section-head">
+    <h2><em>Typography</em>.</h2>
+    <span class="num">02 · geist + grotesk</span>
+  </div>
+  <p class="section-lede">Space Grotesk for display and headings — quietly geometric, very legible, tightened tracking. Geist for body — 16px, line-height 1.7, comfortable reading rhythm. JetBrains Mono for code, tokens, and data.</p>
+
+  <section class="specimen">
+    <div class="meta">
+      <span>Aa — <b style="color:var(--accent)">Space Grotesk</b></span>
+      <span>weights 500 / 600 / 700</span>
+      <span>display + headings</span>
+    </div>
+    <div class="display">A question <em>that bites</em>.</div>
+    <p class="pangram">Display type for hero titles and section headings. Letter-spacing -0.025em on h1 and -0.02em on h2 keeps the geometric forms feeling crisp without becoming brittle.</p>
+  </section>
+
+  <section class="specimen body">
+    <div class="meta">
+      <span>Aa — <b style="color:var(--accent)">Geist</b></span>
+      <span>400 / 500 / 600 / 700</span>
+      <span>body — paragraph + UI</span>
+    </div>
+    <div class="display">Geist sets the rhythm.</div>
+    <p class="pangram">Body type at 16px / line-height 1.7. Carries paragraphs, table cells, button labels, and form copy. Pairs cleanly with Space Grotesk for headings without competing for attention.</p>
+  </section>
+
+  <section class="specimen mono">
+    <div class="meta">
+      <span>Aa — <b style="color:var(--accent)">JetBrains Mono</b></span>
+      <span>question_strategy_version · 1.4.0</span>
+      <span>data + code</span>
+    </div>
+    <div class="display">strategy_id := ambiguous</div>
+    <p class="pangram">strategy_id := ambiguous · version := 1.4.0 · supports_personas := [#low-context #frustrated #onboarding] · output_count := 12 · rubrics := [faithfulness, helpfulness]</p>
+  </section>
+
+  <div class="section-head">
+    <h2><em>Strategies</em>.</h2>
+    <span class="num">03 · the kit</span>
+  </div>
+  <p class="section-lede">Each strategy is a card, with a one-line description and a tag for the rubric it stress-tests. The kit grows over time; the palette absorbs new entries gracefully.</p>
+
+  <div class="strategy-grid">
+    <div class="strategy"><span class="tag">01</span><div class="name">Ambiguate</div><div class="desc">Strip context until the prompt is plausibly two different requests.</div></div>
+    <div class="strategy"><span class="tag">02</span><div class="name">Multi-turn</div><div class="desc">Spread the request across 3–5 turns, hide the punch-line in turn 4.</div></div>
+    <div class="strategy"><span class="tag">03</span><div class="name">Adversify</div><div class="desc">Wrap a benign question in a jailbreak attempt that should be refused.</div></div>
+    <div class="strategy"><span class="tag">04</span><div class="name">Code-switch</div><div class="desc">Mid-prompt language shift — Hindi/English, Spanish/English.</div></div>
+    <div class="strategy"><span class="tag">05</span><div class="name">Long-context</div><div class="desc">Bury the operative request inside ~4k tokens of unrelated text.</div></div>
+    <div class="strategy"><span class="tag">06</span><div class="name">Hallucinate-bait</div><div class="desc">Cite a paper, person, or API that does not exist; ask for elaboration.</div></div>
+  </div>
+
+  <div class="section-head">
+    <h2><em>Components</em>.</h2>
+    <span class="num">04 · sketches</span>
+  </div>
+  <p class="section-lede">A small kit, intentionally restrained. Buttons, pills, inputs, code, and accent-bar cards. The accent-bar card is the dominant component because every output of this stage is a specimen of a question.</p>
+
+  <div class="components-grid">
+    <div class="demo-card">
+      <h4><em>Buttons</em></h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;">
+        <button class="btn btn--primary">Generate set →</button>
+        <button class="btn btn--secondary">Discard</button>
+      </div>
+      <p>Primary uses the violet accent on white; secondary is transparent with a 1px border. Both round 8px, Space Grotesk 600.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Pills</em></h4>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px;">
+        <span class="pill">#ambiguous</span>
+        <span class="pill">#multi-turn</span>
+        <span class="pill pill--neutral">v1.4.0</span>
+      </div>
+      <p>Strategy IDs use the accent-soft pill; version stamps and neutrals use the surface-alt pill with a thin border.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Inputs</em></h4>
+      <input class="input-demo" type="text" placeholder="persona-id-low-context-v3" />
+      <p style="margin-top:10px;">Surface background, 1px border, 8px radius. Focus glows with a 3px accent-soft ring and a violet border.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Inline code</em></h4>
+      <p style="margin:10px 0 0;">Use <code>strategy_id</code> with a <code>version</code> stamp such as <code>1.4.0</code>; the surface-alt background and tight border keep code anchored without shouting.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Accent-bar card</em></h4>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 14px 14px 22px;position:relative;box-shadow:0 1px 3px var(--shadow);">
+        <span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);border-radius:10px 0 0 10px;"></span>
+        <p style="margin:0;font-family:var(--font-body);font-size:14px;color:var(--text-muted);line-height:1.6;">A note in the margin: the persona would not phrase this so politely.</p>
+      </div>
+    </div>
+    <div class="demo-card">
+      <h4><em>Table cell</em></h4>
+      <table class="token-table" style="margin-top:10px;font-size:12px;">
+        <thead><tr><th>Strategy</th><th>Version</th></tr></thead>
+        <tbody>
+          <tr><td>ambiguate</td><td>1.4.0</td></tr>
+          <tr><td>multi-turn</td><td>0.9.2</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2><em>Token reference</em>.</h2>
+    <span class="num">05 · the contract</span>
+  </div>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Value</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot" style="background:#f9f8f5;"></span>--bg</td><td>#f9f8f5</td><td>page background</td></tr>
+      <tr><td><span class="dot" style="background:#ffffff;"></span>--surface</td><td>#ffffff</td><td>cards, specimens</td></tr>
+      <tr><td><span class="dot" style="background:#f2f0ed;"></span>--surface-alt</td><td>#f2f0ed</td><td>th, code, pill-neutral</td></tr>
+      <tr><td><span class="dot" style="background:#eeece8;"></span>--surface-soft</td><td>#eeece8</td><td>nested surface</td></tr>
+      <tr><td><span class="dot" style="background:#171717;"></span>--text</td><td>#171717</td><td>primary text</td></tr>
+      <tr><td><span class="dot" style="background:#5a5a5a;"></span>--text-muted</td><td>#5a5a5a</td><td>secondary text</td></tr>
+      <tr><td><span class="dot" style="background:#858585;"></span>--text-faint</td><td>#858585</td><td>captions, meta</td></tr>
+      <tr><td><span class="dot" style="background:rgba(176,168,155,0.45);"></span>--border</td><td>rgba(176,168,155,0.45)</td><td>borders</td></tr>
+      <tr><td><span class="dot" style="background:rgba(176,168,155,0.70);"></span>--border-strong</td><td>rgba(176,168,155,0.70)</td><td>strong borders</td></tr>
+      <tr><td><span class="dot" style="background:#7c3aed;"></span>--accent</td><td>#7c3aed</td><td>violet — primary</td></tr>
+      <tr><td><span class="dot" style="background:#6d28d9;"></span>--accent-hover</td><td>#6d28d9</td><td>hover state</td></tr>
+      <tr><td><span class="dot" style="background:#ede9fe;"></span>--accent-soft</td><td>#ede9fe</td><td>pill bg, focus ring</td></tr>
+      <tr><td><span class="dot" style="background:rgba(23,23,23,0.06);"></span>--shadow</td><td>rgba(23,23,23,0.06)</td><td>card shadow</td></tr>
+      <tr><td><span class="dot" style="background:#1a1a1a;"></span>--code-bg</td><td>#1a1a1a</td><td>code-block bg</td></tr>
+      <tr><td><span class="dot" style="background:#ebebeb;"></span>--code-text</td><td>#ebebeb</td><td>code-block text</td></tr>
+    </tbody>
+  </table>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / question-generation / palette.html</span>
+    <span><a href="../index.html">← back to UI Mocks</a></span>
+  </footer>
+
+</main>
+
+</body>
+</html>

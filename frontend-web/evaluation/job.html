@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Evaluation — Job · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      moon.style.display = isDark() ? 'none' : 'block';
+      sun.style.display  = isDark() ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a href="./index.html" class="back-link"><span class="arrow">←</span> Back to jobs</a>
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Job detail</p>
+    <h1 id="title">Loading… <span class="qualifier" id="title-meta"></span></h1>
+    <p class="subtitle" id="subtitle">…</p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <!-- Progress strip -->
+  <section id="progress-section">
+    <h2 style="font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin:24px 0 0;">Progress</h2>
+    <div class="progress-strip" id="progress"></div>
+  </section>
+
+  <!-- KPI strip -->
+  <div class="kpi-strip" id="kpis"></div>
+
+  <!-- Main two-column area -->
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:28px;align-items:start;margin-top:18px;" id="two-col">
+
+    <div>
+      <!-- Inputs panel -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Inputs (frozen)</h2>
+          <span class="meta" id="inputs-meta"></span>
+        </div>
+        <dl class="kv-grid" id="inputs"></dl>
+      </section>
+
+      <!-- Aggregate panel -->
+      <section class="panel" id="aggregate-panel" style="display:none;">
+        <div class="panel-header">
+          <h2>Aggregate scores</h2>
+          <span class="meta" id="aggregate-meta"></span>
+        </div>
+        <div class="aggregate-grid" id="aggregate"></div>
+      </section>
+
+      <!-- Verdicts -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Verdicts</h2>
+          <span class="meta" id="verdicts-meta">—</span>
+        </div>
+        <div class="q-filter">
+          <select id="filter-judge"><option value="">All judges</option></select>
+          <select id="filter-verdict">
+            <option value="">All verdicts</option>
+            <option value="pass">Pass</option>
+            <option value="fail">Fail</option>
+            <option value="abstain">Abstain</option>
+          </select>
+        </div>
+        <div class="verdict-list" id="verdicts">
+          <p style="color:var(--text-faint);font-style:italic;">No verdicts yet — the worker is still running.</p>
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <!-- Audit timeline -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Audit trail</h2>
+          <span class="meta">Events</span>
+        </div>
+        <ul class="timeline" id="timeline"></ul>
+      </section>
+
+      <!-- Actions -->
+      <section class="panel" id="actions-panel" style="display:none;">
+        <div class="panel-header">
+          <h2>Actions</h2>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button class="btn primary" id="btn-ship" style="display:none;">Ship verdict set</button>
+          <a class="btn primary" id="btn-exec" style="display:none;">📊 Executive report →</a>
+          <a class="btn ghost" id="btn-viewer" style="display:none;">View verdict set →</a>
+        </div>
+      </section>
+    </div>
+
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / evaluation / job.html · spec at <a href="../../../implementation-guides/enterprise-eval-observability-framework/evaluation/" style="color:var(--text-muted);text-decoration:underline;">implementation-guides</a></span>
+    <span>synthetic only</span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  function getQuery(name) {
+    return new URLSearchParams(location.search).get(name);
+  }
+
+  function classOfScore(v) { return v >= 0.8 ? "high" : v >= 0.65 ? "mid" : "low"; }
+
+  function renderProgress(job) {
+    const host = document.getElementById("progress");
+    host.innerHTML = "";
+    const idx = EV.STATE_ORDER.indexOf(job.state);
+    EV.PHASES.forEach((p, i) => {
+      const div = document.createElement("div");
+      const isDone = job.state === "shipped" || i < idx;
+      const isActive = i === idx && job.state !== "shipped";
+      div.className = "phase" + (isDone ? " done" : "") + (isActive ? " active" : "");
+      let metaText = "";
+      if (p.state === "queued")          metaText = `enqueued ${EV.fmtTsShort(job.created_at)}`;
+      if (p.state === "running")         metaText = `${job.progress.cells_done} / ${job.progress.cells_total} cells`;
+      if (p.state === "aggregating")     metaText = job.progress.consensus_rate ? `consensus ${(job.progress.consensus_rate*100).toFixed(0)}%` : "—";
+      if (p.state === "ready_for_review") metaText = job.output ? `${job.output.verdict_count} verdicts` : "—";
+      div.innerHTML = `
+        <div class="num">${p.num}</div>
+        <div class="label">${p.label}</div>
+        <div class="meta">${metaText}</div>
+      `;
+      host.appendChild(div);
+    });
+    // Add a final shipped phase
+    const ship = document.createElement("div");
+    ship.className = "phase" + (job.state === "shipped" ? " done active" : "");
+    ship.innerHTML = `<div class="num">04</div><div class="label">Shipped</div><div class="meta">${job.completed_at ? EV.fmtTsShort(job.completed_at) : "—"}</div>`;
+    host.appendChild(ship);
+  }
+
+  function renderKpis(job) {
+    const host = document.getElementById("kpis");
+    const pct = job.progress.cells_total ? Math.round(100 * job.progress.cells_done / job.progress.cells_total) : 0;
+    const passCount = job.output?.pass_count ?? "—";
+    const failCount = job.output?.fail_count ?? "—";
+    const consensus = job.progress.consensus_rate ? `${(job.progress.consensus_rate * 100).toFixed(0)}%` : "—";
+    host.innerHTML = `
+      <div class="kpi">
+        <div class="lbl">Cells</div>
+        <div class="val">${job.progress.cells_done} / ${job.progress.cells_total}</div>
+        <div class="sub">${pct}% complete</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">Judge calls</div>
+        <div class="val">${job.progress.judge_call_count.toLocaleString()}</div>
+        <div class="sub">${job.inputs.mode === "jury" ? `jury × ${EV.panelById(job.inputs.panel_id)?.cost_multiplier ?? 1}` : "single judge"}</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">Pass / Fail</div>
+        <div class="val">${passCount} / ${failCount}</div>
+        <div class="sub">${job.output ? `${job.output.abstain_count} abstain` : "in flight"}</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">Jury consensus</div>
+        <div class="val">${consensus}</div>
+        <div class="sub">unanimous panels</div>
+      </div>
+    `;
+  }
+
+  function renderInputs(job) {
+    const host = document.getElementById("inputs");
+    const judges = job.inputs.judge_ids
+      .map(id => `<code>${id}</code>`).join("<br/>");
+    const dimensions = EV.dimensionsFromJudges(job.inputs.judge_ids)
+      .map(d => `<span class="qtag dim" style="font-family:var(--font-mono);font-size:11px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:0.15rem 0.55rem;letter-spacing:0.04em;text-transform:uppercase;">${d}</span>`)
+      .join(" ");
+    const mit = (job.inputs.mitigations || [])
+      .map(m => `<code>${m}</code>`).join(" ");
+    const rows = [
+      ["Run ID(s)",       (job.inputs.run_ids || []).map(r => `<code>${r}</code>`).join("<br/>")],
+      ["Judges",          judges],
+      ["Dimensions",      dimensions],
+      ["Mode",            job.inputs.mode === "jury" ? `jury · panel <code>${job.inputs.panel_id}</code>` : "judge"],
+      ["Aggregation",     `<code>${job.inputs.aggregation}</code>`],
+      ["Mitigations",     mit || "—"],
+      ["Config hash",     `<code style="font-size:10.5px;">${job.config_hash}</code>`],
+      ["Submitted by",    job.created_by],
+      ["Submitted at",    EV.fmtTs(job.created_at)],
+    ];
+    host.innerHTML = "";
+    rows.forEach(([k, v]) => {
+      const dt = document.createElement("dt"); dt.textContent = k;
+      const dd = document.createElement("dd"); dd.innerHTML = v;
+      host.appendChild(dt); host.appendChild(dd);
+    });
+    document.getElementById("inputs-meta").textContent = `${job.inputs.judge_ids.length} judge${job.inputs.judge_ids.length === 1 ? "" : "s"}`;
+  }
+
+  function renderAggregate(job) {
+    if (!job.output?.aggregate_scores) {
+      document.getElementById("aggregate-panel").style.display = "none";
+      return;
+    }
+    document.getElementById("aggregate-panel").style.display = "";
+    document.getElementById("aggregate-meta").textContent = `${job.output.verdict_count} verdicts`;
+    const host = document.getElementById("aggregate");
+    host.innerHTML = "";
+    Object.entries(job.output.aggregate_scores).forEach(([dim, score]) => {
+      const cls = classOfScore(score);
+      const tile = document.createElement("div");
+      tile.className = "aggregate-tile";
+      const passRate = job.output.pass_count / Math.max(1, job.output.verdict_count);
+      tile.innerHTML = `
+        <div class="dim-label">${dim}</div>
+        <div class="dim-value">${score.toFixed(2)}</div>
+        <div class="score-gauge ${cls}"><span class="bar"><i style="width:${Math.round(score*100)}%"></i></span></div>
+        <div class="dim-meta"><b>${(passRate*100).toFixed(0)}%</b> pass · jury <b>${job.progress.consensus_rate ? (job.progress.consensus_rate*100).toFixed(0) + "%" : "—"}</b></div>
+      `;
+      host.appendChild(tile);
+    });
+  }
+
+  function renderVerdicts(job) {
+    const meta = document.getElementById("verdicts-meta");
+    const host = document.getElementById("verdicts");
+    if (!job.verdict_set_id) {
+      host.innerHTML = `<p style="color:var(--text-faint);font-style:italic;">No verdicts yet — the worker is still running.</p>`;
+      meta.textContent = `${job.progress.verdicts_emitted} so far`;
+      return;
+    }
+    const all = EV.getVerdictSet(job.verdict_set_id) || [];
+    meta.textContent = `${all.length} cells`;
+
+    // Populate filter
+    const fJudge = document.getElementById("filter-judge");
+    if (fJudge.options.length === 1) {
+      const dims = new Set(all.map(v => v.dimension));
+      Array.from(dims).forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d; opt.textContent = d; fJudge.appendChild(opt);
+      });
+    }
+    const wantDim = fJudge.value;
+    const wantVerdict = document.getElementById("filter-verdict").value;
+    const filtered = all.filter(v =>
+      (!wantDim || v.dimension === wantDim) &&
+      (!wantVerdict || v.verdict === wantVerdict)
+    );
+
+    host.innerHTML = "";
+    if (filtered.length === 0) {
+      host.innerHTML = `<p style="color:var(--text-faint);font-style:italic;">No verdicts match those filters.</p>`;
+      return;
+    }
+    filtered.slice(0, 24).forEach(v => {
+      const cls = classOfScore(v.score);
+      const row = document.createElement("div");
+      row.className = "verdict-row";
+      const jurorRows = (v.judges && v.judges.length > 1) ? `
+        <div class="juror-list">
+          ${v.judges.map(j => `<div class="juror"><b>${j.model}</b><span class="num">${j.score.toFixed(2)}</span><span>${j.verdict}</span></div>`).join("")}
+        </div>
+      ` : "";
+      row.innerHTML = `
+        <div class="vid">${v.verdict_id.slice(0, 12)}…</div>
+        <div class="vbody">
+          <p class="vprompt">${v.question_prompt}</p>
+          <div class="vmeta">
+            <span class="qtag dim">${v.dimension}</span>
+            <span class="qtag">${v.persona_name}</span>
+            <span class="qtag">${v.mode}${v.consensus_rate != null ? ` · consensus ${(v.consensus_rate*100).toFixed(0)}%` : ""}</span>
+          </div>
+          <div class="vreasoning">${v.reasoning}</div>
+          ${jurorRows}
+        </div>
+        <div class="vscore"><div class="score-gauge ${cls}"><span class="bar"><i style="width:${Math.round(v.score*100)}%"></i></span><span class="num">${v.score.toFixed(2)}</span></div></div>
+        <div class="vverdict ${v.verdict}">${v.verdict}</div>
+      `;
+      host.appendChild(row);
+    });
+    if (filtered.length > 24) {
+      const more = document.createElement("p");
+      more.style.cssText = "text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;margin-top:14px;";
+      more.innerHTML = `+ ${filtered.length - 24} more — <a href="./verdict-set.html?id=${encodeURIComponent(job.verdict_set_id)}" style="color:var(--accent);text-decoration:underline;">open the full viewer</a>`;
+      host.appendChild(more);
+    }
+  }
+
+  function renderTimeline(job) {
+    const host = document.getElementById("timeline");
+    host.innerHTML = "";
+    job.events.forEach(e => {
+      const li = document.createElement("li");
+      li.className = "done";
+      li.innerHTML = `<b>${EV.phaseLabel(e.state)}</b><br/><span class="who">${e.by}</span> · ${EV.fmtTs(e.ts)}`;
+      host.appendChild(li);
+    });
+  }
+
+  function renderActions(job) {
+    const wrap = document.getElementById("actions-panel");
+    const ship = document.getElementById("btn-ship");
+    const view = document.getElementById("btn-viewer");
+    const exec = document.getElementById("btn-exec");
+    let any = false;
+    if (job.state === "ready_for_review") {
+      ship.style.display = "";
+      ship.onclick = async () => {
+        const ok = await EV.confirmModal({
+          title: "Ship this verdict set?",
+          body: `Verdict set <b>${job.verdict_set_id}</b> will become immutable. Observability and audit reports will reference it by ID.`,
+          confirmLabel: "Ship",
+        });
+        if (ok && EV.shipJob(job.job_id, "you@aibuildercore.com")) {
+          EV.toast("Shipped", "Evaluation");
+          load();
+        }
+      };
+      any = true;
+    }
+    if (job.state === "shipped") {
+      exec.style.display = "";
+      exec.href = `./executive-report.html?id=${encodeURIComponent(job.job_id)}`;
+      any = true;
+    }
+    if (job.verdict_set_id) {
+      view.style.display = "";
+      view.href = `./verdict-set.html?id=${encodeURIComponent(job.verdict_set_id)}`;
+      any = true;
+    }
+    wrap.style.display = any ? "" : "none";
+  }
+
+  function load() {
+    const id = getQuery("id");
+    const job = id ? EV.getJob(id) : null;
+    if (!job) {
+      document.getElementById("title").textContent = "Job not found";
+      document.getElementById("subtitle").textContent = "Check the URL or return to the jobs list.";
+      return;
+    }
+    document.title = `Evaluation — ${job.job_id} · AIBuilderCore`;
+
+    document.getElementById("title").innerHTML = `Job <code style="font-size:0.6em;background:var(--surface-alt);padding:0.1em 0.35em;border-radius:4px;border:1px solid var(--border);">${job.job_id}</code> <span class="qualifier" id="title-meta">— ${EV.phaseLabel(job.state)}</span>`;
+
+    const dims = EV.dimensionsFromJudges(job.inputs.judge_ids);
+    document.getElementById("subtitle").innerHTML =
+      `Run <code>${job.inputs.run_ids[0]}</code> evaluated by <b>${job.inputs.judge_ids.length}</b> ${job.inputs.judge_ids.length === 1 ? "judge" : "judges"} (<b>${dims.length}</b> dimension${dims.length === 1 ? "" : "s"}) in ${job.inputs.mode === "jury" ? `jury mode · ${job.inputs.panel_id}` : "judge mode"}.`;
+
+    const head = document.getElementById("head-pills");
+    head.innerHTML = `
+      <span class="pill pill--accent"><span class="state-pill ${job.state}">${EV.phaseLabel(job.state)}</span></span>
+      <span class="pill"><b>${job.inputs.mode}</b>${job.inputs.panel_id ? ` · ${job.inputs.panel_id}` : ""}</span>
+      <span class="pill"><b>${job.progress.cells_done}</b> / ${job.progress.cells_total} cells</span>
+      ${job.progress.consensus_rate ? `<span class="pill">consensus <b>${(job.progress.consensus_rate*100).toFixed(0)}%</b></span>` : ""}
+    `;
+
+    renderProgress(job);
+    renderKpis(job);
+    renderInputs(job);
+    renderAggregate(job);
+    renderVerdicts(job);
+    renderTimeline(job);
+    renderActions(job);
+  }
+
+  document.getElementById("filter-judge").addEventListener("change", () => {
+    const id = getQuery("id");
+    const job = id ? EV.getJob(id) : null;
+    if (job) renderVerdicts(job);
+  });
+  document.getElementById("filter-verdict").addEventListener("change", () => {
+    const id = getQuery("id");
+    const job = id ? EV.getJob(id) : null;
+    if (job) renderVerdicts(job);
+  });
+
+  load();
+  EV.startTicking(load);
+</script>
+
+</body>
+</html>

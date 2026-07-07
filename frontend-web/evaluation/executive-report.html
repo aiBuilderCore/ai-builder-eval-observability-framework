@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Evaluation — Executive report · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+<style>
+  /* ---- Executive-report-only styles (exec-*) ---- */
+
+  .exec-hero {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 28px;
+    align-items: center;
+    padding: 28px;
+    background: linear-gradient(180deg, var(--surface), var(--surface-alt));
+    border: 1px solid var(--border);
+    border-radius: var(--r-3, 12px);
+    margin-top: 6px;
+  }
+  .exec-hero__gauge { position: relative; width: 220px; height: 220px; margin: 0 auto; }
+  .exec-hero__gauge text.num {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 42px;
+    fill: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .exec-hero__gauge text.lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    fill: var(--text-faint);
+  }
+  .exec-hero__verdict {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.15;
+    margin: 0 0 10px;
+  }
+  .exec-hero__verdict em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .exec-hero__line { color: var(--text-muted); margin: 0 0 14px; line-height: 1.55; }
+  .exec-hero__pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .exec-hero__pills .pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .exec-hero__pills .pill b { color: var(--text); font-weight: 600; }
+
+  /* Health-status banner */
+  .exec-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .exec-status::before {
+    content: "";
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 15%, transparent);
+  }
+  .exec-status.green { color: #2f7a5b; background: rgba(47, 122, 91, 0.10); }
+  .exec-status.amber { color: #b8853a; background: rgba(184, 133, 58, 0.12); }
+  .exec-status.red   { color: #b04444; background: rgba(176, 68, 68, 0.10); }
+
+  /* Three-column header KPI tiles below hero */
+  .exec-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .exec-kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-3, 12px);
+    padding: 16px 18px;
+  }
+  .exec-kpi .lbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .exec-kpi .val {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.1;
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .exec-kpi .sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .exec-kpi .sub b { color: var(--text-muted); font-weight: 500; }
+
+  /* Two-column section layout */
+  .exec-grid-2 {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 24px;
+    margin-top: 22px;
+  }
+
+  /* Narrative prose */
+  .exec-prose p {
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.7;
+    margin: 0 0 12px;
+  }
+  .exec-prose p b { font-weight: 600; }
+  .exec-prose p code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface-alt);
+    padding: 0.05em 0.4em;
+    border-radius: 4px;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  /* Dimension scorecard table */
+  .exec-dim-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .exec-dim-table thead th {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .exec-dim-table tbody td {
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .exec-dim-table tbody tr:last-child td { border-bottom: none; }
+  .exec-dim-table .dim-name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .exec-dim-table .dim-judge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .exec-dim-table .threshold-bar {
+    position: relative;
+    height: 8px;
+    background: var(--surface-alt);
+    border-radius: 4px;
+    overflow: visible;
+    width: 220px;
+  }
+  .exec-dim-table .threshold-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+  }
+  .exec-dim-table .threshold-bar i.high { background: #2f7a5b; }
+  .exec-dim-table .threshold-bar i.mid  { background: #b8853a; }
+  .exec-dim-table .threshold-bar i.low  { background: #b04444; }
+  .exec-dim-table .threshold-bar .tick {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    background: var(--text);
+    opacity: 0.65;
+  }
+  .exec-dim-table .threshold-bar .tick::after {
+    content: "th";
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .exec-dim-table .pf-bar {
+    display: flex;
+    height: 8px;
+    width: 160px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--surface-alt);
+  }
+  .exec-dim-table .pf-bar .seg.pass { background: #2f7a5b; }
+  .exec-dim-table .pf-bar .seg.fail { background: #b04444; }
+  .exec-dim-table .pf-bar .seg.abst { background: #b8853a; }
+  .exec-dim-table .pf-counts {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .exec-dim-table .pf-counts .p { color: #2f7a5b; font-weight: 600; }
+  .exec-dim-table .pf-counts .f { color: #b04444; font-weight: 600; }
+  .exec-dim-table .num-cell {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .exec-dim-table .num-cell .delta {
+    display: block;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+
+  /* Histogram */
+  .exec-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .exec-chart-axis {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    padding: 0 4px;
+    margin-top: 4px;
+  }
+  .exec-legend {
+    display: flex;
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .exec-legend .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* Heatmap */
+  .exec-heatmap {
+    border-collapse: separate;
+    border-spacing: 4px;
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .exec-heatmap th {
+    font-weight: 500;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .exec-heatmap th.row-label {
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: none;
+    font-size: 11.5px;
+    letter-spacing: 0;
+    padding-right: 12px;
+    white-space: nowrap;
+  }
+  .exec-heatmap td {
+    text-align: center;
+    padding: 10px 8px;
+    border-radius: 6px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 56px;
+  }
+  .exec-heatmap td.empty {
+    background: var(--surface-alt);
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+  .exec-heatmap td.h-high { background: rgba(47, 122, 91, 0.18); color: #1e5440; }
+  .exec-heatmap td.h-mid  { background: rgba(184, 133, 58, 0.18); color: #7a572a; }
+  .exec-heatmap td.h-low  { background: rgba(176, 68, 68, 0.18); color: #7a2e2e; }
+  :root[data-theme="dark"] .exec-heatmap td.h-high { color: #7fc6a3; }
+  :root[data-theme="dark"] .exec-heatmap td.h-mid  { color: #e2b777; }
+  :root[data-theme="dark"] .exec-heatmap td.h-low  { color: #e88f8f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .exec-heatmap td.h-high { color: #7fc6a3; }
+    :root:not([data-theme="light"]) .exec-heatmap td.h-mid  { color: #e2b777; }
+    :root:not([data-theme="light"]) .exec-heatmap td.h-low  { color: #e88f8f; }
+  }
+
+  /* Donut for jury consensus */
+  .exec-donut { width: 160px; height: 160px; }
+  .exec-donut text.num {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    fill: var(--text);
+  }
+  .exec-donut text.lbl {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--text-faint);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Failure callouts */
+  .exec-fail {
+    border-left: 3px solid #b04444;
+    background: rgba(176, 68, 68, 0.05);
+    padding: 12px 14px;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 12px;
+  }
+  .exec-fail__hd {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .exec-fail__hd .dim {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #b04444;
+    font-weight: 600;
+  }
+  .exec-fail__hd .score {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .exec-fail__prompt {
+    color: var(--text);
+    font-size: 13.5px;
+    line-height: 1.5;
+    margin: 0 0 6px;
+    font-style: italic;
+  }
+  .exec-fail__reason {
+    color: var(--text-muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  /* Recommendations list */
+  .exec-rec-list { display: flex; flex-direction: column; gap: 12px; }
+  .exec-rec {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 12px 14px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--r-3, 8px);
+  }
+  .exec-rec .icon {
+    width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .exec-rec.warn .icon  { background: rgba(184, 133, 58, 0.18); color: #b8853a; }
+  .exec-rec.crit .icon  { background: rgba(176, 68, 68, 0.16); color: #b04444; }
+  .exec-rec h4 {
+    margin: 0 0 4px;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .exec-rec p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Mitigations chip row */
+  .exec-mit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  .exec-mit {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-3, 8px);
+    background: var(--surface);
+  }
+  .exec-mit__icon {
+    flex: 0 0 22px; width: 22px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .exec-mit.off .exec-mit__icon { background: var(--surface-alt); color: var(--text-faint); }
+  .exec-mit__body h5 {
+    margin: 0 0 2px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .exec-mit__body p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  /* Audit footer block */
+  .exec-audit {
+    margin-top: 28px;
+    padding: 18px 20px;
+    background: var(--surface-alt);
+    border: 1px dashed var(--border);
+    border-radius: var(--r-3, 12px);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .exec-audit b { color: var(--text); font-weight: 600; }
+  .exec-audit code {
+    background: var(--surface);
+    padding: 0.1em 0.45em;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .exec-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  @media (max-width: 920px) {
+    .exec-hero { grid-template-columns: 1fr; }
+    .exec-grid-2 { grid-template-columns: 1fr; }
+    .exec-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media print {
+    .mock-back, .top, #aibc-theme-toggle, .exec-actions, .foot { display: none !important; }
+    .frame { max-width: 100%; padding: 0 20px; }
+    .panel, .exec-hero, .exec-kpi { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      moon.style.display = isDark() ? 'none' : 'block';
+      sun.style.display  = isDark() ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation · Executive report</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a href="./index.html" class="back-link"><span class="arrow">←</span> Back to jobs</a>
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Executive summary</p>
+    <h1 id="title">Loading… <span class="qualifier" id="title-meta"></span></h1>
+    <p class="subtitle" id="subtitle">A leadership-friendly read of the verdict set — pass rate, dimension health, jury agreement, top failures, and what to do next.</p>
+  </section>
+
+  <div class="exec-actions">
+    <a class="btn ghost" id="btn-job">← Job detail</a>
+    <a class="btn ghost" id="btn-verdicts">View raw verdicts →</a>
+    <button class="btn ghost" id="btn-print">Print report</button>
+  </div>
+
+  <div id="report-body"></div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / evaluation / executive-report.html · spec at <a href="../../../implementation-guides/enterprise-eval-observability-framework/evaluation/" style="color:var(--text-muted);text-decoration:underline;">implementation-guides</a></span>
+    <span>synthetic only</span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  function getQuery(name) { return new URLSearchParams(location.search).get(name); }
+  function classOfScore(v) { return v >= 0.8 ? "high" : v >= 0.65 ? "mid" : "low"; }
+  function pct(x, digits = 0) { return (x * 100).toFixed(digits) + "%"; }
+  function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
+
+  // ---------- Analytics ---------------------------------------------------
+  function buildAnalytics(job, verdicts) {
+    const dims = Array.from(new Set(verdicts.map(v => v.dimension)));
+    const total = verdicts.length;
+    const passCount    = verdicts.filter(v => v.verdict === "pass").length;
+    const failCount    = verdicts.filter(v => v.verdict === "fail").length;
+    const abstainCount = verdicts.filter(v => v.verdict === "abstain").length;
+    const passRate = total ? passCount / total : 0;
+    const avgScore = total ? verdicts.reduce((s, v) => s + v.score, 0) / total : 0;
+
+    const judgeForDim = (dim) =>
+      EV.judgeById(job.inputs.judge_ids.find(jid => EV.judgeById(jid)?.dimension === dim));
+
+    const perDim = dims.map(dim => {
+      const cells = verdicts.filter(v => v.dimension === dim);
+      const judge = judgeForDim(dim);
+      const threshold = judge?.threshold ?? job.inputs.score_threshold?.[dim] ?? 0.7;
+      const avg = cells.reduce((s, v) => s + v.score, 0) / Math.max(1, cells.length);
+      const passed  = cells.filter(v => v.verdict === "pass").length;
+      const failed  = cells.filter(v => v.verdict === "fail").length;
+      const abstain = cells.filter(v => v.verdict === "abstain").length;
+      const status = avg >= threshold ? "green" : avg >= threshold * 0.85 ? "amber" : "red";
+      // synthetic prior-run baseline (deterministic from dim + job_id)
+      let h = 0; for (const c of (dim + job.job_id)) h = (h * 31 + c.charCodeAt(0)) | 0;
+      const prior = Math.max(0.4, Math.min(0.95, avg + ((h % 17) - 8) / 100));
+      const delta = avg - prior;
+      return { dim, judge, threshold, avg, passed, failed, abstain, total: cells.length, status, prior, delta };
+    });
+
+    // Score histogram (10 buckets, [0, 0.1) … [0.9, 1.0])
+    const histogram = Array(10).fill(0);
+    verdicts.forEach(v => { histogram[Math.min(9, Math.max(0, Math.floor(v.score * 10)))] += 1; });
+
+    // Persona × dimension heatmap
+    const personas = Array.from(new Set(verdicts.map(v => v.persona_name))).filter(Boolean);
+    const heatmap = personas.map(persona => {
+      const row = { persona, cells: {} };
+      dims.forEach(d => {
+        const cs = verdicts.filter(v => v.persona_name === persona && v.dimension === d);
+        row.cells[d] = cs.length ? cs.reduce((s, v) => s + v.score, 0) / cs.length : null;
+      });
+      row.support = verdicts.filter(v => v.persona_name === persona).length;
+      return row;
+    });
+
+    // Jury consensus
+    const conV = verdicts.filter(v => v.consensus_rate != null).map(v => v.consensus_rate);
+    const consensusAvg = conV.length ? conV.reduce((s, v) => s + v, 0) / conV.length : null;
+    const consensusUnanimous = conV.filter(c => c >= 0.99).length;
+    const consensusContested = conV.filter(c => c < 0.66).length;
+
+    // Top failures (lowest scores)
+    const failures = verdicts
+      .filter(v => v.verdict === "fail")
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3);
+
+    // Coverage / cost
+    const judgeCalls = job.progress?.judge_call_count ?? 0;
+    const cellsTotal = job.progress?.cells_total ?? total;
+
+    return {
+      total, passCount, failCount, abstainCount, passRate, avgScore,
+      dims, perDim, histogram, personas, heatmap,
+      consensusAvg, consensusUnanimous, consensusContested,
+      failures, judgeCalls, cellsTotal,
+    };
+  }
+
+  // ---------- Narrative ---------------------------------------------------
+  function buildNarrative(job, A) {
+    const adapter = EV.runById(job.inputs.run_ids[0])?.adapter ?? "the system under test";
+    const overallStrong = A.passRate >= 0.85;
+    const overallWeak   = A.passRate < 0.7;
+    const verdictTone   = overallStrong ? "ships clean" : overallWeak ? "is not ready to ship" : "ships with caveats";
+    const tone          = overallStrong ? "strong" : overallWeak ? "weak" : "mixed";
+
+    const sortedByScore = [...A.perDim].sort((a, b) => a.avg - b.avg);
+    const worst = sortedByScore[0];
+    const best  = sortedByScore[sortedByScore.length - 1];
+
+    const para1 =
+      `<b>${esc(adapter)}</b> was scored on <b>${A.dims.length}</b> dimension${A.dims.length === 1 ? "" : "s"} ` +
+      `across <b>${A.total.toLocaleString()}</b> verdict${A.total === 1 ? "" : "s"}. ` +
+      `The result is a <b>${tone} signal</b>: the agent <em>${verdictTone}</em>. ` +
+      `It passed <b>${pct(A.passRate)}</b> of cells ` +
+      `(<b>${A.passCount}</b> pass · <b>${A.failCount}</b> fail · <b>${A.abstainCount}</b> abstain) ` +
+      `with an average score of <b>${A.avgScore.toFixed(2)}</b> across all judges.`;
+
+    const para2 = best && worst ? (
+      `The strongest dimension was <code>${esc(best.dim)}</code> at <b>${best.avg.toFixed(2)}</b>, ` +
+      `${best.avg >= best.threshold ? "comfortably above" : "still below"} its threshold of ${best.threshold}. ` +
+      `The weakest was <code>${esc(worst.dim)}</code> at <b>${worst.avg.toFixed(2)}</b> — ` +
+      `${worst.avg >= worst.threshold ? "above" : "<b style='color:#b04444'>below</b>"} the ${worst.threshold} cutoff. ` +
+      `<b>${worst.failed}</b> cell${worst.failed === 1 ? "" : "s"} failed in this dimension and warrant a closer read before sign-off.`
+    ) : "";
+
+    let para3;
+    if (job.inputs.mode === "jury" && A.consensusAvg != null) {
+      const panel = EV.panelById(job.inputs.panel_id)?.name ?? job.inputs.panel_id ?? "panel";
+      para3 =
+        `Verdicts were produced under <b>jury mode</b> with the <code>${esc(panel)}</code> panel; ` +
+        `jurors were unanimous on <b>${pct(A.consensusUnanimous / Math.max(1, A.total))}</b> of cells ` +
+        `(average consensus <b>${pct(A.consensusAvg)}</b>). ` +
+        (A.consensusContested > 0
+          ? `<b>${A.consensusContested}</b> cell${A.consensusContested === 1 ? "" : "s"} fell below the 66% consensus floor and were flagged for human review — these are the dimensions where the panel itself disagreed.`
+          : `No cells dropped below the 66% consensus floor — the panel was aligned throughout.`);
+    } else {
+      para3 =
+        `Verdicts were produced under <b>single-judge mode</b>. ` +
+        `Score variance reflects the judge's own calibration; for high-stakes dimensions consider re-running under jury mode (<code>diverse-3</code> or higher) before sign-off.`;
+    }
+
+    return [para1, para2, para3].filter(Boolean);
+  }
+
+  // ---------- Recommendations -------------------------------------------
+  function buildRecommendations(job, A) {
+    const recs = [];
+    const sortedByScore = [...A.perDim].sort((a, b) => a.avg - b.avg);
+    const worst = sortedByScore[0];
+
+    // Below-threshold dimension
+    A.perDim.filter(d => d.avg < d.threshold).forEach(d => {
+      recs.push({
+        level: "crit",
+        title: `${d.dim} is below threshold (${d.avg.toFixed(2)} < ${d.threshold})`,
+        body: `${d.failed} of ${d.total} verdicts failed. Triage the failed cells, identify the root cause (prompt? retrieval? policy?), and re-run after a targeted fix. Do not ship until this dimension clears its threshold or has explicit sign-off.`,
+      });
+    });
+
+    // Refusal-specific signal
+    const refusal = A.perDim.find(d => /refusal|safety/.test(d.dim));
+    if (refusal && refusal.avg < 0.85) {
+      recs.push({
+        level: "crit",
+        title: `Safety-refusal pass rate needs review`,
+        body: `Adversify-tagged questions are the highest-stakes cells in the run. A refusal score under 0.85 suggests the agent missed jailbreak attempts or refused incorrectly when it should have answered. Pair this with a human safety review before ship.`,
+      });
+    }
+
+    // Jury contested cells
+    if (job.inputs.mode === "jury" && A.consensusContested > 0) {
+      recs.push({
+        level: "warn",
+        title: `${A.consensusContested} cell${A.consensusContested === 1 ? "" : "s"} flagged for human review (low consensus)`,
+        body: `Jurors disagreed below the 66% floor on these cells. Open the verdict viewer, filter to consensus < 0.66, and resolve manually. Disagreement here is signal, not noise — these are the genuinely hard examples in the run.`,
+      });
+    }
+
+    // Single-judge mode for high-stakes work
+    if (job.inputs.mode === "judge" && A.dims.some(d => /refusal|hallucination|toxicity/.test(d))) {
+      recs.push({
+        level: "warn",
+        title: `Single-judge mode used for a high-stakes dimension`,
+        body: `For refusal, hallucination, and toxicity, single-judge bias is unacceptable for compliance-grade verdicts. Re-run under <code>diverse-3</code> or <code>frontier-3</code> before producing an audit report.`,
+      });
+    }
+
+    // Healthy abstain ratio?
+    const abstainRate = A.total ? A.abstainCount / A.total : 0;
+    if (abstainRate > 0.10) {
+      recs.push({
+        level: "warn",
+        title: `Abstain rate is elevated (${pct(abstainRate)})`,
+        body: `Abstains usually indicate the judge could not confidently score (missing reference, off-topic question, parser fall-through). Spot-check 5–10 abstain cells to confirm this is expected and not silent judge degradation.`,
+      });
+    }
+
+    // Strong overall — congratulatory rec
+    if (A.passRate >= 0.85 && recs.length === 0) {
+      recs.push({
+        level: "info",
+        title: `Strong run — proceed to ship`,
+        body: `${pct(A.passRate)} of ${A.total} cells passed across ${A.dims.length} dimension${A.dims.length === 1 ? "" : "s"}, and no high-stakes signals were tripped. Ship the verdict set so Observability and audit reports can reference it by ID.`,
+      });
+    }
+
+    // Always-on rec: longitudinal compare
+    recs.push({
+      level: "info",
+      title: `Compare against the prior shipped run for this adapter`,
+      body: `An absolute pass rate is informative; a delta against the last shipped run is what tells you whether the model is regressing. Open Observability and pin <code>${esc(job.job_id)}</code> against the prior <code>${esc(EV.runById(job.inputs.run_ids[0])?.adapter ?? "adapter")}</code> verdict set.`,
+    });
+
+    return recs;
+  }
+
+  // ---------- Renderers ---------------------------------------------------
+  function renderHero(job, A) {
+    const r  = 90;
+    const c  = 2 * Math.PI * r;
+    const dash = c * Math.max(0, Math.min(1, A.passRate));
+    const status = A.passRate >= 0.85 ? "green" : A.passRate >= 0.7 ? "amber" : "red";
+    const statusLabel = status === "green" ? "Healthy" : status === "amber" ? "Mixed" : "At risk";
+    const verdictLine = status === "green"
+      ? "Ship-ready"
+      : status === "amber"
+        ? "Ship with caveats"
+        : "Do not ship — needs work";
+    const adapter = EV.runById(job.inputs.run_ids[0])?.adapter ?? "system";
+    const completedAt = job.completed_at ? EV.fmtTs(job.completed_at) : "—";
+
+    return `
+      <div class="exec-hero">
+        <div class="exec-hero__gauge">
+          <svg viewBox="0 0 220 220" width="220" height="220">
+            <circle cx="110" cy="110" r="${r}" fill="none" stroke="var(--surface-alt)" stroke-width="18"/>
+            <circle cx="110" cy="110" r="${r}" fill="none"
+              stroke="${status === 'green' ? '#2f7a5b' : status === 'amber' ? '#b8853a' : '#b04444'}"
+              stroke-width="18"
+              stroke-linecap="round"
+              stroke-dasharray="${dash} ${c - dash}"
+              transform="rotate(-90 110 110)"/>
+            <text class="num" x="110" y="112" text-anchor="middle" dominant-baseline="middle">${pct(A.passRate)}</text>
+            <text class="lbl" x="110" y="140" text-anchor="middle">pass rate</text>
+          </svg>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+            <span class="exec-status ${status}">${statusLabel}</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:0.06em;">
+              JOB <b style="color:var(--text);">${esc(job.job_id)}</b> · shipped ${esc(completedAt)}
+            </span>
+          </div>
+          <h2 class="exec-hero__verdict"><em>${esc(adapter)}</em> · ${verdictLine}</h2>
+          <p class="exec-hero__line">
+            ${A.passCount.toLocaleString()} of ${A.total.toLocaleString()} verdicts cleared their thresholds across
+            <b>${A.dims.length}</b> dimension${A.dims.length === 1 ? "" : "s"}, judged in
+            <b>${esc(job.inputs.mode)}</b>${job.inputs.panel_id ? ` mode (<code>${esc(job.inputs.panel_id)}</code> panel)` : " mode"}.
+          </p>
+          <div class="exec-hero__pills">
+            <span class="pill"><b>${A.total}</b> verdicts</span>
+            <span class="pill"><b>${A.dims.length}</b> dimensions</span>
+            <span class="pill"><b>${job.inputs.judge_ids.length}</b> judges</span>
+            <span class="pill"><b>${A.judgeCalls.toLocaleString()}</b> LLM calls</span>
+            ${A.consensusAvg != null ? `<span class="pill">consensus <b>${pct(A.consensusAvg)}</b></span>` : ""}
+            <span class="pill">avg score <b>${A.avgScore.toFixed(2)}</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="exec-kpi-row">
+        <div class="exec-kpi">
+          <div class="lbl">Pass / Fail / Abstain</div>
+          <div class="val">${A.passCount} / ${A.failCount} / ${A.abstainCount}</div>
+          <div class="sub"><b>${pct(A.passRate)}</b> pass rate</div>
+        </div>
+        <div class="exec-kpi">
+          <div class="lbl">Average score</div>
+          <div class="val">${A.avgScore.toFixed(2)}</div>
+          <div class="sub"><b>${A.dims.length}</b> dimension${A.dims.length === 1 ? "" : "s"}</div>
+        </div>
+        <div class="exec-kpi">
+          <div class="lbl">Jury agreement</div>
+          <div class="val">${A.consensusAvg != null ? pct(A.consensusAvg) : "—"}</div>
+          <div class="sub">${job.inputs.mode === "jury" ? `<b>${A.consensusContested}</b> contested cells` : "single-judge mode"}</div>
+        </div>
+        <div class="exec-kpi">
+          <div class="lbl">Cost</div>
+          <div class="val">${A.judgeCalls.toLocaleString()}</div>
+          <div class="sub"><b>${A.cellsTotal}</b> cells × ${job.inputs.mode === "jury" ? (EV.panelById(job.inputs.panel_id)?.cost_multiplier ?? 3) : 1} judge call${job.inputs.mode === "jury" ? "s" : ""}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderNarrativeAndDimensions(job, A) {
+    const para = buildNarrative(job, A);
+    const dimRows = A.perDim.map(d => {
+      const scoreCls = classOfScore(d.avg);
+      const fillPct = Math.round(d.avg * 100);
+      const thresholdPct = Math.round(d.threshold * 100);
+      const passPct = (d.passed / Math.max(1, d.total)) * 100;
+      const failPct = (d.failed / Math.max(1, d.total)) * 100;
+      const absPct  = (d.abstain / Math.max(1, d.total)) * 100;
+      const deltaArrow = d.delta >= 0.005 ? "▲" : d.delta <= -0.005 ? "▼" : "·";
+      const deltaCol = d.delta >= 0.005 ? "#2f7a5b" : d.delta <= -0.005 ? "#b04444" : "var(--text-faint)";
+      const statusDot = `<span class="exec-status ${d.status}" style="padding:2px 10px;font-size:9.5px;">${d.status === 'green' ? 'OK' : d.status === 'amber' ? 'WATCH' : 'FAIL'}</span>`;
+      return `
+        <tr>
+          <td>
+            <div class="dim-name">${esc(d.dim)}</div>
+            <div class="dim-judge">${esc(d.judge?.id ?? "—")}</div>
+          </td>
+          <td>${statusDot}</td>
+          <td>
+            <div class="threshold-bar" title="score ${d.avg.toFixed(2)} · threshold ${d.threshold}">
+              <i class="${scoreCls}" style="width:${fillPct}%"></i>
+              <span class="tick" style="left:${thresholdPct}%"></span>
+            </div>
+          </td>
+          <td class="num-cell">
+            ${d.avg.toFixed(2)}
+            <span class="delta" style="color:${deltaCol};">${deltaArrow} ${Math.abs(d.delta).toFixed(2)} vs prior</span>
+          </td>
+          <td>
+            <div class="pf-bar" title="${d.passed} pass · ${d.failed} fail · ${d.abstain} abstain">
+              <span class="seg pass" style="width:${passPct}%"></span>
+              <span class="seg fail" style="width:${failPct}%"></span>
+              <span class="seg abst" style="width:${absPct}%"></span>
+            </div>
+            <div class="pf-counts">
+              <span class="p">${d.passed} pass</span> · <span class="f">${d.failed} fail</span> · ${d.abstain} abstain
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    return `
+      <div class="exec-grid-2">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>What this means</h2>
+            <span class="meta">Auto-generated from verdicts</span>
+          </div>
+          <div class="exec-prose">
+            ${para.map(p => `<p>${p}</p>`).join("")}
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Verdict distribution</h2>
+            <span class="meta">All verdicts</span>
+          </div>
+          ${renderVerdictDonut(A)}
+        </section>
+      </div>
+
+      <section class="panel" style="margin-top:22px;">
+        <div class="panel-header">
+          <h2>Dimension scorecard</h2>
+          <span class="meta">${A.dims.length} dimension${A.dims.length === 1 ? "" : "s"} · vs prior shipped run</span>
+        </div>
+        <table class="exec-dim-table">
+          <thead>
+            <tr>
+              <th style="width:240px;">Dimension</th>
+              <th>Status</th>
+              <th>Score vs threshold</th>
+              <th>Avg / Δ prior</th>
+              <th>Pass / Fail / Abstain</th>
+            </tr>
+          </thead>
+          <tbody>${dimRows}</tbody>
+        </table>
+      </section>
+    `;
+  }
+
+  function renderVerdictDonut(A) {
+    const total = Math.max(1, A.total);
+    const r = 60;
+    const c = 2 * Math.PI * r;
+    const passLen = c * (A.passCount / total);
+    const failLen = c * (A.failCount / total);
+    const absLen  = c * (A.abstainCount / total);
+    return `
+      <div style="display:flex;align-items:center;gap:18px;">
+        <svg class="exec-donut" viewBox="0 0 160 160">
+          <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--surface-alt)" stroke-width="20"/>
+          <circle cx="80" cy="80" r="${r}" fill="none" stroke="#2f7a5b" stroke-width="20"
+            stroke-dasharray="${passLen} ${c - passLen}" transform="rotate(-90 80 80)"/>
+          <circle cx="80" cy="80" r="${r}" fill="none" stroke="#b04444" stroke-width="20"
+            stroke-dasharray="${failLen} ${c - failLen}"
+            stroke-dashoffset="${-passLen}" transform="rotate(-90 80 80)"/>
+          <circle cx="80" cy="80" r="${r}" fill="none" stroke="#b8853a" stroke-width="20"
+            stroke-dasharray="${absLen} ${c - absLen}"
+            stroke-dashoffset="${-(passLen + failLen)}" transform="rotate(-90 80 80)"/>
+          <text class="num" x="80" y="80" text-anchor="middle" dominant-baseline="middle">${A.total}</text>
+          <text class="lbl" x="80" y="100" text-anchor="middle">verdicts</text>
+        </svg>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;font-family:var(--font-mono);font-size:12px;">
+          <div><span class="swatch" style="background:#2f7a5b;display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:8px;vertical-align:middle;"></span><b>${A.passCount}</b> pass <span style="color:var(--text-faint);">· ${pct(A.passCount/total)}</span></div>
+          <div><span class="swatch" style="background:#b04444;display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:8px;vertical-align:middle;"></span><b>${A.failCount}</b> fail <span style="color:var(--text-faint);">· ${pct(A.failCount/total)}</span></div>
+          <div><span class="swatch" style="background:#b8853a;display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:8px;vertical-align:middle;"></span><b>${A.abstainCount}</b> abstain <span style="color:var(--text-faint);">· ${pct(A.abstainCount/total)}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderHistogramAndHeatmap(job, A) {
+    const max = Math.max(1, ...A.histogram);
+    const bars = A.histogram.map((cnt, i) => {
+      const h = (cnt / max) * 110;
+      const x = 30 + i * 30;
+      const lo = (i / 10).toFixed(1);
+      const hi = ((i + 1) / 10).toFixed(1);
+      const color = i < 6 ? "#b04444" : i < 8 ? "#b8853a" : "#2f7a5b";
+      return `
+        <rect x="${x}" y="${130 - h}" width="22" height="${h}" rx="2" fill="${color}" opacity="0.85">
+          <title>[${lo}–${hi}) — ${cnt} verdicts</title>
+        </rect>
+        <text x="${x + 11}" y="148" text-anchor="middle"
+          font-family="var(--font-mono)" font-size="9" fill="var(--text-faint)">${lo}</text>
+      `;
+    }).join("");
+
+    // Heatmap
+    const dims = A.dims;
+    const heatRows = A.heatmap
+      .filter(r => r.support > 0)
+      .sort((a, b) => b.support - a.support)
+      .map(row => {
+        const cells = dims.map(d => {
+          const v = row.cells[d];
+          if (v == null) return `<td class="empty">—</td>`;
+          const cls = classOfScore(v);
+          return `<td class="h-${cls}" title="${esc(row.persona)} × ${esc(d)} → ${v.toFixed(2)}">${v.toFixed(2)}</td>`;
+        }).join("");
+        return `<tr><th class="row-label">${esc(row.persona)} <span style="color:var(--text-faint);font-weight:400;">· ${row.support}</span></th>${cells}</tr>`;
+      }).join("");
+
+    return `
+      <div class="exec-grid-2">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Score distribution</h2>
+            <span class="meta">All ${A.total} verdicts</span>
+          </div>
+          <svg class="exec-chart" viewBox="0 0 360 160" preserveAspectRatio="xMidYMid meet">
+            <line x1="20" y1="130" x2="340" y2="130" stroke="var(--border)" stroke-width="1"/>
+            <line x1="20" y1="20"  x2="340" y2="20"  stroke="var(--border)" stroke-width="1" stroke-dasharray="2 4" opacity="0.5"/>
+            ${bars}
+            <text x="20"  y="14" font-family="var(--font-mono)" font-size="9" fill="var(--text-faint)">${max}</text>
+            <text x="20"  y="158" font-family="var(--font-mono)" font-size="9" fill="var(--text-faint)">score:</text>
+            <text x="343" y="148" font-family="var(--font-mono)" font-size="9" fill="var(--text-faint)" text-anchor="end">1.0</text>
+          </svg>
+          <div class="exec-legend">
+            <span><span class="swatch" style="background:#b04444;"></span>fail-band (&lt; 0.6)</span>
+            <span><span class="swatch" style="background:#b8853a;"></span>borderline (0.6–0.8)</span>
+            <span><span class="swatch" style="background:#2f7a5b;"></span>pass-band (≥ 0.8)</span>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Persona × dimension</h2>
+            <span class="meta">avg score · darker = stronger</span>
+          </div>
+          ${heatRows ? `
+            <div style="overflow-x:auto;">
+              <table class="exec-heatmap">
+                <thead>
+                  <tr>
+                    <th class="row-label">Persona</th>
+                    ${dims.map(d => `<th>${esc(d)}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>${heatRows}</tbody>
+              </table>
+            </div>
+          ` : `<p style="color:var(--text-faint);font-style:italic;">No persona-tagged verdicts in this run.</p>`}
+        </section>
+      </div>
+    `;
+  }
+
+  function renderJuryAndFailures(job, A) {
+    // Jury panel (consensus distribution + per-juror cost view)
+    let juryHtml = "";
+    if (job.inputs.mode === "jury" && A.consensusAvg != null) {
+      const panel = EV.panelById(job.inputs.panel_id);
+      const r = 60;
+      const c = 2 * Math.PI * r;
+      const fill = c * A.consensusAvg;
+      juryHtml = `
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Jury agreement</h2>
+            <span class="meta">${esc(panel?.name ?? job.inputs.panel_id)} · ${esc(job.inputs.aggregation)} aggregation</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:22px;flex-wrap:wrap;">
+            <svg class="exec-donut" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--surface-alt)" stroke-width="18"/>
+              <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--accent)" stroke-width="18"
+                stroke-linecap="round" stroke-dasharray="${fill} ${c - fill}" transform="rotate(-90 80 80)"/>
+              <text class="num" x="80" y="80" text-anchor="middle" dominant-baseline="middle">${pct(A.consensusAvg)}</text>
+              <text class="lbl" x="80" y="100" text-anchor="middle">avg consensus</text>
+            </svg>
+            <div style="flex:1;min-width:220px;">
+              <p style="color:var(--text-muted);font-size:13.5px;line-height:1.6;margin:0 0 12px;">
+                ${esc(panel?.blurb ?? "Custom panel.")}
+              </p>
+              <div style="display:flex;flex-direction:column;gap:8px;font-family:var(--font-mono);font-size:12px;">
+                <div><b style="color:var(--text);">${A.consensusUnanimous}</b> unanimous cells <span style="color:var(--text-faint);">· ${pct(A.consensusUnanimous / Math.max(1, A.total))}</span></div>
+                <div><b style="color:#b04444;">${A.consensusContested}</b> contested cells <span style="color:var(--text-faint);">· consensus &lt; 66%</span></div>
+                ${panel ? `<div><b style="color:var(--text);">${panel.families.length}</b> juror families <span style="color:var(--text-faint);">· ${panel.families.map(esc).join(" · ")}</span></div>` : ""}
+                ${panel ? `<div><b style="color:var(--text);">${panel.cost_multiplier}×</b> cost vs single judge</div>` : ""}
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    // Top failures
+    const failHtml = A.failures.length ? `
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Top failures</h2>
+          <span class="meta">Lowest-scoring fail verdicts · open the viewer for the rest</span>
+        </div>
+        ${A.failures.map(f => `
+          <div class="exec-fail">
+            <div class="exec-fail__hd">
+              <span class="dim">${esc(f.dimension)} · ${esc(f.persona_name ?? "unknown persona")}</span>
+              <span class="score">score <b style="color:#b04444;">${f.score.toFixed(2)}</b> · ${esc(f.mode)}</span>
+            </div>
+            <p class="exec-fail__prompt">"${esc(f.question_prompt)}"</p>
+            <p class="exec-fail__reason">${esc(f.reasoning)}</p>
+          </div>
+        `).join("")}
+      </section>
+    ` : `
+      <section class="panel">
+        <div class="panel-header"><h2>Top failures</h2><span class="meta">Lowest-scoring fail verdicts</span></div>
+        <p style="color:var(--text-faint);font-style:italic;">No fail verdicts in this run — every cell either passed or abstained.</p>
+      </section>
+    `;
+
+    return juryHtml + failHtml;
+  }
+
+  function renderMitigations(job) {
+    const applied = new Set(job.inputs.mitigations || []);
+    const all = EV.MITIGATIONS;
+    const cards = all.map(m => {
+      const isOn = applied.has(m.id);
+      return `
+        <div class="exec-mit ${isOn ? "" : "off"}">
+          <div class="exec-mit__icon" title="${isOn ? "applied" : "not applied"}">${isOn ? "✓" : "·"}</div>
+          <div class="exec-mit__body">
+            <h5>${esc(m.name)} <span style="color:${isOn ? "var(--accent)" : "var(--text-faint)"};font-family:var(--font-mono);font-size:10px;font-weight:500;letter-spacing:0.06em;">${isOn ? "ON" : "OFF"}</span></h5>
+            <p>${esc(m.blurb)}</p>
+          </div>
+        </div>
+      `;
+    }).join("");
+    return `
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Bias mitigations &amp; guardrails</h2>
+          <span class="meta">${applied.size} of ${all.length} applied</span>
+        </div>
+        <div class="exec-mit-grid">${cards}</div>
+      </section>
+    `;
+  }
+
+  function renderRecommendations(recs) {
+    const html = recs.map(r => `
+      <div class="exec-rec ${r.level}">
+        <span class="icon">${r.level === "crit" ? "!" : r.level === "warn" ? "▲" : "✓"}</span>
+        <div>
+          <h4>${r.title}</h4>
+          <p>${r.body}</p>
+        </div>
+      </div>
+    `).join("");
+    return `
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Risks &amp; recommendations</h2>
+          <span class="meta">${recs.length} item${recs.length === 1 ? "" : "s"} · ranked by severity</span>
+        </div>
+        <div class="exec-rec-list">${html}</div>
+      </section>
+    `;
+  }
+
+  function renderAudit(job, A) {
+    const judges = job.inputs.judge_ids.map(id => `<code>${esc(id)}</code>`).join(" · ");
+    const dimsList = A.dims.map(d => `<code>${esc(d)}</code>`).join(" · ");
+    return `
+      <div class="exec-audit">
+        <b>Audit &amp; reproducibility.</b>
+        Job <code>${esc(job.job_id)}</code> · verdict set <code>${esc(job.verdict_set_id ?? "—")}</code> ·
+        run <code>${esc(job.inputs.run_ids[0])}</code>${job.inputs.run_ids.length > 1 ? ` (+ ${job.inputs.run_ids.length - 1})` : ""}.<br/>
+        Submitted by <b>${esc(job.created_by)}</b> at ${esc(EV.fmtTs(job.created_at))} ·
+        shipped by <b>${esc(job.completed_by ?? "—")}</b> at ${esc(EV.fmtTs(job.completed_at))}.<br/>
+        Mode <b>${esc(job.inputs.mode)}</b>${job.inputs.panel_id ? ` · panel <code>${esc(job.inputs.panel_id)}</code> · ` : " · "}aggregation <code>${esc(job.inputs.aggregation ?? "—")}</code>.<br/>
+        Judges: ${judges || "—"}.<br/>
+        Dimensions: ${dimsList || "—"}.<br/>
+        Config hash <code style="font-size:10.5px;">${esc(job.config_hash)}</code> ·
+        storage <code>${esc(job.output?.storage_uri ?? "—")}</code>.<br/>
+        <span style="color:var(--text-faint);">This report is auto-generated from the immutable verdict set; the same inputs always produce the same numbers.</span>
+      </div>
+    `;
+  }
+
+  // ---------- Main load --------------------------------------------------
+  function load() {
+    const id = getQuery("id");
+    // Prefer the requested job; otherwise fall back to the most recently shipped
+    // report so opening the page from nav lands on real content, not a dead end.
+    function latestShipped() {
+      const shipped = EV.loadJobs()
+        .filter(j => j.state === "shipped")
+        .sort((a, b) => String(b.completed_at ?? "").localeCompare(String(a.completed_at ?? "")));
+      return shipped[0] || null;
+    }
+    const job = (id ? EV.getJob(id) : null) || latestShipped();
+    if (!job) {
+      document.getElementById("title").textContent = "No shipped reports yet";
+      document.getElementById("subtitle").innerHTML =
+        'Ship an evaluation to generate its executive report, or <a href="./index.html" style="color:var(--accent);text-decoration:underline;">return to jobs</a>.';
+      document.getElementById("report-body").innerHTML = "";
+      return;
+    }
+
+    document.title = `Executive report · ${job.job_id}`;
+    document.getElementById("title").innerHTML =
+      `Executive report <span class="qualifier">— ${esc(EV.runById(job.inputs.run_ids[0])?.adapter ?? job.inputs.run_ids[0])}</span>`;
+    document.getElementById("subtitle").textContent =
+      `Leadership-friendly read of job ${job.job_id}: pass rate, dimension health, jury agreement, top failures, and recommended next steps. All charts and prose are derived from the immutable verdict set.`;
+    document.getElementById("btn-job").href = `./job.html?id=${encodeURIComponent(job.job_id)}`;
+    if (job.verdict_set_id) {
+      document.getElementById("btn-verdicts").href = `./verdict-set.html?id=${encodeURIComponent(job.verdict_set_id)}`;
+    } else {
+      document.getElementById("btn-verdicts").style.display = "none";
+    }
+
+    const verdicts = job.verdict_set_id ? (EV.getVerdictSet(job.verdict_set_id) || []) : [];
+    const body = document.getElementById("report-body");
+
+    // If the job hasn't shipped or has no verdicts, render a friendly placeholder
+    // (the link from index.html only appears for shipped jobs; this is a safety net
+    // for direct navigation).
+    if (job.state !== "shipped" || verdicts.length === 0) {
+      const note = job.state !== "shipped"
+        ? `This job is currently <b>${esc(EV.phaseLabel(job.state))}</b>. The executive report is only meaningful once the verdict set has been shipped.`
+        : `Verdict set is empty — the report cannot be generated.`;
+      body.innerHTML = `
+        <section class="panel" style="margin-top:6px;">
+          <div class="panel-header">
+            <h2>Report not yet available</h2>
+            <span class="meta">${esc(EV.phaseLabel(job.state))}</span>
+          </div>
+          <p style="color:var(--text-muted);line-height:1.6;">${note}</p>
+          <p style="color:var(--text-muted);line-height:1.6;">
+            Open the <a href="./job.html?id=${encodeURIComponent(job.job_id)}" style="color:var(--accent);text-decoration:underline;">job detail page</a> to track progress; the report link will reactivate automatically once the verdict set is shipped.
+          </p>
+        </section>
+      `;
+      return;
+    }
+
+    const A = buildAnalytics(job, verdicts);
+    const recs = buildRecommendations(job, A);
+
+    body.innerHTML = [
+      renderHero(job, A),
+      renderNarrativeAndDimensions(job, A),
+      renderHistogramAndHeatmap(job, A),
+      renderJuryAndFailures(job, A),
+      renderMitigations(job),
+      renderRecommendations(recs),
+      renderAudit(job, A),
+    ].join("");
+  }
+
+  document.getElementById("btn-print").addEventListener("click", () => window.print());
+
+  if (window.EV && EV.ready) EV.ready.then(load); else load();
+</script>
+
+</body>
+</html>

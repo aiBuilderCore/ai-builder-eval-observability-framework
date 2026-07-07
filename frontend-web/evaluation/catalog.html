@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Evaluation — Judge Catalog · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      moon.style.display = isDark() ? 'none' : 'block';
+      sun.style.display  = isDark() ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a href="./index.html" class="back-link"><span class="arrow">←</span> Back to jobs</a>
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Catalog</p>
+    <h1>Judges <span class="qualifier">— built-in + your custom (BYOJ)</span></h1>
+    <p class="subtitle">
+      Built-in judges are versioned, opaque, and shared across teams — that's the comparability contract. Custom judges (BYOJ) are user-authored, namespaced under you, capped per user, and excluded from cross-team rollups by default. Need a new built-in? File a request.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--accent"><b id="pill-judges">10</b> built-in</span>
+      <span class="pill"><b id="pill-dims">10</b> dimensions</span>
+      <span class="pill"><b id="pill-llm">7</b> frontier-LLM</span>
+      <span class="pill"><b id="pill-non">2</b> non-LLM</span>
+      <span class="pill"><b id="pill-spec">1</b> specialist</span>
+      <span class="pill"><b id="pill-custom">0</b> custom · <span id="pill-quota">0/2</span></span>
+    </div>
+  </section>
+
+  <div class="filter-bar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search by name, dimension, family, reference type…" />
+    </div>
+    <div id="family-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <a class="btn primary" id="btn-new-custom" href="./custom-judge.html">＋ New custom judge</a>
+    <span class="count"><b id="count">0</b> shown</span>
+  </div>
+
+  <h2 id="builtins-head" style="font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin:18px 0 10px;">Built-in judges</h2>
+  <div class="judge-grid" id="grid"></div>
+
+  <h2 id="custom-head" style="font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin:28px 0 10px;display:none;">Your custom judges <span style="color:var(--text-faint);font-weight:500;text-transform:none;letter-spacing:0;">— BYOJ, excluded from cross-team rollups by default</span></h2>
+  <div class="judge-grid" id="custom-grid"></div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / evaluation / catalog.html · spec at <a href="../../../implementation-guides/enterprise-eval-observability-framework/evaluation/" style="color:var(--text-muted);text-decoration:underline;">implementation-guides</a></span>
+    <span>10 judges · 10 dimensions · synthetic only</span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const state = { search: "", family: null };
+
+  const FAMILY_LABELS = {
+    "frontier-LLM":   "Frontier LLM",
+    "specialist-LLM": "Specialist",
+    "non-LLM":        "Non-LLM",
+  };
+
+  function judgeCard(j, kind) {
+    const card = document.createElement("article");
+    card.className = "judge-card";
+    const turnTypes = (j.turn_types || []).join(" · ");
+    const refLabel = j.reference ?? j.reference_requirement ?? "—";
+    const familyClass = j.family === "non-LLM" ? "family-non-llm" :
+                        j.family === "specialist-LLM" ? "family-specialist" : "";
+    const opaqueMark = kind === "custom"
+      ? `<span class="opaque-mark" style="background:var(--accent-soft);color:var(--accent);">custom</span>`
+      : `<span class="opaque-mark">opaque</span>`;
+    const editLink = kind === "custom"
+      ? `<a href="./custom-judge.html?id=${encodeURIComponent(j.id)}" style="font-family:var(--font-mono);font-size:10.5px;color:var(--accent);text-decoration:underline;letter-spacing:0.04em;text-transform:uppercase;">edit →</a>`
+      : "";
+    card.innerHTML = `
+      ${opaqueMark}
+      <div class="head">
+        <div>
+          <div class="id">${j.id}</div>
+          <div class="name">${j.name}</div>
+        </div>
+        ${editLink ? `<div>${editLink}</div>` : ""}
+      </div>
+      <p class="blurb">${j.blurb || ""}</p>
+      <div class="specs">
+        <span class="spec dim">${j.dimension}</span>
+        <span class="spec"><b>turns:</b> ${turnTypes}</span>
+        <span class="spec"><b>ref:</b> ${refLabel}</span>
+        <span class="spec ${familyClass}"><b>family:</b> ${FAMILY_LABELS[j.family] ?? j.family}</span>
+        <span class="spec cost">cost ${j.cost}</span>
+        <span class="spec"><b>threshold:</b> ${j.threshold}</span>
+      </div>
+    `;
+    return card;
+  }
+
+  function render() {
+    const builtins = EV.JUDGES;
+    const customs  = EV.customJudgesByOwner(EV.CURRENT_USER);
+
+    // pill counts
+    document.getElementById("pill-judges").textContent = builtins.length;
+    const dims = new Set(builtins.map(j => j.dimension));
+    document.getElementById("pill-dims").textContent = dims.size;
+    document.getElementById("pill-llm").textContent  = builtins.filter(j => j.family === "frontier-LLM").length;
+    document.getElementById("pill-non").textContent  = builtins.filter(j => j.family === "non-LLM").length;
+    document.getElementById("pill-spec").textContent = builtins.filter(j => j.family === "specialist-LLM").length;
+    document.getElementById("pill-custom").textContent = customs.length;
+    document.getElementById("pill-quota").textContent  = `${customs.length}/${EV.BYOJ_QUOTA}`;
+
+    // quota gating on the CTA
+    const cta = document.getElementById("btn-new-custom");
+    if (customs.length >= EV.BYOJ_QUOTA) {
+      cta.classList.add("disabled");
+      cta.style.opacity = "0.55";
+      cta.style.pointerEvents = "none";
+      cta.title = `Quota reached (${EV.BYOJ_QUOTA}/user). Edit or delete an existing custom judge.`;
+      cta.textContent = `Quota reached · ${customs.length}/${EV.BYOJ_QUOTA}`;
+    } else {
+      cta.classList.remove("disabled");
+      cta.style.opacity = "";
+      cta.style.pointerEvents = "";
+      cta.title = "";
+      cta.textContent = "＋ New custom judge";
+    }
+
+    // family filter pills
+    const pillHost = document.getElementById("family-pills");
+    pillHost.innerHTML = "";
+    const opts = [["All", null], ["Frontier LLM", "frontier-LLM"], ["Specialist", "specialist-LLM"], ["Non-LLM", "non-LLM"]];
+    opts.forEach(([text, val]) => {
+      const isActive = state.family === val;
+      const el = document.createElement("button");
+      el.className = "pill" + (isActive ? " active" : "");
+      el.textContent = text;
+      el.onclick = () => { state.family = val; render(); };
+      pillHost.appendChild(el);
+    });
+
+    const q = state.search.trim().toLowerCase();
+    const matches = (j) => {
+      if (state.family && j.family !== state.family) return false;
+      if (!q) return true;
+      const blob = [j.id, j.name, j.dimension, j.family, j.reference || j.reference_requirement, j.pattern, j.blurb].join(" ").toLowerCase();
+      return blob.includes(q);
+    };
+
+    const filteredBuiltins = builtins.filter(matches);
+    const filteredCustoms  = customs.filter(matches);
+    document.getElementById("count").textContent = filteredBuiltins.length + filteredCustoms.length;
+
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+    filteredBuiltins.forEach(j => grid.appendChild(judgeCard(j, "builtin")));
+
+    const customGrid = document.getElementById("custom-grid");
+    customGrid.innerHTML = "";
+    document.getElementById("custom-head").style.display = customs.length ? "" : "none";
+    if (filteredCustoms.length === 0 && customs.length > 0) {
+      customGrid.innerHTML = `<p style="color:var(--text-faint);font-style:italic;font-family:var(--font-mono);font-size:11px;">No custom judges match this filter.</p>`;
+    } else {
+      filteredCustoms.forEach(j => customGrid.appendChild(judgeCard(j, "custom")));
+    }
+  }
+
+  document.getElementById("search").addEventListener("input", (e) => {
+    state.search = e.target.value;
+    render();
+  });
+
+  render();
+</script>
+
+</body>
+</html>

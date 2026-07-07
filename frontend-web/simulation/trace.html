@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Simulation — Trace · AIBuilderCore</title>
+<script>
+  (function () { try { var t = localStorage.getItem('aibc-theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Simulation</em></span>
+    </div>
+    <span class="product-name">
+      <a href="../index.html">Enterprise Eval Observability</a> ·
+      <a href="./index.html">Simulation</a> ·
+      <a id="back-run" href="#">Run</a> ·
+      <b id="crumb-trace">Trace</b>
+    </span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> <span id="head-id">trc_…</span></p>
+    <h1 id="head-title">Conversation</h1>
+    <p class="subtitle" id="head-subtitle">—</p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <div class="row-2" style="margin-top:24px;">
+    <section class="panel">
+      <div class="panel-header"><h2>Persona &amp; scenario</h2><span class="meta">from QGen</span></div>
+      <dl class="kv-grid" id="persona-kv"></dl>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header"><h2>Run config</h2><span class="meta">snapshot</span></div>
+      <dl class="kv-grid" id="run-kv"></dl>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>Conversation</h2>
+      <span class="meta"><b id="turn-count">0</b> turns · stop reason <span id="stop-pill-host"></span></span>
+    </div>
+    <div class="trace-stream" id="stream"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header"><h2>Annotations</h2><span class="meta">eval-readable signals</span></div>
+    <dl class="kv-grid" id="annot-kv"></dl>
+  </section>
+
+  <div style="display:flex;justify-content:space-between;margin:32px 0 0;">
+    <a class="btn ghost" id="back-btn" href="#">← back to run</a>
+    <a class="btn primary" id="next-btn" href="#" style="display:none;">Next conversation →</a>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / simulation / trace.html</span>
+    <span><a href="./index.html">← back to runs</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const traceId = params.get("id");
+  if (!traceId) { location.href = "./index.html"; }
+
+  function render() {
+    const trace = SIM.getTrace(traceId);
+    if (!trace) { location.href = "./index.html"; return; }
+    const run = SIM.getRun(trace.run_id);
+
+    document.title = `Trace ${trace.trace_id} — Simulation · AIBuilderCore`;
+    document.getElementById("crumb-trace").textContent = trace.trace_id;
+    document.getElementById("back-run").textContent = trace.run_id;
+    document.getElementById("back-run").href = `./run.html?id=${encodeURIComponent(trace.run_id)}`;
+    document.getElementById("back-btn").href = `./run.html?id=${encodeURIComponent(trace.run_id)}`;
+
+    document.getElementById("head-id").textContent = trace.trace_id;
+    const persona = SIM.PERSONAS[trace.persona?.id] || {};
+    document.getElementById("head-title").innerHTML = `${SIM.escapeHtml(persona.name || trace.persona?.id)} <span class="qualifier">— ${trace.scenario?.length}.${trace.scenario?.style}.${trace.scenario?.difficulty}</span>`;
+    document.getElementById("head-subtitle").innerHTML = `
+      <code>${trace.question_id}</code> · <code>${trace.prompt_shape?.id}@v${trace.prompt_shape?.version}</code> · expected
+      <code>${trace.expected_behavior}</code> · rubric <code>${trace.rubric_dimension}</code>
+    `;
+    const pills = document.getElementById("head-pills");
+    pills.innerHTML = `
+      <span class="pill pill--accent"><b>${trace.turns.length}</b> turns</span>
+      <span class="pill"><span class="stop-pill ${trace.stop_reason}">${trace.stop_reason}</span></span>
+      <span class="pill"><span class="transport-pill ${run?.adapter_snapshot?.transport || ""}">${run?.adapter_snapshot?.transport || "?"}</span></span>
+      <span class="pill"><b>${trace.mode}</b></span>
+      <span class="pill"><b>${trace.session_policy}</b> · <code>${trace.session_id_used || "—"}</code></span>
+    `;
+
+    // Persona / scenario panel
+    document.getElementById("persona-kv").innerHTML = `
+      <dt>Persona</dt><dd><b>${SIM.escapeHtml(persona.name || trace.persona?.id)}</b> · v${trace.persona?.version}</dd>
+      <dt>Description</dt><dd>${SIM.escapeHtml(persona.description || "—")}</dd>
+      <dt>Primary rubric</dt><dd><code>${persona.primary_rubric || trace.rubric_dimension || "—"}</code></dd>
+      <dt>Scenario</dt><dd><code>${trace.scenario?.length}.${trace.scenario?.style}.${trace.scenario?.difficulty}</code></dd>
+      <dt>Prompt shape</dt><dd><code>${trace.prompt_shape?.id}@v${trace.prompt_shape?.version}</code></dd>
+      ${trace.archive_cell ? `<dt>Archive cell</dt><dd>risk: <code>${trace.archive_cell.risk_category}</code> · style: <code>${trace.archive_cell.attack_style}</code></dd>` : ""}
+    `;
+
+    // Run config panel
+    document.getElementById("run-kv").innerHTML = `
+      <dt>Run</dt><dd><a href="./run.html?id=${encodeURIComponent(trace.run_id)}" style="color:var(--accent);text-decoration:underline;"><code>${trace.run_id}</code></a></dd>
+      <dt>Adapter</dt><dd><span class="transport-pill ${run?.adapter_snapshot?.transport || ""}">${run?.adapter_snapshot?.transport || "?"}</span> <code>${trace.adapter_id}</code> v${trace.adapter_version}</dd>
+      <dt>Mode</dt><dd><code>${trace.mode}</code></dd>
+      <dt>Session policy</dt><dd><code>${trace.session_policy}</code></dd>
+      <dt>Session ID</dt><dd><code>${trace.session_id_used || "—"}</code></dd>
+      <dt>Stop reason</dt><dd><span class="stop-pill ${trace.stop_reason}">${trace.stop_reason}</span></dd>
+    `;
+
+    document.getElementById("turn-count").textContent = trace.turns.length;
+    document.getElementById("stop-pill-host").innerHTML = `<span class="stop-pill ${trace.stop_reason}">${trace.stop_reason}</span>`;
+
+    // Stream
+    const stream = document.getElementById("stream");
+    stream.innerHTML = "";
+    trace.turns.forEach(t => {
+      const div = document.createElement("div");
+      div.className = "turn " + t.role;
+      const tsShort = (t.ts || "").slice(11, 19);
+      const body = SIM.escapeHtml(t.text).replace(/\n/g, "<br/>");
+      const latencyLine = t.latency_ms || (t.tokens && (t.tokens.in || t.tokens.out)) ? `
+        <div class="latency">
+          ${t.latency_ms ? `<span><b>latency</b> ${t.latency_ms}ms</span>` : ""}
+          ${t.tokens?.in  ? `<span><b>in</b> ${t.tokens.in} tok</span>`   : ""}
+          ${t.tokens?.out ? `<span><b>out</b> ${t.tokens.out} tok</span>` : ""}
+        </div>` : "";
+      const internalBlock = t.simulator_internal ? `
+        <details class="simulator-internal">
+          <summary>Simulator internal</summary>
+          <pre>${SIM.escapeHtml(JSON.stringify(t.simulator_internal, null, 2))}</pre>
+        </details>` : "";
+      div.innerHTML = `
+        <div class="meta"><b>${t.role}</b><span class="ts">${tsShort}</span></div>
+        <div>
+          <div class="bubble">${body}</div>
+          ${latencyLine}
+          ${internalBlock}
+          ${t.is_seed_prompt ? `<div style="margin-top:6px;font-family:var(--font-mono);font-size:10.5px;color:var(--accent);letter-spacing:0.06em;text-transform:uppercase;">↑ verbatim QGen prompt</div>` : ""}
+        </div>
+      `;
+      stream.appendChild(div);
+    });
+
+    // Annotations
+    const a = trace.annotations || {};
+    document.getElementById("annot-kv").innerHTML = `
+      <dt>Topic-drift max</dt><dd><code>${(a.topic_drift_max ?? 0).toFixed(2)}</code></dd>
+      <dt>Longest assistant silence</dt><dd><code>${a.longest_assistant_silence_ms ?? 0}ms</code></dd>
+      <dt>Tool calls</dt><dd><code>${a.tool_calls_made ?? 0}</code> made · <code>${a.tool_call_failures ?? 0}</code> failed</dd>
+    `;
+
+    // Next conversation
+    const peers = SIM.tracesForRun(trace.run_id);
+    const idx = peers.findIndex(p => p.trace_id === trace.trace_id);
+    const next = peers[idx + 1];
+    if (next) {
+      document.getElementById("next-btn").style.display = "";
+      document.getElementById("next-btn").href = `./trace.html?id=${encodeURIComponent(next.trace_id)}`;
+    }
+  }
+
+  // Live mode: wait for the adapter's first hydrate so getTrace()/getRun() resolve.
+  if (window.SIM && SIM.ready) SIM.ready.then(render); else render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Judge calibration · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="calibration">
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Per-tenant judge calibration · stage 3 of feedback loop · calibrate</p>
+    <h1>Judge κ vs <em>human gold</em> <span class="qualifier">— bias is task × judge × tenant specific</span></h1>
+    <p class="subtitle">
+      Cohen's κ between judge verdicts and a sliding human-gold sample, computed per tenant on a 30-day rolling window.
+      Without per-tenant calibration, every score the platform emits is suspect — and no leading vendor in May 2026 ships
+      this as a primary product surface.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--err"><b>faithfulness_v3</b> · κ=0.59 · drifting</span>
+      <span class="pill pill--ok"><b>safety_v2</b> · κ=0.81</span>
+      <span class="pill pill--warn"><b>helpfulness_v4</b> · κ=0.72</span>
+      <span class="pill"><b>3</b> judges tracked</span>
+    </div>
+  </section>
+
+  <div class="calib-tabs" role="tablist" aria-label="Calibration views">
+    <button type="button" role="tab" aria-selected="true" data-panel="overview">Overview</button>
+    <button type="button" role="tab" aria-selected="false" data-panel="queue">Review queue</button>
+    <button type="button" role="tab" aria-selected="false" data-panel="alerts">Alerts</button>
+  </div>
+
+  <!-- ============= PANEL: OVERVIEW (exec / stakeholder read) ============= -->
+  <section class="calib-panel" id="panel-overview">
+
+  <p class="viz-caption" style="margin-bottom:14px;">
+    <b>What this shows:</b> how well each inline judge agrees with a human rater on labelled samples,
+    measured as <abbr title="Cohen's κ (kappa) — 0 means chance agreement, 1 means perfect agreement. Target ≥ 0.75.">Cohen's κ</abbr>
+    on a 30-day rolling window. Drops here mean the judge's verdicts should be trusted less.
+  </p>
+
+  <!-- ============= PRIMARY κ CHART ============= -->
+  <div class="kappa-card">
+    <div class="head">
+      <div>
+        <h3>faithfulness_v3 · acme-corp</h3>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--text-faint);margin-top:6px;">
+          318 paired labels · last 30 days · target κ ≥ 0.75 · alert on κ &lt; 0.65 (drift Δ &gt; 0.10)
+        </div>
+      </div>
+      <div class="now"><span style="color:var(--signal-err);">0.59</span> <em>now</em></div>
+    </div>
+    <svg class="kappa-svg" id="kappa-chart"></svg>
+    <div style="display:flex;gap:18px;margin-top:14px;font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:12px;height:6px;background:rgba(31,143,94,0.20);vertical-align:middle;margin-right:6px;"></span>target band κ ≥ 0.75</span>
+      <span><span style="display:inline-block;width:12px;height:6px;background:rgba(201,122,31,0.30);vertical-align:middle;margin-right:6px;"></span>warn 0.65 ≤ κ &lt; 0.75</span>
+      <span><span style="display:inline-block;width:12px;height:6px;background:rgba(184,61,43,0.30);vertical-align:middle;margin-right:6px;"></span>breach κ &lt; 0.65</span>
+      <span style="margin-left:auto;color:var(--signal-err);">↓ −0.06 in 30d</span>
+    </div>
+  </div>
+
+  <!-- ============= SECONDARY JUDGE TILES ============= -->
+  <div class="section-head" style="margin-top:36px;">
+    <h2>Other <em>judges</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">click to switch · same chart, new series</span></div>
+  </div>
+  <div class="signal-grid" id="judges-grid"></div>
+
+  </section>
+
+  <!-- ============= PANEL: REVIEW QUEUE (operator read) ============= -->
+  <section class="calib-panel" id="panel-queue" hidden>
+
+  <p class="viz-caption" style="margin-bottom:14px;">
+    <b>For annotators:</b> label whether the judge's verdict matches your read. Each
+    labeled row adds one paired sample to the κ chart on the Overview tab.
+  </p>
+
+  <!-- ============= HUMAN-GOLD REVIEW QUEUE ============= -->
+  <div class="section-head" style="margin-top:8px;">
+    <h2>Human-gold <em>review queue</em></h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">reservoir-sampled · 0.3% rate · faithfulness_v3</span>
+      <a href="#">queue settings →</a>
+    </div>
+  </div>
+  <div class="review-list" id="review-list"></div>
+
+  <div id="review-summary" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);padding:16px 18px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);box-shadow:0 1px 3px var(--shadow);margin-top:4px;">
+    <span id="review-summary-text"></span>
+    <button onclick="resetReview()" style="margin-left:14px;font-family:var(--font-mono);font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:var(--r-1);background:var(--surface);color:var(--text-muted);cursor:pointer;">reset queue</button>
+  </div>
+
+  </section>
+
+  <!-- ============= PANEL: ALERTS (admin read) ============= -->
+  <section class="calib-panel" id="panel-alerts" hidden>
+
+  <p class="viz-caption" style="margin-bottom:14px;">
+    <b>For admins:</b> configure when a κ drop should trigger downstream action.
+    Alerts route to Slack, and — when κ falls below the gate's trust floor —
+    <a href="./gate.html">the deploy gate</a> will block promotion even if pass rates are green.
+  </p>
+
+  <div style="background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-3);padding:14px 18px;margin-bottom:20px;box-shadow:0 1px 3px var(--shadow);">
+    <div style="font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);">κ → gate link</div>
+    <div style="font-size:14px;margin-top:6px;line-height:1.55;">
+      <b>faithfulness_v3</b> is at <b style="color:var(--signal-err);">κ=0.59</b> — below the gate's trust floor of κ ≥ 0.65.
+      Any deploy gate that uses <code>faithfulness_v3</code> as a signal will
+      <a href="./gate.html"><b>BLOCK</b> until this judge recalibrates</a>, regardless of pass rate.
+    </div>
+  </div>
+
+  <!-- ============= ALERT CONFIG ============= -->
+  <div class="section-head" style="margin-top:8px;">
+    <h2>Drift <em>alert config</em></h2>
+    <div class="actions"><a href="./monitors.html">drift alerts route through the monitor catalogue →</a></div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;box-shadow:0 1px 3px var(--shadow);">
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Threshold</div>
+      <div style="font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;">κ &lt; 0.65</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:4px;">absolute</div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Drift Δ</div>
+      <div style="font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;">Δ &gt; 0.10</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:4px;">within 30d window</div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Sample floor</div>
+      <div style="font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;">100 paired</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:4px;">no κ before this</div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Routing</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:500;margin-top:4px;">slack:#eval-judges<br/>evidence_pack</div>
+    </div>
+  </div>
+
+  </section>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / calibration.html</span>
+    <span><a href="./monitors.html">monitor catalogue →</a></span>
+  </footer>
+
+</main>
+
+<script>
+  // Tab toggle — pure DOM, no framework.
+  (function () {
+    const tabs = document.querySelectorAll('.calib-tabs button');
+    tabs.forEach(btn => btn.addEventListener('click', function () {
+      const panel = btn.getAttribute('data-panel');
+      tabs.forEach(b => b.setAttribute('aria-selected', b === btn ? 'true' : 'false'));
+      document.querySelectorAll('.calib-panel').forEach(p => {
+        p.hidden = (p.id !== 'panel-' + panel);
+      });
+    }));
+  })();
+</script>
+<script src="../_api.js"></script>
+<script src="app.js?v=2"></script>
+<script>
+  const REVIEW_ITEMS = [
+    { id: 'q_01HXC1', version: 'v3.1.2', text: '"…the case opened on April 14th, with three open invoices totaling $4,212.40. The customer\'s pattern of late filings…"', judge_verdict: 'PASS', judge_score: 0.92, judge_color: 'var(--signal-ok)' },
+    { id: 'q_01HXC2', version: 'v3.1.2', text: '"Yes — based on the KB article you cited, the 30-day grace period applies. I\'ve drafted a refund authorization for $128.00."', judge_verdict: 'PASS', judge_score: 0.88, judge_color: 'var(--signal-ok)' },
+    { id: 'q_01HXC3', version: 'v3.1.2', text: '"Per our policy, all enterprise customers receive a 90-day warranty extension automatically." <span style="color:var(--signal-err);font-style:italic;">[no source cited]</span>', judge_verdict: 'PASS', judge_score: 0.81, judge_color: 'var(--signal-ok)' },
+    { id: 'q_01HXC4', version: 'v3.1.2', text: '"I cannot find documentation that supports your claim about the 60-day window — could you share the article reference?"', judge_verdict: 'FAIL', judge_score: 0.42, judge_color: 'var(--signal-warn)' },
+  ];
+  const labels = {};
+
+  function renderReviewList() {
+    const list = document.getElementById('review-list');
+    const pending = REVIEW_ITEMS.filter(it => !labels[it.id]);
+    if (!pending.length) {
+      list.innerHTML = '';
+      const agreed = Object.values(labels).filter(l => l === 'agree').length;
+      const disagreed = Object.values(labels).filter(l => l === 'disagree').length;
+      const skipped = Object.values(labels).filter(l => l === 'skip').length;
+      document.getElementById('review-summary').style.display = '';
+      document.getElementById('review-summary-text').textContent =
+        'Queue complete · ' + agreed + ' agreed · ' + disagreed + ' disagreed · ' + skipped + ' skipped — κ contribution recorded.';
+      return;
+    }
+    document.getElementById('review-summary').style.display = 'none';
+    list.innerHTML = pending.map(it => `
+      <div class="review-row" id="row-${it.id}">
+        <div class="qid">${it.id}<br/>${it.version}</div>
+        <div class="text">${it.text}</div>
+        <div class="judge"><b>faithfulness</b><br/><span style="color:${it.judge_color};">${it.judge_verdict} · ${it.judge_score.toFixed(2)}</span></div>
+        <div class="judge"><b>your call?</b></div>
+        <div class="actions">
+          <button class="agree" onclick="label('${it.id}','agree',this)">agree</button>
+          <button class="disagree" onclick="label('${it.id}','disagree',this)">disagree</button>
+          <button onclick="label('${it.id}','skip',this)">skip</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function label(id, choice, btn) {
+    labels[id] = choice;
+    const row = document.getElementById('row-' + id);
+    if (row) {
+      const msg = choice === 'agree' ? '✓ agreed' : (choice === 'disagree' ? '✗ disagreed' : '— skipped');
+      const clr = choice === 'agree' ? 'var(--signal-ok)' : (choice === 'disagree' ? 'var(--signal-err)' : 'var(--text-faint)');
+      row.style.opacity = '0.5';
+      row.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      row.querySelector('.actions').innerHTML = '<span style="font-family:var(--font-mono);font-size:12px;color:' + clr + ';">' + msg + '</span>';
+      setTimeout(() => { row.remove(); renderReviewList(); }, 600);
+    }
+  }
+
+  function resetReview() {
+    Object.keys(labels).forEach(k => delete labels[k]);
+    renderReviewList();
+  }
+
+  (function () {
+    const obs = window.AIBC_OBS;
+    if (!obs) return;
+    renderReviewList();
+    const judges = obs.State.judges();
+    const primary = judges[0];
+
+    // primary chart
+    obs.renderKappaChart(document.getElementById('kappa-chart'), primary.series, { w: 1100, h: 200 });
+
+    // secondary judge tiles
+    const grid = document.getElementById('judges-grid');
+    grid.innerHTML = judges.map(j => {
+      const cls = j.kappa_now < j.kappa_threshold ? 'spark--err' :
+                  (j.kappa_now < j.kappa_target ? 'spark--warn' : 'spark--ok');
+      const status = j.kappa_now < j.kappa_threshold ? 'breach' :
+                    (j.kappa_now < j.kappa_target ? 'warn' : 'within');
+      return `
+        <div class="signal-card">
+          <div class="label">${obs.escapeHtml(j.id)} · ${obs.escapeHtml(j.tenant)}</div>
+          <div class="value">${j.kappa_now.toFixed(2)} <em>κ</em></div>
+          <div class="delta ${j.kappa_now < j.kappa_threshold ? 'up' : 'flat'}">
+            ${j.paired_labels_30d} paired · ${j.window_days}d
+          </div>
+          <svg class="spark ${cls}" data-kappa="${j.id}" style="width:100%;height:30px;margin-top:6px;"></svg>
+          <div class="meta">target ≥ ${j.kappa_target.toFixed(2)} · breach &lt; ${j.kappa_threshold.toFixed(2)} · <b>${status}</b></div>
+        </div>`;
+    }).join('');
+
+    grid.querySelectorAll('svg.spark').forEach(svg => {
+      const id = svg.getAttribute('data-kappa');
+      const j = judges.find(x => x.id === id);
+      obs.renderSparkline(svg, j.series, { w: 220, h: 30 });
+    });
+  })();
+</script>
+</body>
+</html>

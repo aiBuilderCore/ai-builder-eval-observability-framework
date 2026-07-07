@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Trajectory drift · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="trajectory">
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Trajectory drift · stage 4 of feedback loop · identify failure modes</p>
+    <h1>Drift on the <em>shape</em> of the trajectory <span class="qualifier">— not the scalars</span></h1>
+    <p class="subtitle">
+      Token / latency / cost dashboards answer <em>is this slower than yesterday?</em> Trajectory drift answers
+      <em>is the agent picking different tools, planning differently, delegating differently</em> — even when
+      latency and cost look fine. This is the failure mode that's invisible everywhere else in the market.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--err"><b>z=4.7</b> tool-call sequence</span>
+      <span class="pill pill--warn"><b>0.42</b> planner-step KL</span>
+      <span class="pill pill--err"><b>+38%</b> delegation-edge churn</span>
+      <span class="pill"><b>billing-agent</b> · prompt v2.4</span>
+      <span class="pill"><b>24h</b> baseline</span>
+    </div>
+  </section>
+
+  <!-- ============= EXPERIMENT PAIR PICKER ============= -->
+  <div class="exp-picker" id="exp-picker">
+    <div class="field">
+      <label class="field" style="font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;display:block;">Baseline batch</label>
+      <select class="input" id="pick-baseline"></select>
+    </div>
+    <div class="field">
+      <label class="field" style="font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;display:block;">Candidate batch</label>
+      <select class="input" id="pick-candidate"></select>
+    </div>
+    <div class="field">
+      <label class="field" style="font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;display:block;">Cohort</label>
+      <select class="input" id="pick-cohort">
+        <option selected>persona × prompt_version</option>
+        <option>tenant × prompt_version</option>
+        <option>global</option>
+      </select>
+    </div>
+    <div>
+      <button class="btn subtle" id="exp-apply" style="margin-top:22px;">Apply →</button>
+    </div>
+  </div>
+  <div id="exp-applied" style="margin:-8px 0 14px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);min-height:16px;"></div>
+
+  <!-- ============= TOOL-CALL SEQUENCE DRIFT HEATMAP ============= -->
+  <div class="section-head">
+    <h2>Tool-call <em>sequence drift</em> · last 24 h</h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">edit-distance over tool-name alphabet · per-cohort z-score</span>
+    </div>
+  </div>
+  <p class="viz-caption">
+    <b>What this tells you:</b> each cell is one <b>persona × hour</b>. A hot cell means the agent's
+    tool-call sequence for that persona diverged sharply from its baseline in that window. Hover to
+    inspect · click a hot cell to jump to a run in the batch runs table.
+  </p>
+  <div class="heatmap-wrap">
+    <div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">rows: personas · columns: hourly windows (0–23) · colour: z-score</div>
+    <div class="heatmap" id="heatmap"></div>
+    <div class="heatmap-legend">
+      <span>z-score</span>
+      <span class="swatch" style="background:var(--surface-alt);"></span>0
+      <span class="swatch" style="background:var(--drift-1);"></span>1
+      <span class="swatch" style="background:var(--drift-2);"></span>2
+      <span class="swatch" style="background:var(--drift-3);"></span>3
+      <span class="swatch" style="background:var(--drift-4);"></span>4
+      <span class="swatch" style="background:var(--drift-5);"></span>5
+      <span class="swatch" style="background:var(--drift-6);"></span>6+
+      <span style="margin-left:auto;">7 personas · 24 hourly windows · cohort = persona</span>
+    </div>
+  </div>
+
+  <!-- ============= PLANNER-STEP DISTRIBUTION DIFF ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Planner-step <em>distribution drift</em> · billing-agent</h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">KL divergence vs 7d baseline · breach z &gt; 3.0</span>
+    </div>
+  </div>
+  <p class="viz-caption">
+    <b>What this tells you:</b> the frequency of each planner step (search, retrieve, tool, answer…) in the
+    baseline window vs the last hour. A big shift here — even with the same latency — means the agent is
+    <em>reasoning differently</em>. KL &gt; 0.30 is worth investigating; &gt; 0.40 usually indicates a broken tool.
+  </p>
+  <div class="dist-diff">
+    <div>
+      <h3>Baseline · last 7 days <span class="hint">(rolling)</span></h3>
+      <div id="dist-baseline"></div>
+    </div>
+    <div>
+      <h3>Now · last 1 hour <span class="hint">(KL = 0.42 · breach)</span></h3>
+      <div id="dist-now"></div>
+    </div>
+  </div>
+
+  <!-- ============= SUB-AGENT DELEGATION GRAPH DIFF ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Sub-agent <em>delegation graph drift</em></h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">graph edit distance · top-k edge churn 38% · breach &gt;30%</span>
+    </div>
+  </div>
+  <p class="viz-caption">
+    <b>What this tells you:</b> which sub-agents are calling which other sub-agents.
+    <b style="color:var(--signal-err);">Red</b> edges appear only in the candidate — new delegations.
+    <b style="color:var(--accent);">Purple</b> edges appear in both. Missing edges from the baseline
+    mean the candidate has stopped calling a sub-agent that used to be routine.
+  </p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px;">Baseline · 7d</div>
+      <div id="graph-baseline"></div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:10px;">3 nodes · 3 edges · planner → researcher (0.55) · planner → writer (0.45) · researcher → critic (0.20)</div>
+    </div>
+    <div style="background:var(--surface);border:2px solid var(--signal-err);border-radius:12px;padding:18px;">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--signal-err);margin-bottom:8px;">Now · 1h <span style="background:rgba(184,61,43,0.14);padding:1px 6px;border-radius:4px;margin-left:8px;">churn 38%</span></div>
+      <div id="graph-now"></div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:10px;">5 nodes · 6 edges · two new fan-out edges (planner → critic, planner → verifier) · researcher and writer now also delegate downstream</div>
+    </div>
+  </div>
+
+  <!-- ============= IMPLICATED RUNS / SPANS LIST ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Implicated <em>runs</em></h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">most-divergent traces in the last window · click to open in Simulation</span>
+    </div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0;box-shadow:0 1px 3px var(--shadow);overflow:hidden;">
+    <table class="data-table" style="border:0;border-radius:0;">
+      <thead>
+        <tr>
+          <th>Run / span</th>
+          <th>Persona</th>
+          <th>Prompt</th>
+          <th>Tool-call sequence</th>
+          <th>Z</th>
+          <th>TRAIL</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="id-strong">sim_01HXC9P0 · q_01HXC9PA</div>
+            <div class="id">14 spans · 8 LLM · 6 tool</div>
+          </td>
+          <td>Adversarial Aaron · v4</td>
+          <td><span class="mono" style="font-size:12px;">support_v3.1.2</span></td>
+          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[search → fetch → search → search → fetch → escalate → search]</span></td>
+          <td><span class="mono" style="font-weight:700;color:var(--signal-err);">5.2</span></td>
+          <td><span class="trail-tag" data-cat="planning">replan_storm</span></td>
+          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">23m ago</td>
+        </tr>
+        <tr>
+          <td>
+            <div class="id-strong">live_01HXCA0F · trace</div>
+            <div class="id">22 spans · 10 LLM · 9 tool · 3 agent</div>
+          </td>
+          <td>Methodical Mei · v4</td>
+          <td><span class="mono" style="font-size:12px;">billing_v2.4</span></td>
+          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[lookup → fetch → fetch → fetch → fetch → fetch → escalate]</span></td>
+          <td><span class="mono" style="font-weight:700;color:var(--signal-err);">4.8</span></td>
+          <td><span class="trail-tag" data-cat="execution">tool_argument_invalid</span></td>
+          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">41m ago</td>
+        </tr>
+        <tr>
+          <td>
+            <div class="id-strong">live_01HXC9TB · trace</div>
+            <div class="id">9 spans · 4 LLM · 4 tool · 1 agent</div>
+          </td>
+          <td>Onboarding Olivia · v3</td>
+          <td><span class="mono" style="font-size:12px;">support_v3.1.2</span></td>
+          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[search → fetch → escalate]</span></td>
+          <td><span class="mono" style="font-weight:700;color:var(--signal-warn);">3.4</span></td>
+          <td><span class="trail-tag" data-cat="execution">retrieval_returned_nothing_used_anyway</span></td>
+          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">1h ago</td>
+        </tr>
+        <tr>
+          <td>
+            <div class="id-strong">live_01HXC9XK · trace</div>
+            <div class="id">17 spans · 7 LLM · 8 tool · 2 agent</div>
+          </td>
+          <td>Compliance Cara · v2</td>
+          <td><span class="mono" style="font-size:12px;">support_v3.1.2</span></td>
+          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[lookup → fetch → search → fetch → escalate → escalate]</span></td>
+          <td><span class="mono" style="font-weight:700;color:var(--signal-err);">4.1</span></td>
+          <td><span class="trail-tag" data-cat="reasoning">unsupported_claim</span></td>
+          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">1h ago</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / trajectory.html</span>
+    <span><a href="./monitors.html">monitor catalogue →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script src="batches.js?v=2"></script>
+<script>
+  (function () {
+    const obs = window.AIBC_OBS;
+    const B = window.AIBC_BATCHES;
+    if (!obs) return;
+
+    // Drive the baseline / candidate pickers from real batches.js entries so
+    // adding a new batch surfaces here automatically.
+    if (B) {
+      const batches = B.loadBatches().slice().sort((a, b) =>
+        new Date(b.started_at) - new Date(a.started_at));
+      function label(b) {
+        const pct = (b.pass_rate * 100).toFixed(1) + '%';
+        const warn = b.pass_rate < 0.80 ? ' ⚠' : '';
+        return b.batch_id + ' · ' + b.name + ' · ' + pct + warn;
+      }
+      function opts(sel) {
+        sel.innerHTML = batches.map(b =>
+          '<option value="' + obs.escapeHtml(b.batch_id) + '">' + obs.escapeHtml(label(b)) + '</option>'
+        ).join('');
+      }
+      const baseSel = document.getElementById('pick-baseline');
+      const candSel = document.getElementById('pick-candidate');
+      opts(baseSel); opts(candSel);
+      if (batches.length >= 2) {
+        candSel.value = batches[0].batch_id;
+        baseSel.value = batches[1].batch_id;
+      }
+    }
+
+    function applyExperiment() {
+      const baseSel = document.getElementById('pick-baseline');
+      const candSel = document.getElementById('pick-candidate');
+      const cohortSel = document.getElementById('pick-cohort');
+      const baseId = baseSel.value, candId = candSel.value;
+      const cohort = cohortSel.value;
+      // Reflect the choice in the subnav meta strip and the applied-banner.
+      const metaEl = document.querySelector('.subnav .meta');
+      if (metaEl) metaEl.innerHTML = 'cohort · <b>' + obs.escapeHtml(cohort) + '</b> · 24h';
+      document.getElementById('exp-applied').textContent =
+        '✓ applied · ' + baseId + ' → ' + candId + ' · cohort ' + cohort + ' · 24 h window';
+      // Visual nudge on the picker frame.
+      const frame = document.getElementById('exp-picker');
+      frame.style.borderColor = 'var(--accent)';
+      setTimeout(() => { frame.style.borderColor = ''; }, 1400);
+    }
+    document.getElementById('exp-apply').addEventListener('click', applyExperiment);
+
+    document.getElementById('heatmap').innerHTML = obs.buildHeatmap();
+
+    const baseline = [
+      { name: 'lookup',  baseline: 0.30, now: 0.18 },
+      { name: 'search',  baseline: 0.20, now: 0.12 },
+      { name: 'fetch',   baseline: 0.18, now: 0.32 },
+      { name: 'reason',  baseline: 0.14, now: 0.08 },
+      { name: 'escalate',baseline: 0.08, now: 0.16 },
+      { name: 'reply',   baseline: 0.10, now: 0.14 },
+    ];
+    document.getElementById('dist-baseline').innerHTML = obs.buildDistDiff(baseline, 'baseline');
+    document.getElementById('dist-now').innerHTML = obs.buildDistDiff(baseline, 'now');
+
+    document.getElementById('graph-baseline').innerHTML = obs.buildDelegationGraph('baseline');
+    document.getElementById('graph-now').innerHTML = obs.buildDelegationGraph('now');
+  })();
+</script>
+</body>
+</html>

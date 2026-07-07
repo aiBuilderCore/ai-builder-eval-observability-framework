@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Datasets · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="datasets">
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Dataset curation · stage 4–5 of feedback loop</p>
+    <h1>Curated <em>datasets</em> <span class="qualifier">— promote failures, track health, export for training</span></h1>
+    <p class="subtitle">
+      Failed runs and low-scoring EVALUATOR spans are the richest signal for improvement. Promote them here into
+      versioned, filter-scoped datasets. Health checks flag staleness, persona-coverage gaps, and class skew
+      before you export to OpenAI JSONL or push to a fine-tune job.
+    </p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <!-- ============= SUGGESTED PROMOTIONS ============= -->
+  <div class="cohort-strip" id="suggested-strip" hidden>
+    <div class="cohort-strip__head">
+      <h3><em>Suggested</em> promotions</h3>
+      <span class="caption">auto-picked from the most recent batch with regressions · click to pre-fill the form below</span>
+    </div>
+    <div id="suggested-chips"></div>
+  </div>
+
+  <!-- ============= PROMOTE FROM BATCH ============= -->
+  <div class="section-head">
+    <h2>Promote <em>failing runs</em> to dataset</h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">source: batch · filter: EVALUATOR verdict</span></div>
+  </div>
+  <div class="promote-panel">
+    <div class="promote-form">
+      <div class="field">
+        <label>Source batch</label>
+        <select class="input" id="prm-batch"></select>
+        <div class="hint">promotes runs matching the filter below</div>
+      </div>
+      <div class="field">
+        <label>Filter expression</label>
+        <input class="input mono" id="prm-filter" type="text" value="status=fail OR faithfulness_v3 &lt; 0.65" />
+        <div class="hint">EVALUATOR span attribute · evaluated lazily</div>
+      </div>
+      <div class="field">
+        <label>Target dataset name</label>
+        <input class="input" id="prm-name" type="text" placeholder="e.g. support-agent · regression set" />
+        <div class="hint">creates a new versioned dataset record</div>
+      </div>
+      <div>
+        <button class="btn primary" id="prm-submit" style="margin-top:22px;">Promote →</button>
+      </div>
+    </div>
+    <div id="prm-feedback" style="margin-top:12px;font-family:var(--font-mono);font-size:12px;color:var(--text-faint);min-height:18px;"></div>
+  </div>
+
+  <!-- ============= DATASET HEALTH CARDS ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Dataset <em>health</em></h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">staleness · persona coverage · diversity score</span>
+    </div>
+  </div>
+  <div class="dataset-grid" id="datasets-grid"></div>
+
+  <!-- ============= EXPORT PANEL ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Export <em>for training</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">OpenAI JSONL · fine-tune ready datasets only</span></div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);padding:20px;box-shadow:0 1px 3px var(--shadow);">
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:flex-end;">
+      <div class="field">
+        <label>Dataset</label>
+        <select class="input" id="exp-ds"></select>
+      </div>
+      <div class="field">
+        <label>Format</label>
+        <select class="input">
+          <option selected>OpenAI JSONL · fine-tune</option>
+          <option>Anthropic Messages JSONL</option>
+          <option>CSV · flat</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn ghost" id="exp-submit" style="margin-top:22px;">Export →</button>
+      </div>
+    </div>
+    <div id="exp-feedback" style="margin-top:10px;font-family:var(--font-mono);font-size:12px;color:var(--text-faint);min-height:18px;"></div>
+  </div>
+
+  <!-- ============= LOOP CLOSURE — re-run the gate after fine-tune ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Close the <em>loop</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">curated dataset → trained candidate → gate verdict</span></div>
+  </div>
+  <div class="loop-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="loop-stage">
+      <span class="loop-stage__num">5 · here</span>
+      <span class="loop-stage__verb">Curate</span>
+      <span class="loop-stage__name">Datasets</span>
+      <span class="loop-stage__desc">Above — promote failing runs, track health, export OpenAI JSONL.</span>
+    </div>
+    <div class="loop-stage" style="border-style:dashed;">
+      <span class="loop-stage__num">5b · external</span>
+      <span class="loop-stage__verb">Improve</span>
+      <span class="loop-stage__name">Fine-tune or prompt-swap</span>
+      <span class="loop-stage__desc">Train a candidate model on the exported JSONL, or swap the prompt version. Lives outside this UI.</span>
+    </div>
+    <a class="loop-stage" href="./gate.html">
+      <span class="loop-stage__num">6</span>
+      <span class="loop-stage__verb">Deploy</span>
+      <span class="loop-stage__name">Gate verdict</span>
+      <span class="loop-stage__desc">Compare the candidate's next batch against the baseline. PASS ships, BLOCK loops back here for another curation pass.</span>
+    </a>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / datasets.html</span>
+    <span><a href="./gate.html">gate →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script src="batches.js?v=2"></script>
+<script>
+  (function () {
+    const obs = window.AIBC_OBS;
+    const B = window.AIBC_BATCHES;
+    if (!obs || !B) return;
+
+    // Suggested promotions: auto-pick the failing cohorts from the most recent
+    // batch that has any. Chips pre-fill the form below when clicked.
+    (function renderSuggested() {
+      const strip = document.getElementById('suggested-strip');
+      if (!strip) return;
+      const batches = B.loadBatches().slice().sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+      const withFailures = batches.find(b => b.pass_rate < 1.0);
+      if (!withFailures) return;
+      const cohorts = B.groupByFailureCohort(withFailures.batch_id);
+      if (!cohorts.length) return;
+      strip.hidden = false;
+      const container = document.getElementById('suggested-chips');
+      container.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">From <code>${B.escapeHtml(withFailures.batch_id)}</code> · <b>${withFailures.name}</b> (${(withFailures.pass_rate * 100).toFixed(0)}% pass):</div>` +
+        cohorts.map(c => `
+          <a href="#" class="cohort-chip" data-batch="${B.escapeHtml(withFailures.batch_id)}" data-cohort="${B.escapeHtml(c.key)}" data-label="${B.escapeHtml(c.label)}">
+            <span>${B.escapeHtml(c.label)}</span>
+            <span class="cohort-chip__count">${c.runs.length} run${c.runs.length === 1 ? '' : 's'}</span>
+          </a>`).join('');
+      container.addEventListener('click', function (e) {
+        const chip = e.target.closest('.cohort-chip');
+        if (!chip) return;
+        e.preventDefault();
+        const batchId = chip.getAttribute('data-batch');
+        const cohortKey = chip.getAttribute('data-cohort');
+        const cohortLabel = chip.getAttribute('data-label');
+        const batchSel = document.getElementById('prm-batch');
+        if (batchSel) batchSel.value = batchId;
+        const filterInp = document.getElementById('prm-filter');
+        if (filterInp) filterInp.value = 'cohort=' + cohortKey;
+        const nameInp = document.getElementById('prm-name');
+        if (nameInp) nameInp.value = withFailures.sut + ' · ' + cohortLabel.toLowerCase();
+        const fb = document.getElementById('prm-feedback');
+        if (fb) fb.textContent = '← pre-filled from suggested cohort · ' + cohortLabel;
+        document.querySelector('.promote-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    })();
+
+    // Source-batch dropdown is driven from the real batches.js, sorted newest first.
+    // If trace.html sent us here with ?from_batch=…[&from_run=…], that batch is
+    // pre-selected and a hint surfaces above the form.
+    function populateBatchPicker(preselectId) {
+      const sel = document.getElementById('prm-batch');
+      const batches = B.loadBatches().slice().sort((a, b) =>
+        new Date(b.started_at) - new Date(a.started_at));
+      sel.innerHTML = batches.map(b => {
+        const pct = (b.pass_rate * 100).toFixed(1) + '%';
+        return '<option value="' + obs.escapeHtml(b.batch_id) + '">' +
+               obs.escapeHtml(b.batch_id + ' · ' + b.name + ' · ' + pct + ' pass') +
+               '</option>';
+      }).join('');
+      if (preselectId && batches.find(b => b.batch_id === preselectId)) {
+        sel.value = preselectId;
+      }
+    }
+
+    const qs = new URLSearchParams(location.search);
+    const fromBatch = qs.get('from_batch');
+    const fromRun = qs.get('from_run');
+    const fromIncident = qs.get('from_incident');
+    populateBatchPicker(fromBatch);
+    if (fromBatch) {
+      const fb = document.getElementById('prm-feedback');
+      fb.textContent = '← pre-filled from trace ' + (fromRun || '') + ' in batch ' + fromBatch;
+      document.getElementById('prm-name').placeholder =
+        'e.g. ' + fromBatch + ' · root-cause set';
+    } else if (fromIncident) {
+      const incidents = obs.State.incidents();
+      const inc = incidents.find(i => i.id === fromIncident);
+      const fb = document.getElementById('prm-feedback');
+      if (inc) {
+        fb.textContent = '← pre-filled from live incident ' + fromIncident +
+          ' (' + inc.implicated_runs + ' implicated runs · ' + inc.cohort + ')';
+        document.getElementById('prm-name').placeholder =
+          'e.g. ' + (inc.trail_class || 'incident') + ' · live regression';
+        document.getElementById('prm-filter').value =
+          inc.trail_class ? ('trail_class=' + inc.trail_class) : ('cohort=' + inc.cohort);
+      } else {
+        fb.textContent = '← pre-filled from live incident ' + fromIncident;
+      }
+    }
+
+    function renderAll() {
+      const datasets = obs.State.datasets();
+
+      const totalRows = datasets.reduce((s, d) => s + d.rows, 0);
+      const countDs = document.getElementById('count-ds');
+      const countRows = document.getElementById('count-rows');
+      if (countDs) countDs.textContent = datasets.length;
+      if (countRows) countRows.textContent = totalRows;
+
+      const ready = datasets.filter(d => d.ready_for_finetune).length;
+      const skewAlert = datasets.filter(d => d.health.skew_alert).length;
+      document.getElementById('head-pills').innerHTML =
+        '<span class="pill pill--accent"><b>' + datasets.length + '</b> datasets</span>' +
+        '<span class="pill"><b>' + totalRows + '</b> total rows</span>' +
+        '<span class="pill pill--ok"><b>' + ready + '</b> fine-tune ready</span>' +
+        (skewAlert ? '<span class="pill pill--warn"><b>' + skewAlert + '</b> skew alert</span>' : '') +
+        '<span class="pill">localStorage · synthetic</span>';
+
+      const grid = document.getElementById('datasets-grid');
+      grid.innerHTML = datasets.map(d => {
+        const staleClass = d.health.staleness_days > 3 ? 'warn' : (d.health.staleness_days > 7 ? 'err' : 'ok');
+        const covClass = d.health.persona_coverage < 0.5 ? 'err' : (d.health.persona_coverage < 0.7 ? 'warn' : 'ok');
+        const divClass = d.health.diversity_score < 0.5 ? 'err' : (d.health.diversity_score < 0.65 ? 'warn' : 'ok');
+        return `
+          <div class="dataset-card ${d.health.skew_alert ? 'skew-alert' : ''}">
+            <div>
+              <div class="ds-source">${obs.escapeHtml(d.source.replace('_', ' '))}</div>
+              <div class="ds-name" style="margin-top:4px;">${obs.escapeHtml(d.name)}</div>
+            </div>
+            <div class="ds-filter">${obs.escapeHtml(d.filter)}</div>
+            ${d.source_batches.length ? '<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);">from ' + d.source_batches.map(b => obs.escapeHtml(b)).join(', ') + '</div>' : ''}
+            <div class="ds-health">
+              <div class="ds-health-item">
+                <span class="lbl">Rows</span>
+                <span class="val">${d.rows}</span>
+              </div>
+              <div class="ds-health-item">
+                <span class="lbl">Staleness</span>
+                <span class="val ${staleClass}">${d.health.staleness_days}d</span>
+              </div>
+              <div class="ds-health-item">
+                <span class="lbl">Persona cov.</span>
+                <span class="val ${covClass}">${(d.health.persona_coverage * 100).toFixed(0)}%</span>
+              </div>
+              <div class="ds-health-item">
+                <span class="lbl">Diversity</span>
+                <span class="val ${divClass}">${d.health.diversity_score.toFixed(2)}</span>
+              </div>
+            </div>
+            ${d.health.skew_alert ? '<div style="font-family:var(--font-mono);font-size:11px;color:var(--signal-warn);background:rgba(201,122,31,0.10);border-radius:var(--r-1);padding:5px 8px;">⚠ class skew detected — check persona distribution before exporting</div>' : ''}
+            <div class="ds-footer">
+              <span>${obs.escapeHtml(d.id)} · <b>${d.exports}</b> exports · ${obs.escapeHtml(d.last_updated.slice(0, 10))}</span>
+              <div class="ds-actions">
+                ${d.ready_for_finetune
+                  ? '<button onclick="exportDs(\'' + d.id + '\',this)">Export JSONL</button>'
+                  : '<button disabled style="opacity:0.4;cursor:not-allowed;" title="not ready for fine-tune">Export JSONL</button>'}
+                <button onclick="deleteDs('${d.id}')">Remove</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('') || '<div style="grid-column:1/-1;background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-3);padding:48px;text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">no datasets yet · promote failing runs above</div>';
+
+      // populate export dropdown
+      const expSel = document.getElementById('exp-ds');
+      expSel.innerHTML = datasets.filter(d => d.ready_for_finetune)
+        .map(d => '<option value="' + d.id + '">' + obs.escapeHtml(d.name) + ' · ' + d.rows + ' rows</option>').join('');
+      if (!expSel.innerHTML) expSel.innerHTML = '<option disabled>no fine-tune ready datasets</option>';
+    }
+
+    function exportDs(id, btn) {
+      const datasets = obs.State.datasets();
+      const d = datasets.find(x => x.id === id);
+      if (d) { d.exports++; obs.State.saveDatasets(datasets); }
+      document.getElementById('exp-feedback').textContent =
+        '✓ Synthetic export: ' + (d ? d.name : id) + '.jsonl queued · ' + (d ? d.rows : '?') + ' rows';
+      renderAll();
+    }
+
+    function deleteDs(id) {
+      const datasets = obs.State.datasets().filter(d => d.id !== id);
+      obs.State.saveDatasets(datasets);
+      renderAll();
+    }
+
+    window.exportDs = exportDs;
+    window.deleteDs = deleteDs;
+
+    document.getElementById('prm-submit').addEventListener('click', () => {
+      const name = document.getElementById('prm-name').value.trim();
+      const batch = document.getElementById('prm-batch').value;
+      const filter = document.getElementById('prm-filter').value.trim();
+      if (!name) { document.getElementById('prm-feedback').textContent = '⚠ enter a dataset name'; return; }
+      const rows = 2 + Math.floor(Math.random() * 10);
+      const source = fromIncident ? 'live_monitor' : 'batch_promotion';
+      const datasets = obs.State.datasets();
+      datasets.unshift({
+        id: 'ds_' + obs.ulid(''),
+        name,
+        source,
+        source_batches: source === 'batch_promotion' ? [batch] : [],
+        source_incident: fromIncident || null,
+        filter: filter || 'status=fail',
+        rows,
+        health: {
+          staleness_days: 0,
+          persona_coverage: 0.4 + Math.random() * 0.5,
+          skew_alert: Math.random() < 0.3,
+          diversity_score: 0.4 + Math.random() * 0.5,
+        },
+        last_updated: new Date().toISOString(),
+        ready_for_finetune: rows >= 5,
+        exports: 0,
+      });
+      obs.State.saveDatasets(datasets);
+      document.getElementById('prm-name').value = '';
+      document.getElementById('prm-feedback').textContent = '✓ Created dataset "' +
+        obs.escapeHtml(name) + '" · ' + rows + ' rows promoted from ' +
+        (source === 'live_monitor' ? ('incident ' + fromIncident) : batch);
+      renderAll();
+    });
+
+    document.getElementById('exp-submit').addEventListener('click', () => {
+      const id = document.getElementById('exp-ds').value;
+      if (!id) return;
+      exportDs(id, null);
+    });
+
+    renderAll();
+  })();
+</script>
+</body>
+</html>

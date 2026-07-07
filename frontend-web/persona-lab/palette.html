@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Design tokens — Persona Lab · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<style>
+  /* Tiny, page-local layout helpers — colors / type / components all come
+     from styles.css. Nothing in this block introduces new design tokens. */
+  .swatch-wall {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 32px;
+  }
+  .swatch {
+    border: 1px solid var(--border);
+    border-radius: var(--r-3);
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .swatch__chip {
+    height: 96px;
+    background: var(--sw-bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .swatch__body {
+    padding: 14px 16px 16px;
+  }
+  .swatch__name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+    color: var(--text);
+  }
+  .swatch__token {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .specimen {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-3);
+    padding: 36px 36px 30px;
+    margin-top: 18px;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .specimen .meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .specimen .meta b { color: var(--accent); font-weight: 600; }
+
+  .specimen.display .display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(48px, 8vw, 108px);
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+  .specimen.display .display em {
+    font-style: normal;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .specimen.display .pangram {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 22px;
+    line-height: 1.45;
+    color: var(--text-muted);
+    margin-top: 18px;
+    max-width: 60ch;
+  }
+
+  .specimen.body .display {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: clamp(40px, 6vw, 84px);
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    color: var(--text);
+  }
+  .specimen.body .pangram {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--text-muted);
+    margin-top: 18px;
+    max-width: 60ch;
+  }
+
+  .specimen.mono .display {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: clamp(32px, 5vw, 64px);
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+  .specimen.mono .pangram {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-muted);
+    margin-top: 18px;
+    max-width: 70ch;
+  }
+
+  .components-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    margin-top: 22px;
+  }
+  .demo-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-3);
+    padding: 22px;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .demo-card h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 16px;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .demo-card .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .demo-card .row:last-child { margin-bottom: 0; }
+  .demo-card code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 24px;
+    margin: 80px 0 8px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-head h2 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--text);
+  }
+  .section-head h2 em { font-style: normal; color: var(--accent); font-weight: 700; }
+  .section-head .num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  .section-lede {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 16px;
+    color: var(--text-muted);
+    max-width: 64ch;
+    margin: 18px 0 0;
+    line-height: 1.7;
+  }
+
+  @media (max-width: 880px) {
+    .swatch-wall { grid-template-columns: repeat(2, 1fr); }
+    .components-grid { grid-template-columns: 1fr; }
+  }
+</style>
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Persona Lab</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>01 · Persona Lab</b> · Palette</span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Design tokens</p>
+    <h1>Persona Lab Palette <span class="qualifier">— unified house style</span></h1>
+    <p class="subtitle">
+      A single set of tokens shared across the AIBuilderCore artifacts site and every clickable mock. Cream backdrop, near-black ink, violet accent, Geist + Space Grotesk typography, light + dark themes via <code>prefers-color-scheme</code>.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--accent"><b>--accent</b> #7c3aed</span>
+      <span class="pill"><b>--bg</b> #f9f8f5</span>
+      <span class="pill">Space Grotesk</span>
+      <span class="pill">Geist</span>
+      <span class="pill">JetBrains Mono</span>
+    </div>
+  </section>
+
+  <!-- 01 Color -->
+  <div class="section-head">
+    <h2><em>Colour</em>.</h2>
+    <span class="num">01 · surfaces &amp; accent</span>
+  </div>
+  <p class="section-lede">A short, dominant palette. Violet is the only saturated colour in the system — it carries CTAs, focus rings, active tabs, and the tag pills. Everything else is a calm neutral so the eye doesn't fatigue across long persona-curation sessions.</p>
+
+  <div class="swatch-wall">
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #7c3aed;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Accent · violet</p>
+        <p class="swatch__token">--accent<br/>#7c3aed</p>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #6d28d9;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Accent hover</p>
+        <p class="swatch__token">--accent-hover<br/>#6d28d9</p>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #ede9fe;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Accent soft</p>
+        <p class="swatch__token">--accent-soft<br/>#ede9fe</p>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #171717;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Ink</p>
+        <p class="swatch__token">--text<br/>#171717</p>
+      </div>
+    </div>
+
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #f9f8f5;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Page background</p>
+        <p class="swatch__token">--bg<br/>#f9f8f5</p>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #ffffff;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Surface</p>
+        <p class="swatch__token">--surface<br/>#ffffff</p>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #f2f0ed;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Surface alt</p>
+        <p class="swatch__token">--surface-alt<br/>#f2f0ed</p>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch__chip" style="--sw-bg: #eeece8;"></div>
+      <div class="swatch__body">
+        <p class="swatch__name">Surface soft</p>
+        <p class="swatch__token">--surface-soft<br/>#eeece8</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 Typography -->
+  <div class="section-head">
+    <h2><em>Typography</em>.</h2>
+    <span class="num">02 · display · body · mono</span>
+  </div>
+  <p class="section-lede">Three families. Space Grotesk carries headings and labels (its tighter geometry reads as confident at large sizes). Geist carries body copy and forms (modern, neutral, comfortable at 16px / 1.7). JetBrains Mono carries data, IDs, version stamps, and tokens.</p>
+
+  <section class="specimen display">
+    <div class="meta">
+      <span>Aa — <b>Space Grotesk</b></span>
+      <span>500 / 600 / 700</span>
+      <span>display · headings · labels</span>
+    </div>
+    <div class="display">Persona <em>Lab</em></div>
+    <p class="pangram">A small, deliberate fiction — cast a character, give it goals, give it edge-cases, then keep grading the agent against it until the agent holds up.</p>
+  </section>
+
+  <section class="specimen body">
+    <div class="meta">
+      <span>Aa — <b>Geist</b></span>
+      <span>400 / 500 / 600 / 700</span>
+      <span>body · forms · long copy</span>
+    </div>
+    <div class="display">The roster reads.</div>
+    <p class="pangram">Body type carries forms, tables, hints, and the long edge-case lists. It needs to stay quiet under 500 words of dense prose without becoming generic — Geist's wider apertures keep it readable at 14px while staying neutral enough to host the violet accent without clashing.</p>
+  </section>
+
+  <section class="specimen mono">
+    <div class="meta">
+      <span>Aa — <b>JetBrains Mono</b></span>
+      <span>400 / 500</span>
+      <span>data, tags, version stamps</span>
+    </div>
+    <div class="display">v1.2.0 — onboarding-v1</div>
+    <p class="pangram">persona_id := persona_olivia · tags := [#onboarding #low-context #casual] · updated_at := 2026-04-09 · created_at := 2026-03-12</p>
+  </section>
+
+  <!-- 03 Components -->
+  <div class="section-head">
+    <h2><em>Components</em>.</h2>
+    <span class="num">03 · the kit</span>
+  </div>
+  <p class="section-lede">Buttons, chips, monograms, persona cards, inputs. Everything in this kit sits on the cream <code>--bg</code> surface — never on pure white in production.</p>
+
+  <div class="components-grid">
+
+    <div class="demo-card">
+      <h4>Buttons</h4>
+      <div class="row">
+        <button class="btn primary">Save persona →</button>
+        <button class="btn ghost">Cancel</button>
+        <button class="btn subtle">Bump version</button>
+      </div>
+      <div class="row">
+        <button class="btn danger">Delete persona</button>
+      </div>
+      <div class="row"><code>.btn.primary · .btn.ghost · .btn.subtle · .btn.danger</code></div>
+    </div>
+
+    <div class="demo-card">
+      <h4>Chips &amp; tags</h4>
+      <div class="row">
+        <span class="chip">#onboarding <button>×</button></span>
+        <span class="chip">#multi-turn <button>×</button></span>
+        <span class="chip">#adversarial <button>×</button></span>
+      </div>
+      <div class="row">
+        <span class="tag">#impatient</span>
+        <span class="tag">#low-context</span>
+        <span class="tag">#summary</span>
+      </div>
+      <div class="row"><code>.chip · .tag</code></div>
+    </div>
+
+    <div class="demo-card">
+      <h4>Monograms</h4>
+      <div class="row" style="gap:12px;">
+        <div class="monogram" style="background:#7c3aed;">PL</div>
+        <div class="monogram" style="background:#7a8e5c;">PP</div>
+        <div class="monogram" style="background:#7d5b7e;">CC</div>
+        <div class="monogram" style="background:#b8853a;">HH</div>
+        <div class="monogram" style="background:#5e6655;">MM</div>
+      </div>
+      <div class="row"><code>.monogram + data-hue="…"</code></div>
+    </div>
+
+    <div class="demo-card">
+      <h4>Inputs</h4>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <input class="input" placeholder="A normal field" />
+        <textarea class="textarea" placeholder="Edge-cases, one per line"></textarea>
+      </div>
+      <div class="row"><code>.input · .textarea</code></div>
+    </div>
+
+  </div>
+
+  <!-- 04 Token reference -->
+  <div class="section-head">
+    <h2><em>Token reference</em>.</h2>
+    <span class="num">04 · the contract</span>
+  </div>
+  <p class="section-lede">The full set of CSS custom properties for the unified house style. Defined at <code>:root</code> in <code>persona-lab/styles.css</code>, with a <code>prefers-color-scheme: dark</code> override for the dark theme.</p>
+
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Value (light)</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot" style="background:#f9f8f5;"></span>--bg</td><td>#f9f8f5</td><td>page background</td></tr>
+      <tr><td><span class="dot" style="background:#ffffff;"></span>--surface</td><td>#ffffff</td><td>cards, inputs, modals</td></tr>
+      <tr><td><span class="dot" style="background:#f2f0ed;"></span>--surface-alt</td><td>#f2f0ed</td><td>sub-nav, table headers</td></tr>
+      <tr><td><span class="dot" style="background:#eeece8;"></span>--surface-soft</td><td>#eeece8</td><td>quiet fills</td></tr>
+      <tr><td><span class="dot" style="background:#171717;"></span>--text</td><td>#171717</td><td>primary text</td></tr>
+      <tr><td><span class="dot" style="background:#5a5a5a;"></span>--text-muted</td><td>#5a5a5a</td><td>secondary text, labels</td></tr>
+      <tr><td><span class="dot" style="background:#858585;"></span>--text-faint</td><td>#858585</td><td>captions, stamps</td></tr>
+      <tr><td><span class="dot" style="background:rgba(176,168,155,0.45);"></span>--border</td><td>rgba(176, 168, 155, 0.45)</td><td>borders, dividers</td></tr>
+      <tr><td><span class="dot" style="background:rgba(176,168,155,0.7);"></span>--border-strong</td><td>rgba(176, 168, 155, 0.70)</td><td>hover borders</td></tr>
+      <tr><td><span class="dot" style="background:#7c3aed;"></span>--accent</td><td>#7c3aed</td><td>violet — primary accent</td></tr>
+      <tr><td><span class="dot" style="background:#6d28d9;"></span>--accent-hover</td><td>#6d28d9</td><td>hover, eyebrow accent</td></tr>
+      <tr><td><span class="dot" style="background:#ede9fe;"></span>--accent-soft</td><td>#ede9fe</td><td>focus ring, chip background</td></tr>
+      <tr><td><span class="dot" style="background:#1a1a1a;"></span>--code-bg</td><td>#1a1a1a</td><td>code blocks (dark)</td></tr>
+      <tr><td><span class="dot" style="background:#ebebeb;"></span>--code-text</td><td>#ebebeb</td><td>code blocks ink</td></tr>
+    </tbody>
+  </table>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / persona-lab / palette.html</span>
+    <span><a href="./index.html">← back to gallery</a></span>
+  </footer>
+
+</main>
+
+</body>
+</html>

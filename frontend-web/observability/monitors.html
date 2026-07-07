@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Live ingest · monitors · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="live">
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Live ingest · monitors &amp; incidents · stage 1 of feedback loop · observe</p>
+    <h1>Monitor <em>catalogue</em> <span class="qualifier">— OTLP/gRPC · OTLP/HTTP · same trace contract</span></h1>
+    <p class="subtitle">
+      Authored monitors watch every live span under the same dual-emit OpenInference + OTel GenAI semconv schema
+      the simulation-first path uses. Four signal kinds: <b>span</b> (latency, cost, token budget),
+      <b>score</b> (judge pass rate, κ drift), <b>trajectory</b> (edit-distance, KL divergence),
+      <b>anomaly</b> (TRAIL taxonomy counts). State machine: armed → firing → open → acknowledged → resolved.
+    </p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <div class="cohort-strip" style="margin-top:14px;">
+    <div class="cohort-strip__head">
+      <h3><em>Scope</em> — where does this data come from?</h3>
+    </div>
+    <p style="margin:0;font-size:13px;line-height:1.6;color:var(--text-muted);">
+      This page shows <b>production traffic</b> — traces arriving live from the agent's real users, over
+      OTLP. They land under the same OpenInference + OTel GenAI span contract the
+      <a href="./index.html">pre-release batches</a> use, so anything you observe here can be reproduced by
+      submitting a batch. If a monitor fires and you want to confirm the fix, run a batch first.
+    </p>
+  </div>
+
+  <!-- ============= SIGNAL OVERVIEW TILES ============= -->
+  <div class="signal-grid" id="overview-grid" style="margin-top:16px;"></div>
+
+  <!-- ============= MONITOR LIST ============= -->
+  <div class="section-head" style="margin-top:40px;">
+    <h2>Authored <em>monitors</em></h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">click any row to acknowledge · state advances every ~30s</span>
+      <button class="btn subtle" style="font-size:12px;padding:4px 10px;" id="reset-btn">reset state</button>
+    </div>
+  </div>
+
+  <div class="monitor-list" id="monitor-list">
+    <div style="display:grid;grid-template-columns:110px 1fr 120px 80px 100px 130px;gap:14px;padding:12px 18px;background:var(--surface-alt);border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);">
+      <div>State</div><div>Monitor · signal</div><div>Cohort</div><div>Fires 30d</div><div>Trend</div><div>Routing</div>
+    </div>
+    <div id="monitor-rows"></div>
+  </div>
+
+  <!-- ============= INCIDENTS ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>Recent <em>incidents</em></h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">open + acknowledged · click to resolve</span>
+    </div>
+  </div>
+  <div id="incidents-host"></div>
+
+  <!-- ============= AUTHORING WIZARD PREVIEW ============= -->
+  <div class="section-head" style="margin-top:48px;">
+    <h2>New <em>monitor</em></h2>
+    <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">4-step authoring wizard</span></div>
+  </div>
+  <div class="wizard-steps" id="wizard-steps">
+    <div class="wstep" data-active="true" data-step="0">
+      <div class="num">Step 1</div>
+      <div class="name">Signal</div>
+      <div class="hint">span / score / trajectory / anomaly · which semconv key</div>
+    </div>
+    <div class="wstep" data-step="1">
+      <div class="num">Step 2</div>
+      <div class="name">Cohort</div>
+      <div class="hint">tenant · persona · prompt_version · global</div>
+    </div>
+    <div class="wstep" data-step="2">
+      <div class="num">Step 3</div>
+      <div class="name">Threshold</div>
+      <div class="hint">absolute · rolling baseline · z-score</div>
+    </div>
+    <div class="wstep" data-step="3">
+      <div class="num">Step 4</div>
+      <div class="name">Routing</div>
+      <div class="hint">Slack · PagerDuty · webhook · evidence pack</div>
+    </div>
+  </div>
+  <div class="wpanel" id="wizard-panel">
+    <h2>Signal kind</h2>
+    <p class="lede">What type of signal should this monitor watch?</p>
+    <div class="signal-grid" style="grid-template-columns:repeat(4,1fr);" id="kind-chooser"></div>
+    <div class="wnav">
+      <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-faint);" id="wizard-state-lbl">step 1 of 4</span>
+      <button class="btn primary" id="wizard-next" style="font-size:13px;">Next →</button>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / monitors.html</span>
+    <span><a href="./index.html">← batches</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script>
+  (function () {
+    const obs = window.AIBC_OBS;
+    if (!obs) return;
+
+    const KIND_DESCS = {
+      span:       'Latency, cost, token budget on any OTel span',
+      score:      'Judge pass rate, κ drift, EVALUATOR outputs',
+      trajectory: 'Tool-call edit distance, planner-step KL div',
+      anomaly:    'TRAIL taxonomy counts — discrete event spikes',
+    };
+
+    let wizardStep = 0;
+    const WIZARD_TITLES = ['Signal kind', 'Cohort', 'Threshold', 'Routing'];
+    const WIZARD_LEDE   = [
+      'What type of signal should this monitor watch?',
+      'Which cohort (tenant / persona / prompt_version) should this monitor scope to?',
+      'What condition should trigger this monitor?',
+      'Where should alerts be routed when the monitor fires?',
+    ];
+
+    function render() {
+      const monitors   = obs.State.monitors();
+      const incidents  = obs.State.incidents();
+
+      const firing      = monitors.filter(m => m.state === 'firing').length;
+      const open        = monitors.filter(m => m.state === 'open').length;
+      const armed       = monitors.filter(m => m.state === 'armed').length;
+      const acknowledged= monitors.filter(m => m.state === 'acknowledged').length;
+
+      const fc = document.getElementById('firing-count');
+      if (fc) fc.textContent = firing;
+
+      document.getElementById('head-pills').innerHTML =
+        '<span class="pill pill--accent"><b>' + monitors.length + '</b> monitors</span>' +
+        (firing ? '<span class="pill pill--err"><b>' + firing + '</b> firing</span>' : '') +
+        (open   ? '<span class="pill pill--err"><b>' + open   + '</b> open</span>'   : '') +
+        (acknowledged ? '<span class="pill pill--warn"><b>' + acknowledged + '</b> acknowledged</span>' : '') +
+        '<span class="pill"><b>' + armed + '</b> armed</span>' +
+        '<span class="pill">OTLP/gRPC · 4317 · OTLP/HTTP · 4318</span>';
+
+      // overview tiles by kind
+      const kinds = ['span', 'score', 'trajectory', 'anomaly'];
+      document.getElementById('overview-grid').innerHTML = kinds.map(k => {
+        const km = monitors.filter(m => m.kind === k);
+        const kFiring = km.filter(m => m.state === 'firing' || m.state === 'open').length;
+        const state = kFiring > 0 ? 'err' : 'ok';
+        return `<div class="signal-card" style="cursor:default;">
+          <div class="label">${k.toUpperCase()} · ${km.length} monitors</div>
+          <div class="value">${kFiring > 0 ? kFiring : '—'} <em>${kFiring > 0 ? 'firing' : 'ok'}</em></div>
+          <div class="delta ${kFiring > 0 ? 'up' : 'flat'}">${obs.escapeHtml(KIND_DESCS[k] || k)}</div>
+        </div>`;
+      }).join('');
+
+      // monitor rows
+      const rows = document.getElementById('monitor-rows');
+      if (!monitors.length) {
+        rows.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">no monitors authored yet · use the wizard below</div>';
+      } else
+      rows.innerHTML = monitors.map(m => {
+        const sparkId = 'spark-' + m.id;
+        const sevCls = m.severity === 'page' ? 'err' : (m.severity === 'error' ? 'err' : (m.severity === 'warn' ? 'warn' : ''));
+        const trendCls = m.trend === 'up' ? 'up' : (m.trend === 'down' ? 'down' : 'flat');
+        return `
+          <div class="monitor-row" onclick="ackMonitor('${obs.escapeHtml(m.id)}')">
+            <div>
+              <span class="state-pill" data-state="${obs.escapeHtml(m.state)}"><span class="dot"></span>${obs.escapeHtml(m.state)}</span>
+              <div style="margin-top:5px;"><span class="sev" data-sev="${obs.escapeHtml(m.severity)}">${obs.escapeHtml(m.severity)}</span></div>
+            </div>
+            <div>
+              <div class="mon-name">${obs.escapeHtml(m.name)}</div>
+              <div class="mon-signal">${obs.escapeHtml(m.signal)} · ${obs.escapeHtml(m.threshold)}</div>
+            </div>
+            <div class="mon-cohort">${obs.escapeHtml(m.cohort || '—')}</div>
+            <div class="mon-fires">${m.fires_30d}</div>
+            <div>
+              <svg class="spark spark--${sevCls || 'ok'}" id="${sparkId}" style="width:100%;height:24px;"></svg>
+              <div style="font-family:var(--font-mono);font-size:9.5px;color:var(--text-faint);margin-top:2px;text-align:center;" class="${trendCls}">${obs.escapeHtml(m.window)}</div>
+            </div>
+            <div class="mon-routing">${(m.routing || []).map(r => obs.escapeHtml(r)).join('<br/>')}</div>
+          </div>`;
+      }).join('');
+
+      // render sparklines after DOM update
+      monitors.forEach(m => {
+        const svg = document.getElementById('spark-' + m.id);
+        if (svg && m.sparkline) obs.renderSparkline(svg, m.sparkline, { w: 130, h: 24 });
+      });
+
+      // incidents
+      const incHost = document.getElementById('incidents-host');
+      const activeInc = incidents.filter(i => i.state === 'open' || i.state === 'acknowledged' || i.state === 'firing');
+      if (!activeInc.length) {
+        incHost.innerHTML = '<div style="background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-3);padding:24px;text-align:center;color:var(--signal-ok);font-family:var(--font-mono);font-size:12px;">✓ no open incidents</div>';
+      } else {
+        incHost.innerHTML = activeInc.map(inc => {
+          const trailParts = inc.trail_class ? inc.trail_class.split('.') : [];
+          const cat = trailParts[0] || 'execution';
+          return `
+            <div class="incident" onclick="resolveInc('${obs.escapeHtml(inc.id)}')">
+              <div class="ts">${obs.escapeHtml(obs.fmtRelative(inc.fired_at))}</div>
+              <div class="body">
+                <div class="title">${obs.escapeHtml(inc.monitor_name)}</div>
+                <div class="meta">${obs.escapeHtml(inc.id)}</div>
+                <div class="cohort">${obs.escapeHtml(inc.cohort)}</div>
+              </div>
+              <div class="breach">breach <b>${typeof inc.breach_value === 'number' ? inc.breach_value.toFixed(2) : obs.escapeHtml(String(inc.breach_value))}</b><br/>threshold ${typeof inc.threshold === 'number' ? inc.threshold.toFixed(2) : obs.escapeHtml(String(inc.threshold))}</div>
+              <div>
+                <span class="state-pill" data-state="${obs.escapeHtml(inc.state)}"><span class="dot"></span>${obs.escapeHtml(inc.state)}</span>
+                ${inc.trail_class ? '<div style="margin-top:6px;"><span class="trail-tag" data-cat="' + obs.escapeHtml(cat) + '">' + obs.escapeHtml(inc.trail_class) + '</span></div>' : ''}
+              </div>
+              <div class="right">
+                <span class="sev" data-sev="${obs.escapeHtml(inc.severity)}">${obs.escapeHtml(inc.severity)}</span>
+                <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-top:6px;">${inc.implicated_runs} runs</div>
+                ${inc.implicated_runs > 0 ? '<a href="./datasets.html?from_incident=' + encodeURIComponent(inc.id) + '" onclick="event.stopPropagation()" style="display:inline-block;margin-top:6px;font-family:var(--font-mono);font-size:10.5px;color:var(--accent);text-decoration:none;">promote → dataset</a>' : ''}
+              </div>
+            </div>`;
+        }).join('');
+      }
+    }
+
+    function ackMonitor(id) {
+      const monitors = obs.State.monitors();
+      const m = monitors.find(x => x.id === id);
+      if (!m) return;
+      const ACK_MAP = { firing: 'open', open: 'acknowledged', acknowledged: 'resolved', resolved: 'armed', armed: 'armed' };
+      if (m.state !== 'silent') m.state = ACK_MAP[m.state] || m.state;
+      obs.State.saveMonitors(monitors);
+      render();
+    }
+
+    function resolveInc(id) {
+      const incidents = obs.State.incidents();
+      const inc = incidents.find(x => x.id === id);
+      if (inc) inc.state = inc.state === 'open' ? 'acknowledged' : 'resolved';
+      obs.State.saveIncidents(incidents);
+      render();
+    }
+
+    window.ackMonitor = ackMonitor;
+    window.resolveInc = resolveInc;
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      obs.State.reset();
+      render();
+    });
+
+    // Wizard
+    document.getElementById('kind-chooser').innerHTML = ['span', 'score', 'trajectory', 'anomaly'].map(k => `
+      <div class="signal-card" style="cursor:pointer;" onclick="selectKind('${k}')" id="kind-${k}">
+        <div class="label">${k.toUpperCase()}</div>
+        <div class="value" style="font-size:16px;">${k}</div>
+        <div class="meta">${obs.escapeHtml(KIND_DESCS[k] || '')}</div>
+      </div>`).join('');
+
+    window.selectKind = function(k) {
+      document.querySelectorAll('#kind-chooser .signal-card').forEach(c => c.style.borderColor = '');
+      const el = document.getElementById('kind-' + k);
+      if (el) el.style.borderColor = 'var(--accent)';
+    };
+
+    document.getElementById('wizard-next').addEventListener('click', () => {
+      const steps = document.querySelectorAll('.wstep');
+      if (wizardStep < steps.length) {
+        steps[wizardStep].removeAttribute('data-active');
+        steps[wizardStep].setAttribute('data-done', 'true');
+      }
+      wizardStep = Math.min(wizardStep + 1, 3);
+      if (wizardStep < steps.length) steps[wizardStep].setAttribute('data-active', 'true');
+      document.getElementById('wizard-panel').querySelector('h2').textContent = WIZARD_TITLES[wizardStep] || 'Review';
+      document.getElementById('wizard-panel').querySelector('.lede').textContent = WIZARD_LEDE[wizardStep] || 'Review your monitor configuration before saving.';
+      document.getElementById('wizard-state-lbl').textContent = 'step ' + (wizardStep + 1) + ' of 4';
+      if (wizardStep === 3) {
+        document.getElementById('wizard-next').textContent = 'Save monitor →';
+        document.getElementById('kind-chooser').innerHTML =
+          '<div style="grid-column:1/-1;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);padding:12px 0;">' +
+          'Routing: <b>slack:#eval-alerts</b> · PagerDuty: <b>eval-oncall</b> · webhook: optional<br/>' +
+          'Evidence pack auto-attach: <b>enabled</b> for trajectory + score monitors</div>';
+      }
+    });
+
+    // Live tick
+    render();
+    setInterval(() => {
+      obs.tickWorker();
+      render();
+    }, 3000);
+  })();
+</script>
+</body>
+</html>

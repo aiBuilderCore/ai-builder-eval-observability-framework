@@ -1,0 +1,189 @@
+/* ============================================================================
+   _app.css — shared design-system layer for the Enterprise Eval Observability
+   mock UIs.  Injected by _chrome.js AFTER each sub-app's own styles.css, so the
+   rules here win ties and enforce ONE consistent, executive look across all five
+   stages (Persona Lab · Question Generation · Simulation · Evaluation ·
+   Observability).
+
+   Architecture: each sub-app's styles.css keeps only its *specialty* (trace
+   Gantt, verdict gauge, loop-map). This file owns the shared *grammar* —
+   colour discipline, page-head rhythm, KPI pills, and state chips — so a single
+   edit propagates to all ~34 pages.
+
+   Every rule is scoped under `html.aibc-chrome` both to guarantee it only
+   applies when the shared chrome is present and to lift specificity above the
+   per-app defaults it overrides.
+   ============================================================================ */
+
+/* ── 1 · Colour discipline ────────────────────────────────────────────────
+   Full unification: retire the decorative per-persona "hue" palette. Violet is
+   the one accent; semantic green/amber/red stay reserved for state. Every
+   persona card now keys its ribbon, monogram, quote-rule, and emphasis off the
+   accent instead of a rainbow, so the gallery reads as part of one product. */
+html.aibc-chrome .persona[data-hue],
+html.aibc-chrome .persona[data-hue="ochre"],
+html.aibc-chrome .persona[data-hue="sage"],
+html.aibc-chrome .persona[data-hue="rose"],
+html.aibc-chrome .persona[data-hue="olive"],
+html.aibc-chrome .persona[data-hue="plum"],
+html.aibc-chrome .persona[data-hue="rust"],
+html.aibc-chrome .persona[data-hue="terracotta"] {
+  --p-hue: var(--accent);
+  --p-bg: var(--accent-soft);
+}
+
+/* Monogram: a calm violet-tinted tile rather than a saturated colour block. */
+html.aibc-chrome .monogram {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+html.aibc-chrome .monogram::after { display: none; }
+
+/* Topic tags: one neutral chip everywhere — quiet metadata, not decoration.
+   (State/verdict chips are styled by each app and left untouched.) */
+html.aibc-chrome .tag,
+html.aibc-chrome .persona .tags .tag {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+}
+
+/* ── 2 · Page-head contract ───────────────────────────────────────────────
+   Same rhythm and hierarchy on every stage: airy top space, a muted eyebrow,
+   one tight display H1, a readable one-line subtitle, then the meta row. */
+html.aibc-chrome .page-head {
+  padding-top: clamp(1.5rem, 3.5vw, 2.75rem);
+  padding-bottom: 0.25rem;
+  margin-bottom: clamp(1.25rem, 3vw, 2rem);
+}
+
+html.aibc-chrome .page-head .eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 0.85rem 0;
+}
+html.aibc-chrome .page-head .eyebrow .dot {
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+html.aibc-chrome .page-head h1 {
+  font-size: clamp(26px, 2.8vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -0.028em;
+  margin: 0 0 0.7rem 0;
+}
+/* Qualifier is the plain-English "job to be done" — quiet, never competes. */
+html.aibc-chrome .page-head h1 .qualifier {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+html.aibc-chrome .page-head .subtitle {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 62ch;
+  margin: 0 0 1.15rem 0;
+}
+
+/* ── 3 · KPI meta-pills ───────────────────────────────────────────────────
+   The pill row is the at-a-glance KPI strip. Keep it calm and uniform; let the
+   single accent pill carry the one number that matters most. */
+html.aibc-chrome .meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+html.aibc-chrome .meta-pills .pill {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+}
+html.aibc-chrome .meta-pills .pill b {
+  color: var(--text);
+  font-weight: 600;
+}
+/* Hero KPI — the one violet number per stage. */
+html.aibc-chrome .meta-pills .pill.pill--accent {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+html.aibc-chrome .meta-pills .pill.pill--accent b { color: var(--accent); }
+
+/* ── 3b · KPI stat strip ──────────────────────────────────────────────────
+   The primary at-a-glance metric row on every stage landing. Numbers lead
+   (big display figures), labels are quiet small-caps beneath — an executive
+   dashboard read, replacing the old count-pills. One accent stat carries the
+   headline number; a hairline divider separates each. */
+html.aibc-chrome .aibc-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+  margin: 0.25rem 0 0;
+}
+html.aibc-chrome .aibc-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px 22px;
+  border-left: 1px solid var(--border);
+}
+html.aibc-chrome .aibc-stat:first-child { padding-left: 0; border-left: 0; }
+html.aibc-chrome .aibc-stat__num {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+html.aibc-chrome .aibc-stat--accent .aibc-stat__num { color: var(--accent); }
+html.aibc-chrome .aibc-stat__label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  html.aibc-chrome .aibc-stat { padding: 2px 16px; }
+  html.aibc-chrome .aibc-stat__num { font-size: 22px; }
+}
+
+/* ── 4 · Governance context bar ───────────────────────────────────────────
+   _chrome.js now renders the tenant · env · spend chips on every stage. Give
+   them a consistent, restrained resting state (values in ink, labels faint). */
+html.aibc-chrome .aibc-chrome-chip {
+  background: var(--surface);
+  border-color: var(--border);
+}
+html.aibc-chrome .aibc-chrome-chip__value { color: var(--text); }
+html.aibc-chrome .aibc-chrome-chip--spend .aibc-chrome-chip__value { color: var(--accent); }
+
+/* ── 5 · Restraint pass ───────────────────────────────────────────────────
+   Executive = calm. Soften the default card shadow a touch so surfaces read
+   flatter and the accent does the talking. */
+html.aibc-chrome .persona { box-shadow: 0 1px 2px var(--shadow); }
+html.aibc-chrome .persona:hover { box-shadow: 0 6px 18px var(--shadow-strong); }

@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — start here · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="batches">
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Stage 05 · Traces</p>
+    <h1>Observability <span class="qualifier">— trace, calibrate, and ship</span></h1>
+    <p class="subtitle">
+      A closed loop over your agent's traces — investigate failures, calibrate judges, ship with evidence.
+    </p>
+    <div class="aibc-kpis">
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num" id="pill-batches">0</span><span class="aibc-stat__label">batches</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-runs">0</span><span class="aibc-stat__label">runs</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-spans">0</span><span class="aibc-stat__label">spans</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-eval">0</span><span class="aibc-stat__label">judge verdicts</span></div>
+    </div>
+  </section>
+
+  <div class="section-head" style="margin-top:8px;">
+    <h2>What do you want to <em>do</em>?</h2>
+    <div class="actions"><span style="color:var(--text-faint);">three primary jobs · pick one</span></div>
+  </div>
+
+  <div class="job-hero">
+    <a class="job-card" href="./index.html#failing">
+      <span class="job-card__kicker">Investigate</span>
+      <span class="job-card__title">A failing run <span class="arrow">→</span></span>
+      <span class="job-card__desc">
+        Something broke. Start from a batch with regressions, drill into the failing
+        conversation's trace, and see which judge flagged it.
+      </span>
+      <span class="job-card__ends"><b>You'll see:</b> batch detail · runs table · trace viewer</span>
+    </a>
+    <a class="job-card" href="./gate.html">
+      <span class="job-card__kicker">Ship</span>
+      <span class="job-card__title">A candidate → gate <span class="arrow">→</span></span>
+      <span class="job-card__desc">
+        Two batches (baseline + candidate) go head-to-head. Every configured signal
+        must clear or the deploy is blocked.
+      </span>
+      <span class="job-card__ends"><b>You'll see:</b> pass-rate deltas · signal breakdown · gate verdict</span>
+    </a>
+    <a class="job-card" href="./packs.html">
+      <span class="job-card__kicker">Attest</span>
+      <span class="job-card__title">Compliance / evidence <span class="arrow">→</span></span>
+      <span class="job-card__desc">
+        Snapshot a signed, <code>config_hash</code>-pinned evidence pack for a
+        regulator or auditor from a reviewed batch.
+      </span>
+      <span class="job-card__ends"><b>You'll see:</b> request wizard · pack list · frozen PDF + JSONL</span>
+    </a>
+  </div>
+
+  <div class="section-head" id="recent-batches">
+    <h2>Recent <em>batches</em></h2>
+    <div class="actions">
+      <span style="color:var(--text-faint);">click any row to open the batch · runs roll up to traces</span>
+    </div>
+  </div>
+
+  <table class="batch-table" aria-label="Simulation batches">
+    <thead>
+      <tr>
+        <th>Batch</th>
+        <th>Lineage · 4-tuple</th>
+        <th class="num">Runs</th>
+        <th class="num">Pass rate</th>
+        <th class="num">vs prev</th>
+        <th>Started</th>
+        <th>SUT</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="section-head" style="margin-top:52px;">
+    <h2>The <em>closed feedback loop</em></h2>
+    <div class="actions"><a href="../../../implementation-guides/enterprise-eval-observability-framework/observability/">spec →</a></div>
+  </div>
+  <p style="margin:-6px 0 18px;font-size:14px;color:var(--text-muted);max-width:920px;line-height:1.65;">
+    Five stages run in sequence — Observe, Evaluate, Curate, Deploy, Attest — with two
+    cross-cutting quality checks (Calibrate, Identify) that can fire from any stage. The
+    tab strip at the top follows this order.
+  </p>
+
+  <div class="loop-grid loop-grid--split">
+    <p class="loop-row__label">Sequential stages</p>
+    <div class="loop-row loop-row--seq">
+      <a class="loop-stage" href="./monitors.html">
+        <span class="loop-stage__num">1</span>
+        <span class="loop-stage__verb">Observe</span>
+        <span class="loop-stage__name">Live ingest</span>
+        <span class="loop-stage__desc">Prod traces arrive over OTLP under the same span contract batches use.</span>
+      </a>
+      <a class="loop-stage loop-stage--here" href="./index.html">
+        <span class="loop-stage__num">2</span>
+        <span class="loop-stage__verb">Evaluate</span>
+        <span class="loop-stage__name">Batches</span>
+        <span class="loop-stage__desc">Inline judges score every run. Four-tuple lineage, pass-rate vs prev.</span>
+      </a>
+      <a class="loop-stage" href="./datasets.html">
+        <span class="loop-stage__num">5</span>
+        <span class="loop-stage__verb">Curate</span>
+        <span class="loop-stage__name">Datasets</span>
+        <span class="loop-stage__desc">Promote failing runs into versioned, health-tracked training / eval sets.</span>
+      </a>
+      <a class="loop-stage" href="./gate.html">
+        <span class="loop-stage__num">6</span>
+        <span class="loop-stage__verb">Deploy</span>
+        <span class="loop-stage__name">Gate</span>
+        <span class="loop-stage__desc">Baseline vs candidate. All configured signals must clear or BLOCK.</span>
+      </a>
+      <a class="loop-stage" href="./packs.html">
+        <span class="loop-stage__num">7</span>
+        <span class="loop-stage__verb">Attest</span>
+        <span class="loop-stage__name">Evidence</span>
+        <span class="loop-stage__desc">EU AI Act · SR 11-7 · FINRA. Signed, <code>config_hash</code>-pinned packs.</span>
+      </a>
+    </div>
+
+    <p class="loop-row__label" style="margin-top:22px;">Cross-cutting checks — fire from any stage</p>
+    <div class="loop-row loop-row--cross">
+      <a class="loop-stage" href="./calibration.html">
+        <span class="loop-stage__num">3</span>
+        <span class="loop-stage__verb">Calibrate</span>
+        <span class="loop-stage__name">Judge κ vs human gold</span>
+        <span class="loop-stage__desc">Do your judges still agree with human raters? Feeds the gate's trust check.</span>
+      </a>
+      <a class="loop-stage" href="./trajectory.html">
+        <span class="loop-stage__num">4</span>
+        <span class="loop-stage__verb">Identify</span>
+        <span class="loop-stage__name">Trajectory drift</span>
+        <span class="loop-stage__desc">Failure modes on the <em>shape</em> of the trace, not scalars.</span>
+      </a>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / index.html · spec at <a href="../../../implementation-guides/enterprise-eval-observability-framework/observability/" style="color:var(--text-muted);text-decoration:underline;">implementation-guides</a></span>
+    <span><a href="../../../implementation-guides/enterprise-eval-observability-framework/observability/">spec →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script src="batches.js?v=2"></script>
+<script>
+  (function () {
+    const B = window.AIBC_BATCHES;
+    if (!B) return;
+
+    const batches = B.loadBatches();
+    let totalRuns = 0, totalSpans = 0, totalEval = 0;
+    batches.forEach(b => {
+      totalRuns += b.run_count || 0;
+      (b.runs || []).forEach(r => {
+        totalSpans += (r.spans || []).length;
+        totalEval += (r.spans || []).filter(s => s.kind === 'EVALUATOR').length;
+      });
+    });
+    document.getElementById('pill-batches').textContent = batches.length;
+    document.getElementById('pill-runs').textContent = totalRuns;
+    document.getElementById('pill-spans').textContent = '~' + totalSpans;
+    document.getElementById('pill-eval').textContent = '~' + totalEval;
+
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toISOString().slice(0, 10) + ' · ' + d.toISOString().slice(11, 16) + 'Z';
+    }
+    function passClass(rate) {
+      if (rate >= 0.85) return '';
+      if (rate >= 0.65) return 'warn';
+      return 'err';
+    }
+
+    // Delta table: previous batch in the same experiment.
+    const byExp = {};
+    batches.forEach(b => {
+      if (!byExp[b.experiment_id]) byExp[b.experiment_id] = [];
+      byExp[b.experiment_id].push(b);
+    });
+    Object.values(byExp).forEach(arr => arr.sort((a, b) => new Date(a.started_at) - new Date(b.started_at)));
+
+    const rows = document.getElementById('rows');
+    rows.innerHTML = batches.map(b => {
+      const expArr = byExp[b.experiment_id] || [];
+      const myIdx = expArr.indexOf(b);
+      const prev = myIdx > 0 ? expArr[myIdx - 1] : null;
+      const openUrl = `./batch.html?id=${B.escapeHtml(b.batch_id)}`;
+      let deltaHtml = '<span style="color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">—</span>';
+      if (prev) {
+        const d = b.pass_rate - prev.pass_rate;
+        const sign = d >= 0 ? '+' : '';
+        const cls = d >= 0 ? 'color:var(--signal-ok)' : 'color:var(--signal-err)';
+        const compareUrl = `./batch.html?id=${B.escapeHtml(b.batch_id)}&compare=${B.escapeHtml(prev.batch_id)}`;
+        deltaHtml = `
+          <a href="${compareUrl}" title="Compare to baseline batch"
+             style="font-family:var(--font-mono);font-size:12px;font-weight:600;text-decoration:none;${cls};">
+            ${sign}${(d * 100).toFixed(0)}pp
+          </a>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin-top:2px;">
+            vs ${B.escapeHtml(prev.batch_id.slice(0, 12))}
+          </div>`;
+      }
+      return `
+      <tr onclick="if(event.button===0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.target.closest('a')) location.href='${openUrl}'">
+        <td>
+          <a class="batch-name-link batch-name" href="${openUrl}">${B.escapeHtml(b.name)}</a>
+          <span class="batch-id">${B.escapeHtml(b.batch_id)} · ${B.escapeHtml(b.experiment_id)}</span>
+        </td>
+        <td>
+          <div class="lineage-mini">
+            persona_set · <b>${B.escapeHtml(b.lineage.persona_set_version)}</b><br/>
+            qgen · <b>${B.escapeHtml(b.lineage.question_strategy_version)}</b><br/>
+            target · <b>${B.escapeHtml(b.lineage.target_version)}</b><br/>
+            rubric · <b>${B.escapeHtml(b.lineage.rubric_version)}</b>
+          </div>
+        </td>
+        <td class="num"><span class="pass-num">${b.run_count}</span></td>
+        <td class="num">
+          <span class="pass-num">${(b.pass_rate * 100).toFixed(0)}%</span>
+          <div class="pass-bar ${passClass(b.pass_rate)}"><i style="width:${(b.pass_rate * 100).toFixed(1)}%"></i></div>
+          <div class="pass-meta">${b.pass_count}/${b.run_count} pass</div>
+        </td>
+        <td class="num">${deltaHtml}</td>
+        <td><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);">${fmtTime(b.started_at)}</span></td>
+        <td><span style="font-family:var(--font-mono);font-size:12px;color:var(--text);">${B.escapeHtml(b.sut)}</span></td>
+      </tr>`;
+    }).join('');
+
+    // #failing shortcut on the "Investigate" job card — scroll to first failing batch row.
+    // Runs both on fresh load (hash already set) and on hashchange (card clicked while
+    // already on this page, where the browser doesn't reload and #failing isn't an element id).
+    function goToFailing() {
+      if (location.hash !== '#failing') return;
+      const firstFailing = batches.find(b => b.pass_rate < 0.85);
+      if (!firstFailing) return;
+      const target = document.getElementById('recent-batches');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    window.addEventListener('hashchange', goToFailing);
+    goToFailing();
+  })();
+</script>
+
+</body>
+</html>

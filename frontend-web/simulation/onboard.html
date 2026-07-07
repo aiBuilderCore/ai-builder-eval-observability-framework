@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Simulation — Onboard adapter · AIBuilderCore</title>
+<script>
+  (function () {
+    try { var t = localStorage.getItem('aibc-theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Simulation</em></span>
+    </div>
+    <span class="product-name">
+      <a href="../index.html">Enterprise Eval Observability</a> ·
+      <a href="./index.html">Simulation</a> ·
+      <b>Onboard adapter</b>
+    </span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Adapter onboarding</p>
+    <h1>Onboard a target adapter <span class="qualifier">— REST · MCP · A2A</span></h1>
+    <p class="subtitle">
+      The system under test joins the simulator through an adapter: a small declarative spec that exposes <b>send a message</b>, <b>reset session</b>, and (optional) <b>create session</b>. Pick a transport below — onboarding produces a versioned adapter record and runs a one-prompt smoke test before commit.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--accent">3 transports</span>
+      <span class="pill">smoke-tested</span>
+      <span class="pill">versioned per edit</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="transport-tabs" role="tablist" id="tabs">
+      <button class="transport-tab active" role="tab" data-tab="rest">
+        <div class="tag">01 · REST</div>
+        <div class="name">REST</div>
+        <div class="desc">Declarative spec — base URL, auth, the three operations Simulation actually calls.</div>
+      </button>
+      <button class="transport-tab" role="tab" data-tab="mcp">
+        <div class="tag">02 · MCP</div>
+        <div class="name">Model Context Protocol</div>
+        <div class="desc">Initialize, <code>tools/list</code>, pick a chat tool. <code>Mcp-Session-Id</code> for sticky sessions.</div>
+      </button>
+      <button class="transport-tab" role="tab" data-tab="a2a">
+        <div class="tag">03 · A2A</div>
+        <div class="name">Agent2Agent</div>
+        <div class="desc">Fetch <code>/.well-known/agent-card.json</code>, render skills, pick one. Sessions = <code>contextId</code>.</div>
+      </button>
+    </div>
+
+    <!-- ============== REST PANE ============== -->
+    <div class="transport-pane active" id="pane-rest">
+      <form class="onboard-form" id="form-rest" novalidate>
+        <div class="form-section">
+          <h2><span class="num">01</span>Identity</h2>
+          <p class="sub">A human-readable name for this adapter and the base URL it lives at.</p>
+          <div class="row-2">
+            <div class="field">
+              <label for="rest-name">Adapter name<span class="req">*</span></label>
+              <input class="input" id="rest-name" placeholder="support-bot-prod" required />
+              <span class="hint">Shown in run lists and adapter cards.</span>
+            </div>
+            <div class="field">
+              <label for="rest-base">Base URL<span class="req">*</span></label>
+              <input class="input mono" id="rest-base" placeholder="https://api.partner.example.com" required />
+              <span class="hint">All <code>operations.*.path</code> values are joined onto this.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h2><span class="num">02</span>Auth</h2>
+          <p class="sub">Pick an auth scheme. Credentials are referenced — never inlined.</p>
+          <div class="row-2">
+            <div class="field">
+              <label for="rest-auth-scheme">Scheme</label>
+              <select class="input" id="rest-auth-scheme">
+                <option value="bearer">Bearer token</option>
+                <option value="api_key_header">API key (header)</option>
+                <option value="basic">Basic</option>
+                <option value="oauth2_client_credentials">OAuth2 client credentials</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div class="field" id="rest-credref-wrap">
+              <label for="rest-credref">Credential reference</label>
+              <input class="input mono" id="rest-credref" placeholder="secret://partner/api-key" />
+              <span class="hint">A pointer to where the secret lives (vault, env, secret manager).</span>
+            </div>
+          </div>
+          <div class="field" id="rest-header-wrap" style="display:none;margin-top:14px;">
+            <label for="rest-header-name">Header name</label>
+            <input class="input mono" id="rest-header-name" placeholder="X-Api-Key" />
+          </div>
+          <div class="field" style="margin-top:14px;">
+            <label for="rest-headers">Extra request headers (JSON)</label>
+            <textarea class="textarea code" id="rest-headers">{
+  "Accept": "application/json",
+  "X-Caller": "aibc-simulation"
+}</textarea>
+            <span class="hint">Sent on every request, in addition to auth headers.</span>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h2><span class="num">03</span>Operations</h2>
+          <p class="sub">Three operations Simulation actually calls. Use Jinja-style placeholders <code>{{ session_id }}</code>, <code>{{ message }}</code>, <code>{{ persona_id }}</code>; extract responses with JSONPath.</p>
+
+          <div class="ops-grid">
+            <div class="op-card">
+              <div class="head">
+                <span class="verb">POST</span>
+                <span class="name">send_message</span>
+                <span class="req required">required</span>
+              </div>
+              <div class="row-2">
+                <div class="field">
+                  <label>Path</label>
+                  <input class="input mono" id="rest-send-path" value="/v1/chat" />
+                </div>
+                <div class="field">
+                  <label>Assistant text JSONPath</label>
+                  <input class="input mono" id="rest-send-resp-text" value="$.choices[0].message.content" />
+                </div>
+              </div>
+              <div class="field" style="margin-top:14px;">
+                <label>Body template</label>
+                <textarea class="textarea code" id="rest-send-body">{
+  "session_id": "{{ session_id }}",
+  "message": "{{ message }}",
+  "metadata": { "persona_hint": "{{ persona_id }}" }
+}</textarea>
+              </div>
+            </div>
+
+            <div class="op-card">
+              <div class="head">
+                <span class="verb">POST</span>
+                <span class="name">reset_session</span>
+                <span class="req">optional</span>
+              </div>
+              <div class="row-2">
+                <div class="field">
+                  <label>Path</label>
+                  <input class="input mono" id="rest-reset-path" value="/v1/sessions/{{ session_id }}/reset" />
+                </div>
+                <div class="field">
+                  <label>Body</label>
+                  <input class="input mono" id="rest-reset-body" value="null" />
+                </div>
+              </div>
+              <span class="hint" style="margin-top:8px;display:block;">If absent, Simulation falls back to rotating <code>session_id</code> locally.</span>
+            </div>
+
+            <div class="op-card">
+              <div class="head">
+                <span class="verb">POST</span>
+                <span class="name">create_session</span>
+                <span class="req">optional</span>
+              </div>
+              <div class="row-2">
+                <div class="field">
+                  <label>Path</label>
+                  <input class="input mono" id="rest-create-path" value="/v1/sessions" />
+                </div>
+                <div class="field">
+                  <label>Session-id JSONPath</label>
+                  <input class="input mono" id="rest-create-sid" value="$.id" />
+                </div>
+              </div>
+              <span class="hint" style="margin-top:8px;display:block;">Some adapters require explicit session creation; if absent, the SUT must accept new IDs as fresh.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h2><span class="num">04</span>Limits</h2>
+          <div class="row-3">
+            <div class="field">
+              <label for="rest-timeout">Timeout (s)</label>
+              <input class="input mono" id="rest-timeout" type="number" min="1" value="60" />
+            </div>
+            <div class="field">
+              <label for="rest-retries">Max retries</label>
+              <input class="input mono" id="rest-retries" type="number" min="0" max="10" value="3" />
+            </div>
+            <div class="field">
+              <label for="rest-rate">Rate limit (per min)</label>
+              <input class="input mono" id="rest-rate" type="number" min="1" value="120" />
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-actions">
+          <a class="btn ghost" href="./index.html">Cancel</a>
+          <div class="right">
+            <button class="btn ghost" type="button" data-act="smoke">▶ Run smoke test</button>
+            <button class="btn primary" type="button" data-act="commit" disabled>Commit adapter</button>
+          </div>
+        </div>
+
+        <div class="smoke-pane" id="rest-smoke" style="display:none;"></div>
+      </form>
+    </div>
+
+    <!-- ============== MCP PANE ============== -->
+    <div class="transport-pane" id="pane-mcp">
+      <form class="onboard-form" id="form-mcp" novalidate>
+        <div class="form-section">
+          <h2><span class="num">01</span>Identity</h2>
+          <p class="sub">A name for this adapter and the MCP server URL (Streamable HTTP transport).</p>
+          <div class="row-2">
+            <div class="field">
+              <label for="mcp-name">Adapter name<span class="req">*</span></label>
+              <input class="input" id="mcp-name" placeholder="tool-server-mcp" required />
+            </div>
+            <div class="field">
+              <label for="mcp-url">Server URL<span class="req">*</span></label>
+              <input class="input mono" id="mcp-url" placeholder="https://mcp.partner.example.com/mcp" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h2><span class="num">02</span>Auth</h2>
+          <p class="sub">Same shape as REST — Bearer / OAuth2 / none.</p>
+          <div class="row-2">
+            <div class="field">
+              <label for="mcp-auth-scheme">Scheme</label>
+              <select class="input" id="mcp-auth-scheme">
+                <option value="bearer">Bearer token</option>
+                <option value="oauth2_client_credentials">OAuth2 client credentials</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="mcp-credref">Credential reference</label>
+              <input class="input mono" id="mcp-credref" placeholder="secret://partner/mcp-token" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h2><span class="num">03</span>Discover tools</h2>
+          <p class="sub">Initialize the JSON-RPC connection, capture <code>Mcp-Session-Id</code>, then call <code>tools/list</code>. The user picks the chat tool.</p>
+          <button class="btn ghost" type="button" data-act="discover">↓ Run <code>initialize</code> + <code>tools/list</code></button>
+          <div class="tool-list" id="mcp-tools" style="margin-top:14px;display:none;"></div>
+        </div>
+
+        <div class="form-section">
+          <h2><span class="num">04</span>Session</h2>
+          <div class="radio-cluster">
+            <label class="checked">
+              <input type="radio" name="mcp-session" value="header" checked />
+              <div class="lab"><b>Header (<code>Mcp-Session-Id</code>)</b><small>Sticky session per conversation; init once, echo the ID on every subsequent request.</small></div>
+            </label>
+            <label>
+              <input type="radio" name="mcp-session" value="stateless" />
+              <div class="lab"><b>Stateless</b><small>Re-init on every turn. Use when the server is horizontal-scaled and holds no per-session state.</small></div>
+            </label>
+          </div>
+        </div>
+
+        <div class="wizard-actions">
+          <a class="btn ghost" href="./index.html">Cancel</a>
+          <div class="right">
+            <button class="btn ghost" type="button" data-act="smoke">▶ Run smoke test</button>
+            <button class="btn primary" type="button" data-act="commit" disabled>Commit adapter</button>
+          </div>
+        </div>
+
+        <div class="smoke-pane" id="mcp-smoke" style="display:none;"></div>
+      </form>
+    </div>
+
+    <!-- ============== A2A PANE ============== -->
+    <div class="transport-pane" id="pane-a2a">
+      <form class="onboard-form" id="form-a2a" novalidate>
+        <div class="form-section">
+          <h2><span class="num">01</span>Identity</h2>
+          <p class="sub">A name and the AgentCard URL (typically <code>/.well-known/agent-card.json</code>).</p>
+          <div class="row-2">
+            <div class="field">
+              <label for="a2a-name">Adapter name<span class="req">*</span></label>
+              <input class="input" id="a2a-name" placeholder="support-agent-prod" required />
+            </div>
+            <div class="field">
+              <label for="a2a-card">AgentCard URL<span class="req">*</span></label>
+              <input class="input mono" id="a2a-card" placeholder="https://agent.partner.example.com/.well-known/agent-card.json" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h2><span class="num">02</span>Fetch AgentCard</h2>
+          <p class="sub">Resolves identity, capabilities, skills, IO modes, and <code>securitySchemes</code>.</p>
+          <button class="btn ghost" type="button" data-act="fetch-card">↓ Fetch agent card</button>
+
+          <div id="a2a-card-snapshot" style="display:none;margin-top:14px;">
+            <div class="kv-grid">
+              <dt>Name</dt><dd id="a2a-name-out">—</dd>
+              <dt>Version</dt><dd><code id="a2a-ver-out">—</code></dd>
+              <dt>Auth</dt><dd id="a2a-auth-out">—</dd>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" id="a2a-skill-section" style="display:none;">
+          <h2><span class="num">03</span>Pick a skill</h2>
+          <p class="sub">A2A AgentCards expose one or more <code>skills</code>. Pick the conversational one Simulation should send messages to.</p>
+          <div class="tool-list" id="a2a-skills"></div>
+        </div>
+
+        <div class="form-section" id="a2a-rpc-section" style="display:none;">
+          <h2><span class="num">04</span>RPC method &amp; session</h2>
+          <div class="row-2">
+            <div class="field">
+              <label for="a2a-rpc">RPC method</label>
+              <select class="input" id="a2a-rpc">
+                <option value="message/stream" selected>message/stream (SSE)</option>
+                <option value="message/send">message/send (synchronous)</option>
+              </select>
+              <span class="hint">Streaming preferred when the adapter supports it.</span>
+            </div>
+            <div class="field">
+              <label>Session model</label>
+              <input class="input mono" value="contextId (sticky per conversation)" disabled />
+              <span class="hint">A2A's <code>contextId</code> maps 1:1 onto our <code>per_conversation</code> session policy.</span>
+            </div>
+          </div>
+          <div class="field" style="margin-top:14px;">
+            <label for="a2a-credref">Credential reference</label>
+            <input class="input mono" id="a2a-credref" placeholder="secret://partner/token" />
+          </div>
+        </div>
+
+        <div class="wizard-actions">
+          <a class="btn ghost" href="./index.html">Cancel</a>
+          <div class="right">
+            <button class="btn ghost" type="button" data-act="smoke">▶ Run smoke test</button>
+            <button class="btn primary" type="button" data-act="commit" disabled>Commit adapter</button>
+          </div>
+        </div>
+
+        <div class="smoke-pane" id="a2a-smoke" style="display:none;"></div>
+      </form>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / simulation / onboard.html</span>
+    <span><a href="./index.html">← back to runs</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  // ---------- Tabs ----------
+  const tabs  = document.getElementById("tabs");
+  const panes = document.querySelectorAll(".transport-pane");
+  tabs.addEventListener("click", e => {
+    const btn = e.target.closest(".transport-tab");
+    if (!btn) return;
+    const id = btn.dataset.tab;
+    document.querySelectorAll(".transport-tab").forEach(t => t.classList.toggle("active", t === btn));
+    panes.forEach(p => p.classList.toggle("active", p.id === `pane-${id}`));
+  });
+
+  // ---------- REST: auth-scheme conditional fields ----------
+  const restAuthSel = document.getElementById("rest-auth-scheme");
+  const restCredWrap = document.getElementById("rest-credref-wrap");
+  const restHeaderWrap = document.getElementById("rest-header-wrap");
+  function paintRestAuth() {
+    const v = restAuthSel.value;
+    restCredWrap.style.display = (v === "none") ? "none" : "";
+    restHeaderWrap.style.display = (v === "api_key_header") ? "" : "none";
+  }
+  restAuthSel.addEventListener("change", paintRestAuth);
+  paintRestAuth();
+
+  // ---------- REST smoke + commit ----------
+  let restSmokePassed = false;
+  const restCommitBtn = document.querySelector('#form-rest [data-act="commit"]');
+  const restSmokePane = document.getElementById("rest-smoke");
+
+  function readRestForm() {
+    let headers = {};
+    try { headers = JSON.parse(document.getElementById("rest-headers").value); } catch {}
+    return {
+      name: document.getElementById("rest-name").value.trim(),
+      transport: "rest",
+      transport_config: {
+        base_url: document.getElementById("rest-base").value.trim(),
+        auth: {
+          scheme: restAuthSel.value,
+          header_name: document.getElementById("rest-header-name").value.trim() || undefined,
+          credential_ref: document.getElementById("rest-credref").value.trim() || undefined,
+        },
+        headers,
+        operations: {
+          send_message: {
+            method: "POST",
+            path: document.getElementById("rest-send-path").value.trim(),
+            body: safeParse(document.getElementById("rest-send-body").value),
+            response: { assistant_text: document.getElementById("rest-send-resp-text").value.trim() },
+          },
+          reset_session: {
+            method: "POST",
+            path: document.getElementById("rest-reset-path").value.trim(),
+            body: safeParse(document.getElementById("rest-reset-body").value),
+          },
+          create_session: {
+            method: "POST",
+            path: document.getElementById("rest-create-path").value.trim(),
+            response: { session_id: document.getElementById("rest-create-sid").value.trim() },
+          },
+        },
+        timeout_s: Number(document.getElementById("rest-timeout").value),
+        retry: { max_attempts: Number(document.getElementById("rest-retries").value), backoff_initial_ms: 500, retry_on_status: [429, 500, 502, 503, 504] },
+      },
+      capabilities: {
+        supports_streaming: false,
+        supports_session_id: true,
+        supports_tools: false,
+        max_concurrent_sessions: 16,
+        rate_limit_per_min: Number(document.getElementById("rest-rate").value),
+      },
+    };
+  }
+
+  function safeParse(s) { try { return JSON.parse(s); } catch { return s; } }
+
+  document.querySelector('#form-rest [data-act="smoke"]').addEventListener("click", () => {
+    const cfg = readRestForm();
+    if (!cfg.name || !cfg.transport_config.base_url) { SIM.toast("Fill in name and base URL first", "Smoke"); return; }
+    restSmokePane.style.display = "";
+    restSmokePane.className = "smoke-pane";
+    restSmokePane.innerHTML = `<div class="label">Running smoke test…</div><div class="lines">↳ POST ${cfg.transport_config.base_url}${cfg.transport_config.operations.send_message.path}\n↳ <b>{ "session_id": "smoke", "message": "say hello" }</b>\n…</div>`;
+    setTimeout(() => {
+      restSmokePassed = true;
+      restCommitBtn.disabled = false;
+      restSmokePane.className = "smoke-pane success";
+      restSmokePane.innerHTML = `<div class="label">Smoke ✓ — adapter responded</div><div class="lines">200 OK · 1340ms\n<b>"Hello! How can I help you today?"</b>\n\nResponse extracted via <b>${cfg.transport_config.operations.send_message.response.assistant_text}</b>.\nReady to commit.</div>`;
+    }, 1100);
+  });
+  restCommitBtn.addEventListener("click", () => {
+    if (!restSmokePassed) return;
+    const cfg = readRestForm();
+    const adapter = {
+      adapter_id: SIM.newAdapterId(),
+      name: cfg.name,
+      transport: "rest",
+      version: 1,
+      created_by: "user@team",
+      created_at: SIM.nowISO(),
+      capabilities: cfg.capabilities,
+      smoke_test: { ts: SIM.nowISO(), ping_prompt: "say hello", ping_response_excerpt: "Hello! How can I help you today?", passed: true },
+      transport_config: cfg.transport_config,
+    };
+    SIM.upsertAdapter(adapter);
+    SIM.toast(`Committed <b>${adapter.name}</b> · ${adapter.adapter_id}`, "REST");
+    setTimeout(() => location.href = "./index.html", 700);
+  });
+
+  // ---------- MCP discover + smoke + commit ----------
+  let mcpToolPicked = null;
+  let mcpSmokePassed = false;
+  const mcpCommitBtn = document.querySelector('#form-mcp [data-act="commit"]');
+  const mcpSmokePane = document.getElementById("mcp-smoke");
+
+  document.querySelector('#form-mcp [data-act="discover"]').addEventListener("click", () => {
+    const url = document.getElementById("mcp-url").value.trim();
+    if (!url) { SIM.toast("Set the server URL first", "MCP"); return; }
+    const list = document.getElementById("mcp-tools");
+    list.style.display = "";
+    list.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);padding:10px;">↳ initialize…  ↳ tools/list…</div>`;
+    setTimeout(() => {
+      const tools = [
+        { name: "chat", description: "Conversational interface with tool-calling" },
+        { name: "search_docs", description: "Lookup over partner documentation" },
+        { name: "query_db", description: "Read-only access to partner warehouse" },
+      ];
+      list.innerHTML = "";
+      tools.forEach((t, i) => {
+        const lab = document.createElement("label");
+        if (i === 0) { lab.classList.add("checked"); mcpToolPicked = t; }
+        lab.innerHTML = `
+          <input type="radio" name="mcp-tool" value="${t.name}" ${i === 0 ? "checked" : ""}/>
+          <div>
+            <div class="name">${t.name}</div>
+            <div class="desc">${t.description}</div>
+          </div>
+        `;
+        lab.addEventListener("click", () => {
+          document.querySelectorAll("#mcp-tools label").forEach(l => l.classList.remove("checked"));
+          lab.classList.add("checked");
+          mcpToolPicked = t;
+        });
+        list.appendChild(lab);
+      });
+      SIM.toast("Discovered 3 tools — pick the chat surface", "MCP");
+    }, 850);
+  });
+
+  document.querySelector('#form-mcp [data-act="smoke"]').addEventListener("click", () => {
+    const name = document.getElementById("mcp-name").value.trim();
+    const url  = document.getElementById("mcp-url").value.trim();
+    if (!name || !url) { SIM.toast("Fill in name and server URL first", "Smoke"); return; }
+    if (!mcpToolPicked) { SIM.toast("Discover tools and pick a chat tool first", "Smoke"); return; }
+    mcpSmokePane.style.display = "";
+    mcpSmokePane.className = "smoke-pane";
+    mcpSmokePane.innerHTML = `<div class="label">Running smoke test…</div><div class="lines">↳ tools/call <b>${mcpToolPicked.name}</b> { user_message: "say hello" }\n…</div>`;
+    setTimeout(() => {
+      mcpSmokePassed = true;
+      mcpCommitBtn.disabled = false;
+      mcpSmokePane.className = "smoke-pane success";
+      mcpSmokePane.innerHTML = `<div class="label">Smoke ✓ — adapter responded</div><div class="lines">JSON-RPC 200 · 980ms · Mcp-Session-Id: <b>sess_${Math.random().toString(16).slice(2, 10)}</b>\n<b>"Hi — how can I help?"</b>\n\nReady to commit.</div>`;
+    }, 1100);
+  });
+
+  mcpCommitBtn.addEventListener("click", () => {
+    if (!mcpSmokePassed || !mcpToolPicked) return;
+    const sessionMode = document.querySelector('input[name="mcp-session"]:checked')?.value || "header";
+    const adapter = {
+      adapter_id: SIM.newAdapterId(),
+      name: document.getElementById("mcp-name").value.trim(),
+      transport: "mcp",
+      version: 1,
+      created_by: "user@team",
+      created_at: SIM.nowISO(),
+      capabilities: { supports_streaming: true, supports_session_id: sessionMode === "header", supports_tools: true, max_concurrent_sessions: 24, rate_limit_per_min: 300 },
+      smoke_test: { ts: SIM.nowISO(), ping_prompt: "say hello", ping_response_excerpt: "Hi — how can I help?", passed: true },
+      transport_config: {
+        server_url: document.getElementById("mcp-url").value.trim(),
+        auth: { scheme: document.getElementById("mcp-auth-scheme").value, credential_ref: document.getElementById("mcp-credref").value.trim() || undefined },
+        discovered_tools: [
+          { name: "chat", description: "Conversational interface with tool-calling" },
+          { name: "search_docs", description: "Lookup over partner documentation" },
+          { name: "query_db", description: "Read-only access to partner warehouse" },
+        ],
+        chat_tool: { name: mcpToolPicked.name, input_mapping: { message: "input.user_message", session_id: "input.session_id" }, output_path: "$.content[0].text" },
+        session_mode: sessionMode,
+        init_params: { clientInfo: { name: "aibc-simulation", version: "1.0" }, capabilities: {} },
+      },
+    };
+    SIM.upsertAdapter(adapter);
+    SIM.toast(`Committed <b>${adapter.name}</b> · ${adapter.adapter_id}`, "MCP");
+    setTimeout(() => location.href = "./index.html", 700);
+  });
+
+  // ---------- A2A: fetch card → pick skill → smoke → commit ----------
+  let a2aSkillPicked = null;
+  let a2aCardSnapshot = null;
+  let a2aSmokePassed = false;
+  const a2aCommitBtn = document.querySelector('#form-a2a [data-act="commit"]');
+  const a2aSmokePane = document.getElementById("a2a-smoke");
+
+  document.querySelector('#form-a2a [data-act="fetch-card"]').addEventListener("click", () => {
+    const cardUrl = document.getElementById("a2a-card").value.trim();
+    if (!cardUrl) { SIM.toast("Set the AgentCard URL first", "A2A"); return; }
+    SIM.toast("Fetching agent card…", "A2A");
+    setTimeout(() => {
+      const card = {
+        name: "Partner Support Agent",
+        version: "2.4.1",
+        skills: [
+          { id: "support.answer-question", name: "Answer support question", description: "Handle a typical support inquiry end-to-end.", inputModes: ["text"], outputModes: ["text"] },
+          { id: "support.escalate",        name: "Escalate to human",      description: "Hand off to a human reviewer with structured context.", inputModes: ["text"], outputModes: ["text"] },
+          { id: "support.lookup-account",  name: "Look up account",        description: "Read-only account lookup by external ID.", inputModes: ["text", "json"], outputModes: ["json"] },
+        ],
+        securitySchemes: { bearer: { type: "http", scheme: "bearer" } },
+      };
+      a2aCardSnapshot = card;
+      document.getElementById("a2a-card-snapshot").style.display = "";
+      document.getElementById("a2a-name-out").textContent = card.name;
+      document.getElementById("a2a-ver-out").textContent  = card.version;
+      document.getElementById("a2a-auth-out").innerHTML   = `<code>bearer</code> (HTTP)`;
+      const list = document.getElementById("a2a-skills");
+      list.innerHTML = "";
+      card.skills.forEach((sk, i) => {
+        const lab = document.createElement("label");
+        if (i === 0) { lab.classList.add("checked"); a2aSkillPicked = sk; }
+        lab.innerHTML = `
+          <input type="radio" name="a2a-skill" value="${sk.id}" ${i === 0 ? "checked" : ""}/>
+          <div>
+            <div class="name">${sk.name} · <code style="font-size:11px;">${sk.id}</code></div>
+            <div class="desc">${sk.description} · in: ${sk.inputModes.join(", ")} · out: ${sk.outputModes.join(", ")}</div>
+          </div>
+        `;
+        lab.addEventListener("click", () => {
+          document.querySelectorAll("#a2a-skills label").forEach(l => l.classList.remove("checked"));
+          lab.classList.add("checked");
+          a2aSkillPicked = sk;
+        });
+        list.appendChild(lab);
+      });
+      document.getElementById("a2a-skill-section").style.display = "";
+      document.getElementById("a2a-rpc-section").style.display = "";
+    }, 850);
+  });
+
+  document.querySelector('#form-a2a [data-act="smoke"]').addEventListener("click", () => {
+    const name = document.getElementById("a2a-name").value.trim();
+    if (!name) { SIM.toast("Fill in adapter name first", "Smoke"); return; }
+    if (!a2aSkillPicked) { SIM.toast("Fetch the AgentCard and pick a skill first", "Smoke"); return; }
+    a2aSmokePane.style.display = "";
+    a2aSmokePane.className = "smoke-pane";
+    const rpc = document.getElementById("a2a-rpc").value;
+    a2aSmokePane.innerHTML = `<div class="label">Running smoke test…</div><div class="lines">↳ ${rpc} → skill <b>${a2aSkillPicked.id}</b>\n↳ message: "say hello"\n…</div>`;
+    setTimeout(() => {
+      a2aSmokePassed = true;
+      a2aCommitBtn.disabled = false;
+      a2aSmokePane.className = "smoke-pane success";
+      const ctxId = "ctx_" + Math.random().toString(16).slice(2, 10);
+      a2aSmokePane.innerHTML = `<div class="label">Smoke ✓ — agent responded</div><div class="lines">200 OK · 1180ms · contextId: <b>${ctxId}</b>\nartifact[0].text = <b>"Hello! What can I help you with?"</b>\n\nReady to commit.</div>`;
+    }, 1100);
+  });
+
+  a2aCommitBtn.addEventListener("click", () => {
+    if (!a2aSmokePassed || !a2aSkillPicked || !a2aCardSnapshot) return;
+    const adapter = {
+      adapter_id: SIM.newAdapterId(),
+      name: document.getElementById("a2a-name").value.trim(),
+      transport: "a2a",
+      version: 1,
+      created_by: "user@team",
+      created_at: SIM.nowISO(),
+      capabilities: { supports_streaming: document.getElementById("a2a-rpc").value === "message/stream", supports_session_id: true, supports_tools: false, max_concurrent_sessions: 32, rate_limit_per_min: 600 },
+      smoke_test: { ts: SIM.nowISO(), ping_prompt: "say hello", ping_response_excerpt: "Hello! What can I help you with?", passed: true },
+      transport_config: {
+        agent_card_url: document.getElementById("a2a-card").value.trim(),
+        auth: { scheme: "bearer", credential_ref: document.getElementById("a2a-credref").value.trim() || "secret://partner/token" },
+        agent_card_snapshot: a2aCardSnapshot,
+        skill_id: a2aSkillPicked.id,
+        rpc_method: document.getElementById("a2a-rpc").value,
+        session_mode: "context_id",
+      },
+    };
+    SIM.upsertAdapter(adapter);
+    SIM.toast(`Committed <b>${adapter.name}</b> · ${adapter.adapter_id}`, "A2A");
+    setTimeout(() => location.href = "./index.html", 700);
+  });
+</script>
+
+</body>
+</html>

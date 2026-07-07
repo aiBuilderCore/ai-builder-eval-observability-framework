@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Evaluation — Custom judge (BYOJ) · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+<style>
+  .byoj-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+  @media (max-width: 960px) { .byoj-grid { grid-template-columns: 1fr; } }
+  .byoj-card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .byoj-card h4 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 6px;
+  }
+  .byoj-card .id {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    word-break: break-all;
+  }
+  .byoj-card .row-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+  }
+  .quota-banner {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .quota-banner.full {
+    background: rgba(176, 68, 68, 0.08);
+    color: #b04444;
+    border-color: rgba(176, 68, 68, 0.35);
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .field-row { grid-template-columns: 1fr; } }
+  .err {
+    color: #b04444;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    margin-top: 6px;
+    display: none;
+  }
+  .err.show { display: block; }
+  .reserved-list {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    line-height: 1.7;
+  }
+  .mit-toggles { display: flex; flex-direction: column; gap: 8px; }
+  .mit-toggles label {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--surface);
+  }
+  .mit-toggles label.on { border-color: var(--accent); background: var(--accent-soft); }
+  .mit-toggles label.locked { opacity: 0.7; cursor: not-allowed; }
+  .mit-toggles input { margin-top: 3px; }
+  .mit-toggles .mit-name { font-weight: 600; font-size: 13.5px; }
+  .mit-toggles .mit-blurb { color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      moon.style.display = isDark() ? 'none' : 'block';
+      sun.style.display  = isDark() ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a href="./catalog.html" class="back-link"><span class="arrow">←</span> Back to catalog</a>
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> BYOJ — bring your own judge</p>
+    <h1 id="title">Author a custom judge <span class="qualifier">— for dimensions outside the built-in catalog</span></h1>
+    <p class="subtitle">
+      Custom judges are user-authored, namespaced under you, and capped per user. Cells they score carry <code>provenance: "custom"</code> and stay out of cross-team rollups by default. If a custom judge proves out broadly, request promotion into the built-in catalog.
+    </p>
+  </section>
+
+  <div id="quota-banner" class="quota-banner">
+    <span><b id="quota-text">0 of 2</b> custom judges used. Built-ins remain the comparability contract; BYOJ is the extension path.</span>
+    <a href="./catalog.html" style="color:inherit;text-decoration:underline;">View catalog →</a>
+  </div>
+
+  <div class="byoj-grid">
+    <div>
+      <section class="form-section" style="border-top:0;padding-top:0;">
+        <h2><span class="num" id="form-num">New</span><span id="form-heading">Custom judge</span></h2>
+        <p class="sub">All fields except parser are user-authored. The system enforces a deterministic JSON parser and the form-fill output contract.</p>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Name <span class="req">*</span></label>
+            <input class="input" id="f-name" placeholder="e.g. Brand voice adherence" />
+            <p class="hint">Display name shown in the catalog.</p>
+          </div>
+
+          <div class="field">
+            <label>Slug <span class="req">*</span></label>
+            <input class="input mono" id="f-slug" placeholder="brand_voice" />
+            <p class="hint">Used in the ID: <code>customjudge.&lt;owner&gt;.&lt;slug&gt;@v1</code>.</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Dimension <span class="req">*</span></label>
+          <input class="input mono" id="f-dimension" placeholder="brand_voice" />
+          <p class="hint">Free-form, user-defined. <b>Cannot collide</b> with a built-in dimension. Reserved: <span class="reserved-list" id="reserved-list"></span></p>
+          <p class="err" id="err-dimension">That dimension name is reserved by a built-in judge — pick a different one.</p>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Base model <span class="req">*</span></label>
+            <select class="input" id="f-model"></select>
+            <p class="hint">Pick from approved base models. Custom parsing is enforced separately.</p>
+          </div>
+
+          <div class="field">
+            <label>Reference requirement <span class="req">*</span></label>
+            <select class="input" id="f-ref">
+              <option value="reference-free">reference-free</option>
+              <option value="retrieval-context">retrieval-context</option>
+              <option value="golden-answer">golden-answer</option>
+            </select>
+            <p class="hint">What the trace must carry for this judge to score a cell.</p>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Turn types <span class="req">*</span></label>
+            <select class="input" id="f-turns">
+              <option value="single">single only</option>
+              <option value="multi">multi only</option>
+              <option value="single,multi">single + multi</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Pass threshold</label>
+            <input class="input mono" id="f-threshold" placeholder="0.7" inputmode="decimal" />
+            <p class="hint">Cutoff for pass/fail (0–1).</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Rubric <span class="req">*</span></label>
+          <textarea class="textarea" id="f-rubric" rows="5" placeholder="Score 0–1. Reward… Penalize…"></textarea>
+          <p class="hint">Inlined into the prompt at call time (Prometheus-style rubric-conditioning).</p>
+        </div>
+
+        <div class="field">
+          <label>Prompt template <span class="req">*</span></label>
+          <textarea class="textarea mono" id="f-prompt" rows="6" placeholder="system: You are an evaluator…&#10;user: Question: {{question}}&#10;Answer: {{answer}}&#10;&#10;Rubric:&#10;{{rubric}}&#10;&#10;Return JSON: {&quot;score&quot;: 0..1, &quot;verdict&quot;: &quot;pass|fail|abstain&quot;, &quot;reasoning&quot;: &quot;…&quot;}"></textarea>
+          <p class="hint">Must produce the form-fill JSON contract — see the spec's <a href="../../../implementation-guides/enterprise-eval-observability-framework/evaluation/#output" style="color:var(--accent);">Output</a> section.</p>
+        </div>
+
+        <div class="field">
+          <label>Evaluation steps <span style="color:var(--text-faint);font-weight:500;">(optional)</span></label>
+          <textarea class="textarea" id="f-steps" rows="3" placeholder="One step per line…"></textarea>
+          <p class="hint">G-Eval-style chain-of-thought. One step per line.</p>
+        </div>
+
+        <div class="field">
+          <label>Mitigations</label>
+          <div class="mit-toggles" id="f-mitigations"></div>
+        </div>
+
+        <div class="wizard-actions" style="margin-top:18px;">
+          <button class="btn danger" id="btn-delete" style="display:none;">Delete</button>
+          <div class="right">
+            <a class="btn ghost" href="./catalog.html">Cancel</a>
+            <button class="btn primary" id="btn-save">Save custom judge</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside>
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Your custom judges</h2>
+          <span class="meta"><span id="count">0</span> / <span id="cap">2</span></span>
+        </div>
+        <div id="my-list">
+          <p style="color:var(--text-faint);font-style:italic;font-family:var(--font-mono);font-size:11px;">No custom judges yet.</p>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top:18px;">
+        <div class="panel-header">
+          <h2>What BYOJ is not</h2>
+        </div>
+        <ul style="font-size:13px;line-height:1.6;color:var(--text-muted);padding-left:18px;margin:6px 0 0;">
+          <li>Not part of cross-team rollups (verdicts tagged <code>provenance: "custom"</code>).</li>
+          <li>Not eligible for the named panels (<code>diverse-3</code>, <code>frontier-3</code>, <code>cheap-5</code>).</li>
+          <li>Cannot share a dimension name with a built-in judge.</li>
+          <li>Cannot ship custom JSON parsing — the system enforces a deterministic parser.</li>
+          <li>Once a verdict has been emitted under <code>@v{n}</code>, that version is immutable; edits create <code>@v{n+1}</code>.</li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / evaluation / custom-judge.html · spec at <a href="../../../implementation-guides/enterprise-eval-observability-framework/evaluation/#custom-judges-byoj" style="color:var(--text-muted);text-decoration:underline;">implementation-guides</a></span>
+    <span>BYOJ · per-user quota · synthetic only</span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  function getQuery(name) { return new URLSearchParams(location.search).get(name); }
+
+  const editingId = getQuery("id");
+  const isEdit = !!editingId;
+
+  function slugify(s) {
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 32);
+  }
+
+  function nextVersion(slug, owner) {
+    const owned = EV.customJudgesByOwner(owner);
+    const same = owned.filter(j => {
+      const m = j.id.match(/^customjudge\.[^.]+\.(.+)@v(\d+)$/);
+      return m && m[1] === slug;
+    });
+    const maxV = same.reduce((acc, j) => {
+      const m = j.id.match(/@v(\d+)$/);
+      return m ? Math.max(acc, parseInt(m[1], 10)) : acc;
+    }, 0);
+    return maxV + 1;
+  }
+
+  function renderReserved() {
+    document.getElementById("reserved-list").textContent = EV.DIMENSIONS.join(" · ");
+  }
+
+  function renderModels() {
+    const sel = document.getElementById("f-model");
+    sel.innerHTML = "";
+    EV.APPROVED_MODELS.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m; opt.textContent = m;
+      sel.appendChild(opt);
+    });
+  }
+
+  function renderMitigations(selected) {
+    const host = document.getElementById("f-mitigations");
+    host.innerHTML = "";
+    EV.MITIGATIONS.forEach(m => {
+      const locked = m.id === "self_exclusion";
+      const on = selected.has(m.id) || locked;
+      const lab = document.createElement("label");
+      lab.className = (on ? "on " : "") + (locked ? "locked" : "");
+      lab.innerHTML = `
+        <input type="checkbox" ${on ? "checked" : ""} ${locked ? "disabled" : ""} />
+        <div>
+          <div class="mit-name">${m.name}${locked ? " · enforced" : ""}</div>
+          <div class="mit-blurb">${m.blurb}</div>
+        </div>
+      `;
+      lab.onclick = (e) => {
+        if (locked) { e.preventDefault(); return; }
+        e.preventDefault();
+        if (selected.has(m.id)) selected.delete(m.id); else selected.add(m.id);
+        renderMitigations(selected);
+      };
+      host.appendChild(lab);
+    });
+  }
+
+  function renderQuota() {
+    const customs = EV.customJudgesByOwner(EV.CURRENT_USER);
+    document.getElementById("quota-text").textContent = `${customs.length} of ${EV.BYOJ_QUOTA}`;
+    document.getElementById("count").textContent = customs.length;
+    document.getElementById("cap").textContent   = EV.BYOJ_QUOTA;
+    const banner = document.getElementById("quota-banner");
+    banner.classList.toggle("full", customs.length >= EV.BYOJ_QUOTA && !isEdit);
+
+    const list = document.getElementById("my-list");
+    if (customs.length === 0) {
+      list.innerHTML = `<p style="color:var(--text-faint);font-style:italic;font-family:var(--font-mono);font-size:11px;">No custom judges yet.</p>`;
+      return;
+    }
+    list.innerHTML = "";
+    customs.forEach(j => {
+      const card = document.createElement("div");
+      card.className = "byoj-card";
+      const isThis = isEdit && j.id === editingId;
+      card.innerHTML = `
+        <h4>${isThis ? "Editing" : "Custom"} · <span style="color:var(--accent);">${j.dimension}</span></h4>
+        <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${j.name}</div>
+        <div class="id">${j.id}</div>
+        <div class="row-actions">
+          ${isThis ? "" : `<a class="btn ghost" href="./custom-judge.html?id=${encodeURIComponent(j.id)}" style="font-size:12px;padding:6px 10px;">Edit</a>`}
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  // ---- Save guard --------------------------------------------------
+  function checkOverQuota() {
+    if (isEdit) return false; // editing existing
+    return EV.customJudgesByOwner(EV.CURRENT_USER).length >= EV.BYOJ_QUOTA;
+  }
+
+  function setError(id, on) {
+    document.getElementById(id).classList.toggle("show", !!on);
+  }
+
+  // ---- Bootstrap ---------------------------------------------------
+  const selectedMitigations = new Set(
+    EV.MITIGATIONS.filter(m => m.default).map(m => m.id)
+  );
+
+  renderReserved();
+  renderModels();
+  renderMitigations(selectedMitigations);
+  renderQuota();
+
+  if (isEdit) {
+    const j = EV.getCustomJudge(editingId);
+    if (!j) {
+      document.getElementById("title").innerHTML = "Custom judge not found";
+      document.querySelector(".form-section").style.display = "none";
+    } else {
+      document.getElementById("form-num").textContent = "Edit";
+      document.getElementById("form-heading").textContent = j.name;
+      document.getElementById("f-name").value = j.name;
+      const slug = (j.id.match(/^customjudge\.[^.]+\.(.+)@v\d+$/) || [])[1] ?? "";
+      document.getElementById("f-slug").value = slug;
+      document.getElementById("f-slug").disabled = true;
+      document.getElementById("f-dimension").value = j.dimension;
+      document.getElementById("f-model").value = j.model;
+      document.getElementById("f-ref").value = j.reference_requirement || j.reference || "reference-free";
+      document.getElementById("f-turns").value = (j.turn_types || ["single","multi"]).join(",");
+      document.getElementById("f-threshold").value = j.threshold ?? 0.7;
+      document.getElementById("f-rubric").value = j.rubric || "";
+      document.getElementById("f-prompt").value = j.prompt_template || "";
+      document.getElementById("f-steps").value = (j.evaluation_steps || []).join("\n");
+      selectedMitigations.clear();
+      (j.mitigations || []).forEach(m => selectedMitigations.add(m));
+      renderMitigations(selectedMitigations);
+
+      document.getElementById("btn-delete").style.display = "";
+      document.getElementById("btn-delete").onclick = async () => {
+        const ok = await EV.confirmModal({
+          title: "Delete this custom judge?",
+          body: `<code>${j.id}</code> will be removed. Verdicts already produced under this version remain in their verdict sets — only the judge definition is deleted.`,
+          confirmLabel: "Delete",
+          danger: true,
+        });
+        if (ok) {
+          EV.deleteCustomJudge(j.id);
+          EV.toast("Deleted", "BYOJ");
+          location.href = "./catalog.html";
+        }
+      };
+    }
+  }
+
+  // ---- Save -------------------------------------------------------
+  document.getElementById("btn-save").onclick = (e) => {
+    e.preventDefault();
+
+    const name      = document.getElementById("f-name").value.trim();
+    const slugRaw   = document.getElementById("f-slug").value.trim();
+    const dimension = document.getElementById("f-dimension").value.trim().toLowerCase();
+    const model     = document.getElementById("f-model").value;
+    const refReq    = document.getElementById("f-ref").value;
+    const turns     = document.getElementById("f-turns").value.split(",");
+    const threshRaw = document.getElementById("f-threshold").value.trim();
+    const threshold = threshRaw === "" ? 0.7 : Math.max(0, Math.min(1, Number(threshRaw)));
+    const rubric    = document.getElementById("f-rubric").value.trim();
+    const prompt    = document.getElementById("f-prompt").value.trim();
+    const steps     = document.getElementById("f-steps").value.split("\n").map(s => s.trim()).filter(Boolean);
+
+    if (!name || !slugRaw || !dimension || !rubric || !prompt) {
+      EV.toast("Fill in all required fields.", "BYOJ");
+      return;
+    }
+    setError("err-dimension", false);
+    if (EV.isReservedDimension(dimension)) {
+      setError("err-dimension", true);
+      EV.toast("Reserved dimension — pick another.", "BYOJ");
+      return;
+    }
+    if (EV.ownerHasDimension(EV.CURRENT_USER, dimension, isEdit ? editingId : null)) {
+      setError("err-dimension", true);
+      document.getElementById("err-dimension").textContent =
+        "You already have a custom judge with this dimension.";
+      return;
+    }
+    if (checkOverQuota()) {
+      EV.toast(`Quota reached (${EV.BYOJ_QUOTA} per user). Edit or delete an existing one.`, "BYOJ");
+      return;
+    }
+
+    const slug = slugify(slugRaw);
+    let id;
+    if (isEdit) {
+      // Edit creates a new version. (Mock: we overwrite for simplicity but bump v.)
+      const m = editingId.match(/^(customjudge\.[^.]+\.[^@]+)@v(\d+)$/);
+      const base = m ? m[1] : `customjudge.${EV.CURRENT_USER.split("@")[0]}.${slug}`;
+      const nextV = m ? parseInt(m[2], 10) + 1 : 1;
+      id = `${base}@v${nextV}`;
+    } else {
+      const v = nextVersion(slug, EV.CURRENT_USER);
+      id = EV.customJudgeIdFor(EV.CURRENT_USER, slug, v);
+    }
+
+    const judge = {
+      id,
+      owner: EV.CURRENT_USER,
+      name,
+      dimension,
+      rubric,
+      prompt_template: prompt,
+      model,
+      evaluation_steps: steps,
+      reference_requirement: refReq,
+      mitigations: Array.from(selectedMitigations).concat(["self_exclusion"]).filter((v, i, a) => a.indexOf(v) === i),
+      threshold,
+      turn_types: turns,
+      cost: "$",
+      family: "frontier-LLM",
+      blurb: `User-authored. Scores ${dimension}. Custom — not in cross-team rollups.`,
+      biases: [],
+      created_at: isEdit ? (EV.getCustomJudge(editingId)?.created_at || EV.nowISO()) : EV.nowISO(),
+      updated_at: EV.nowISO(),
+    };
+
+    if (isEdit) {
+      // Replace the editing entry in-place — the new version inherits the slot.
+      EV.deleteCustomJudge(editingId);
+    }
+    EV.upsertCustomJudge(judge);
+    EV.toast(`Saved ${id}`, "BYOJ");
+    location.href = "./catalog.html";
+  };
+</script>
+
+</body>
+</html>

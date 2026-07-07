@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Question Generation — Job · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Question Generation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>02 · Question Generation</b> · Job</span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a class="back-link" href="./index.html"><span class="arrow">←</span> All jobs</a>
+
+  <section class="page-head" id="head"></section>
+
+  <!-- Progress strip -->
+  <div class="progress-strip" id="progress-strip"></div>
+
+  <!-- Inputs panel -->
+  <div class="panel">
+    <div class="panel-header"><h2>Frozen inputs</h2><span class="meta" id="input-hash">sha256:…</span></div>
+    <dl class="kv-grid" id="inputs-kv"></dl>
+  </div>
+
+  <!-- Output panel -->
+  <div class="panel" id="output-panel">
+    <div class="panel-header"><h2>Output</h2><span class="meta" id="output-meta">—</span></div>
+    <dl class="kv-grid" id="output-kv"></dl>
+  </div>
+
+  <!-- Failure (only if failed) -->
+  <div class="panel" id="failure-panel" style="display:none;">
+    <div class="panel-header"><h2>Failure reason</h2></div>
+    <p id="failure-reason" style="margin:0;color:var(--text);font-size:14.5px;line-height:1.6;"></p>
+  </div>
+
+  <!-- Question table -->
+  <div class="panel" id="question-panel">
+    <div class="panel-header"><h2>Generated questions</h2><span class="meta" id="qcount-meta">—</span></div>
+    <div class="q-list" id="q-list"></div>
+  </div>
+
+  <!-- Audit trail -->
+  <div class="panel">
+    <div class="panel-header"><h2>Audit trail</h2><span class="meta">events[]</span></div>
+    <ul class="timeline" id="timeline"></ul>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / question-generation / job.html</span>
+    <span><a href="./index.html">← back to jobs</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const jobId = params.get("id");
+
+  function render() {
+    const job = QG.getJob(jobId);
+    if (!job) {
+      document.getElementById("head").innerHTML = `
+        <p class="eyebrow"><span class="dot"></span> Not found</p>
+        <h1>No job with that ID</h1>
+        <p class="subtitle">The job <code>${jobId}</code> was not found in this browser. <a href="./index.html" style="color:var(--accent);text-decoration:underline;">Back to jobs</a>.</p>`;
+      ["progress-strip","inputs-kv","output-panel","question-panel","timeline"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
+      });
+      return;
+    }
+
+    const persona = (job.inputs.persona_ids || []).map(id => QG.personaById(id));
+    // New jobs use prompt_shapes; legacy seed jobs may still carry strategies.
+    const shapeIds = job.inputs.prompt_shapes ?? job.inputs.strategies ?? [];
+    const strats = QG.strategiesByIds(shapeIds);
+    // Normalize: jobs from the new wizard carry rubric_ids[]; seed jobs carry
+    // a single rubric_id. Either way, the seed set is per-question rubric'd.
+    const rubricIds = job.inputs.rubric_ids
+      ?? (job.inputs.rubric_id ? [job.inputs.rubric_id] : []);
+    const rubricObjs = rubricIds.map(id => QG.rubricById(id)).filter(Boolean);
+    const isMixedRubric = rubricObjs.length > 1;
+    const headRubricLabel = isMixedRubric
+      ? "mixed rubrics"
+      : (rubricObjs[0]?.label.toLowerCase() ?? "rubric");
+    const isShipped = job.state === "shipped";
+    const isReady   = job.state === "ready_for_review";
+    const isFailed  = job.state === "failed";
+    const isActive  = ["queued","running","evolving","filtering"].includes(job.state);
+
+    // ----- Page head -----
+    document.getElementById("head").innerHTML = `
+      <p class="eyebrow"><span class="dot"></span> Job</p>
+      <h1>${job.job_id} <span class="qualifier">— ${headRubricLabel} · ${strats.map(s => s.name).join(" · ") || "—"}</span></h1>
+      <p class="subtitle">
+        Submitted by <b>${job.created_by}</b> at ${QG.fmtTs(job.created_at)}.
+        ${job.completed_at ? `Completed by <b>${job.completed_by}</b> at ${QG.fmtTs(job.completed_at)}.` : ""}
+      </p>
+      <div class="meta-pills">
+        <span class="state-pill ${job.state}">${QG.phaseLabel(job.state)}</span>
+        <span class="pill"><b>${persona.length}</b> personas</span>
+        <span class="pill"><b>${strats.length}</b> prompt shapes</span>
+        <span class="pill"><b>${job.progress.cells_total}</b> cells</span>
+        <span class="pill" title="${job.config_hash}">${job.config_hash.slice(0, 26)}…</span>
+        ${isReady ? '<button class="btn primary" id="ship" style="margin-left:auto;">Ship seed set →</button>' : ""}
+      </div>
+    `;
+    if (isReady) {
+      document.getElementById("ship").onclick = async () => {
+        const ok = await QG.confirmModal({
+          title: "Ship this seed set?",
+          body: `Once shipped, the seed set <b>${job.seed_set_id || "ssid_…"}</b> is immutable and Simulation can reference it by ID forever.`,
+          confirmLabel: "Ship",
+        });
+        if (ok && QG.shipJob(job.job_id, "user@local")) {
+          QG.toast(`Shipped ${job.seed_set_id || "seed set"}`, "Question Generation");
+          render();
+        }
+      };
+    }
+
+    // ----- Progress strip -----
+    const strip = document.getElementById("progress-strip");
+    const stateIdx = QG.STATE_ORDER.indexOf(job.state);
+    strip.innerHTML = QG.PHASES.map(p => {
+      const i = QG.STATE_ORDER.indexOf(p.state);
+      let cls = "";
+      if (isFailed) cls = (p.state === "queued" || p.state === "running") ? "done" : "";
+      else if (i < stateIdx)        cls = "done";
+      else if (i === stateIdx)      cls = "active";
+      const meta =
+        p.state === "running"   ? `${job.progress.cells_done} / ${job.progress.cells_total} cells` :
+        p.state === "evolving"  ? `${job.progress.evolution_passes_applied} pass · ${job.inputs.evolution_passes ?? 1} target` :
+        p.state === "filtering" ? `${job.progress.questions_kept_after_filter || "—"} kept / ${job.progress.questions_generated || "—"}` :
+        p.state === "queued"    ? "" :
+        p.state === "ready_for_review" ? (isShipped ? "shipped" : (isReady ? "awaiting ship" : "")) :
+        "";
+      return `<div class="phase ${cls}"><div class="num">${p.num}</div><div class="label">${p.label}</div>${meta ? `<div class="meta">${meta}</div>` : ""}</div>`;
+    }).join("");
+    if (isFailed) {
+      strip.insertAdjacentHTML("beforeend", `<div class="phase failed"><div class="num">--</div><div class="label">Failed</div></div>`);
+    }
+
+    // ----- Inputs panel -----
+    document.getElementById("input-hash").textContent = job.config_hash.slice(0, 30) + "…";
+    document.getElementById("inputs-kv").innerHTML = `
+      <dt>persona_ids</dt>
+      <dd>${persona.map(p => {
+        if (!p) return "—";
+        const pr = QG.rubricById(p.primary_rubric);
+        return `<code>${p.id}</code> · ${p.name} <small style="color:var(--text-faint);">v${p.version}</small>${pr ? ` <small style="color:var(--accent);">→ ${pr.label}</small>` : ""}`;
+      }).join("<br>") || "—"}</dd>
+      <dt>rubric_ids</dt>
+      <dd>${rubricObjs.length === 0 ? "—" : rubricObjs.map(rr => `<code>${rr.id}</code> <small style="color:var(--text-faint);">v${rr.version}</small>`).join(" · ")}${isMixedRubric ? ' <small style="color:var(--accent);">· mixed-rubric set · per-question scoring</small>' : ""}</dd>
+      <dt>prompt_shapes</dt>
+      <dd>${strats.map(s => `<code>${s.id}</code> · ${s.name} <small style="color:var(--text-faint);">v${s.version}</small>`).join("<br>") || "—"}${job.inputs.shapes_overridden ? ' <small style="color:var(--accent);">· override</small>' : (job.inputs.prompt_shapes ? ' <small style="color:var(--text-faint);">· inferred from personas</small>' : '')}</dd>
+      <dt>count_per_cell</dt>          <dd><code>${job.inputs.count_per_cell ?? "—"}</code></dd>
+      <dt>evolution_passes</dt>        <dd><code>${job.inputs.evolution_passes ?? "—"}</code></dd>
+      <dt>jailbreak_budget</dt>        <dd><code>${job.inputs.jailbreak_budget ?? "—"}</code></dd>
+      <dt>novelty_floor</dt>           <dd><code>${job.inputs.novelty_floor ?? "—"}</code></dd>
+      <dt>language</dt>                <dd><code>${job.inputs.language ?? "en"}</code></dd>
+    `;
+
+    // ----- Output panel -----
+    const op = document.getElementById("output-panel");
+    if (job.output) {
+      op.style.display = "";
+      document.getElementById("output-meta").innerHTML = `<a href="./seed-set.html?id=${encodeURIComponent(job.output.seed_set_id)}" style="color:var(--accent);">view in viewer →</a>`;
+      document.getElementById("output-kv").innerHTML = `
+        <dt>seed_set_id</dt>          <dd><code>${job.output.seed_set_id}</code></dd>
+        <dt>question_count</dt>       <dd><code>${job.output.question_count}</code></dd>
+        <dt>novelty_score</dt>        <dd><code>${(job.output.novelty_score).toFixed(2)}</code> <small style="color:var(--text-faint);">(AutoBencher-style; floor = ${job.inputs.novelty_floor})</small></dd>
+        <dt>diversity_coverage</dt>   <dd><code>${(job.output.diversity_coverage * 100).toFixed(0)}%</code> <small style="color:var(--text-faint);">(Rainbow-Teaming archive cells filled)</small></dd>
+        <dt>storage_uri</dt>          <dd><code>${job.output.storage_uri}</code></dd>
+      `;
+    } else {
+      op.style.display = "none";
+    }
+
+    // ----- Failure -----
+    const fp = document.getElementById("failure-panel");
+    if (isFailed && job.failure_reason) {
+      fp.style.display = "";
+      document.getElementById("failure-reason").textContent = job.failure_reason;
+    } else {
+      fp.style.display = "none";
+    }
+
+    // ----- Question table (only if there's a seed set yet) -----
+    const qp = document.getElementById("question-panel");
+    if (job.output && job.seed_set_id) {
+      const ss = QG.getSeedSet(job.seed_set_id);
+      if (ss && ss.length) {
+        qp.style.display = "";
+        document.getElementById("qcount-meta").textContent = `${ss.length} shown · ${job.output.question_count} total`;
+        document.getElementById("q-list").innerHTML = ss.slice(0, 12).map(q => {
+          const p = QG.personaById(q.persona.id);
+          const shape = q.prompt_shape ?? q.strategy;
+          const s = QG.STRATEGIES.find(x => x.id === shape?.id);
+          const tags = [
+            p ? `<span class="qtag">${p.name}</span>` : "",
+            s ? `<span class="qtag accent">${s.name}</span>` : "",
+            q.scenario ? `<span class="qtag">${q.scenario.length} · ${q.scenario.style} · ${q.scenario.difficulty}</span>` : "",
+            q.archive_cell ? `<span class="qtag accent">${q.archive_cell.risk_category} × ${q.archive_cell.attack_style}</span>` : "",
+            q.expected_behavior ? `<span class="qtag">→ ${q.expected_behavior}</span>` : "",
+          ].join("");
+          return `
+            <div class="q-row">
+              <div class="qid">${q.question_id.slice(-6)}</div>
+              <div class="qbody">${escapeHtml(q.prompt)}<div class="qmeta">${tags}</div></div>
+              <div class="qside">${q.rubric_dimension}</div>
+            </div>`;
+        }).join("");
+      } else {
+        qp.style.display = "none";
+      }
+    } else {
+      qp.style.display = "none";
+    }
+
+    // ----- Audit timeline -----
+    document.getElementById("timeline").innerHTML = job.events.map((e, i) => {
+      const isLast = i === job.events.length - 1;
+      return `<li class="${isLast ? "" : "done"}"><b>${QG.phaseLabel(e.state) || e.state}</b> · ${QG.fmtTs(e.ts)} <span class="who">· by ${e.by}</span></li>`;
+    }).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  render();
+  QG.startTicking(render);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Simulation — Runs · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Simulation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>03 · Simulation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Stage 03 · Runs</p>
+    <h1>Simulation <span class="qualifier">— run questions against your agents</span></h1>
+    <p class="subtitle">
+      Replays a question set against a registered agent and captures every conversation as a trace.
+    </p>
+    <div class="aibc-kpis">
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num" id="pill-total">0</span><span class="aibc-stat__label">runs</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-active">0</span><span class="aibc-stat__label">in flight</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-ready">0</span><span class="aibc-stat__label">ready</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-adapters">0</span><span class="aibc-stat__label">adapters</span></div>
+    </div>
+  </section>
+
+  <div class="filter-bar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search by run ID, submitter, adapter…" />
+    </div>
+    <div id="state-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <a class="btn ghost" href="./onboard.html">＋ Onboard adapter</a>
+    <a class="btn primary" href="./create.html">＋ New run</a>
+    <span class="count"><b id="filter-count">0</b> shown</span>
+  </div>
+
+  <table class="runs-table" aria-label="Simulation runs">
+    <thead>
+      <tr>
+        <th>Run ID</th>
+        <th>Submitted by</th>
+        <th>Created</th>
+        <th>Adapter</th>
+        <th>Mode</th>
+        <th>State</th>
+        <th>Progress</th>
+        <th class="num">Traces</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div id="empty" class="empty" style="display:none;margin-top:18px;">
+    <p style="font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;">No matches</p>
+    <h3>No runs match that filter.</h3>
+    <p>Clear the search, pick another state, or <a href="./create.html" style="color:var(--accent);text-decoration:underline;">submit a new run</a>.</p>
+  </div>
+
+  <section class="panel" style="margin-top:48px;">
+    <div class="panel-header">
+      <h2>Onboarded adapters</h2>
+      <span class="meta"><a href="./onboard.html" style="color:var(--accent);">＋ onboard another</a></span>
+    </div>
+    <div class="adapter-grid" id="adapter-grid"></div>
+  </section>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / simulation / index.html</span>
+    <span><a href="#" id="reset-link">⟲ reset runs to seed</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const state = { search: "", filterState: null };
+
+  function render() {
+    const all = SIM.loadRuns();
+    const adapters = SIM.loadAdapters();
+
+    // pill counts
+    const counts = {
+      total: all.length,
+      active: all.filter(r => ["queued", "warming", "running", "finalizing"].includes(r.state)).length,
+      ready: all.filter(r => r.state === "ready").length,
+      adapters: adapters.length,
+    };
+    document.getElementById("pill-total").textContent    = counts.total;
+    document.getElementById("pill-active").textContent   = counts.active;
+    document.getElementById("pill-ready").textContent    = counts.ready;
+    document.getElementById("pill-adapters").textContent = counts.adapters;
+
+    // state filter pills
+    const pillHost = document.getElementById("state-pills");
+    pillHost.innerHTML = "";
+    const stateOptions = [
+      ["All", null],
+      ["In flight", "_active"],
+      ["Ready", "ready"],
+      ["Failed", "failed"],
+    ];
+    stateOptions.forEach(([text, val]) => {
+      const isActive = state.filterState === val;
+      const el = document.createElement("button");
+      el.className = "pill" + (isActive ? " active" : "");
+      el.textContent = text;
+      el.onclick = () => { state.filterState = val; render(); };
+      pillHost.appendChild(el);
+    });
+
+    // filter rows
+    const q = state.search.trim().toLowerCase();
+    const filtered = all.filter(r => {
+      if (state.filterState === "_active") {
+        if (!["queued", "warming", "running", "finalizing"].includes(r.state)) return false;
+      } else if (state.filterState && r.state !== state.filterState) {
+        return false;
+      }
+      if (!q) return true;
+      const blob = [r.run_id, r.created_by, r.adapter_snapshot?.id, r.adapter_snapshot?.transport, r.inputs?.mode, r.seed_set_id].filter(Boolean).join(" ").toLowerCase();
+      return blob.includes(q);
+    });
+    document.getElementById("filter-count").textContent = filtered.length;
+
+    const rows = document.getElementById("rows");
+    rows.innerHTML = "";
+    document.getElementById("empty").style.display = filtered.length === 0 ? "" : "none";
+    filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
+    filtered.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.onclick = () => location.href = `./run.html?id=${encodeURIComponent(r.run_id)}`;
+
+      const pct = r.progress.conversations_total ? Math.round(100 * r.progress.conversations_done / r.progress.conversations_total) : 0;
+      const progress = r.state === "failed"
+        ? "—"
+        : `${r.progress.conversations_done} / ${r.progress.conversations_total} convos`;
+      const bar = r.state === "failed"
+        ? ""
+        : `<span class="progress-bar"><i style="width:${pct}%"></i></span>`;
+      const traceCount = r.output?.trace_count ?? r.progress.conversations_done ?? 0;
+      const adapter = r.adapter_snapshot || {};
+      const transport = adapter.transport || "—";
+
+      tr.innerHTML = `
+        <td><span class="id">${r.run_id}</span></td>
+        <td>${r.created_by}</td>
+        <td><span class="ts">${SIM.fmtTsShort(r.created_at)}</span></td>
+        <td>
+          <span class="transport-pill ${transport}">${transport}</span>
+          <span class="ts" style="display:block;margin-top:3px;">${SIM.escapeHtml(adapter.id || "—")}</span>
+        </td>
+        <td><span class="ts" style="text-transform:uppercase;letter-spacing:0.06em;">${r.inputs?.mode || "—"}</span></td>
+        <td><span class="state-pill ${r.state}">${SIM.phaseLabel(r.state)}</span></td>
+        <td><div class="progress-cell">${progress}${bar}</div></td>
+        <td class="num">${traceCount || "—"}</td>
+      `;
+      rows.appendChild(tr);
+    });
+
+    // adapter cards
+    const grid = document.getElementById("adapter-grid");
+    grid.innerHTML = "";
+    if (adapters.length === 0) {
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><h3>No adapters onboarded yet.</h3><p><a href="./onboard.html" style="color:var(--accent);text-decoration:underline;">Onboard one</a> to start running.</p></div>`;
+    } else {
+      adapters.forEach(a => {
+        const card = document.createElement("a");
+        card.href = `./onboard.html?edit=${encodeURIComponent(a.adapter_id)}`;
+        card.className = "adapter-card";
+        const url = a.transport_config?.base_url || a.transport_config?.server_url || a.transport_config?.agent_card_url || "—";
+        const smoke = a.smoke_test?.passed ? `<span class="transport-pill" style="color:var(--stop-goal);background:var(--stop-goal-bg);border-color:transparent;">smoke ✓</span>` : `<span class="transport-pill" style="color:var(--stop-err);background:var(--stop-err-bg);border-color:transparent;">smoke ✗</span>`;
+        card.innerHTML = `
+          <div class="head">
+            <div class="name">${SIM.escapeHtml(a.name)}</div>
+            <span class="transport-pill ${a.transport}">${a.transport}</span>
+          </div>
+          <div class="url">${SIM.escapeHtml(url)}</div>
+          <div class="stats">
+            <span>v<b>${a.version}</b></span>
+            <span><b>${a.capabilities?.rate_limit_per_min ?? "—"}</b>/min</span>
+            <span>session: <b>${a.capabilities?.supports_session_id ? "yes" : "no"}</b></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            ${smoke}
+            <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);letter-spacing:0.04em;">${SIM.fmtTsShort(a.created_at)}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+  }
+
+  document.getElementById("search").addEventListener("input", (e) => {
+    state.search = e.target.value;
+    render();
+  });
+  document.getElementById("reset-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    const ok = await SIM.confirmModal({
+      title: "Reset runs to seed?",
+      body: "All custom adapters, runs, and traces in this browser will be discarded; the seed adapters and runs will be restored.",
+      confirmLabel: "Reset",
+      danger: true,
+    });
+    if (ok) { SIM.resetSeed(); SIM.toast("Runs reset to seed", "Simulation"); render(); }
+  });
+
+  render();
+  SIM.startTicking(render);
+</script>
+
+</body>
+</html>

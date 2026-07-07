@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Question Generation — Seed set · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Question Generation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>02 · Question Generation</b> · Seed set</span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a class="back-link" href="./index.html"><span class="arrow">←</span> All jobs</a>
+
+  <section class="page-head" id="head"></section>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2>Seed-set viewer</h2>
+      <span class="meta" id="filter-meta">—</span>
+    </div>
+
+    <div class="q-filter">
+      <select id="f-persona"><option value="">All personas</option></select>
+      <select id="f-strategy"><option value="">All prompt shapes</option></select>
+      <select id="f-scenario" title="Scenario = (length × style × difficulty)"><option value="">All scenario lengths</option></select>
+      <select id="f-rubric"><option value="">All rubric dimensions</option></select>
+    </div>
+    <p class="sub" style="margin:-6px 0 14px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.04em;color:var(--text-faint);">
+      Each question's <b>scenario</b> tag = <code>length · style · difficulty</code> — the prompt's surface-form register.
+    </p>
+
+    <div class="q-list" id="q-list"></div>
+    <div id="empty" class="empty" style="display:none;margin-top:18px;">
+      <p style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;">No matches</p>
+      <h3>No questions match those filters.</h3>
+      <p>Clear the filter drop-downs above.</p>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / question-generation / seed-set.html</span>
+    <span><a href="./index.html">← back to jobs</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const seedSetId = params.get("id");
+  const filters = { persona: "", strategy: "", scenario: "", rubric: "" };
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function init() {
+    const ss = QG.getSeedSet(seedSetId);
+    if (!ss) {
+      document.getElementById("head").innerHTML = `
+        <p class="eyebrow"><span class="dot"></span> Not found</p>
+        <h1>No seed set with that ID</h1>
+        <p class="subtitle">The seed set <code>${seedSetId}</code> was not found in this browser. <a href="./index.html" style="color:var(--accent);text-decoration:underline;">Back to jobs</a>.</p>`;
+      return;
+    }
+
+    // page-head
+    const job = QG.loadJobs().find(j => j.seed_set_id === seedSetId);
+    document.getElementById("head").innerHTML = `
+      <p class="eyebrow"><span class="dot"></span> Seed set</p>
+      <h1>${seedSetId} <span class="qualifier">— ${ss.length} questions</span></h1>
+      <p class="subtitle">
+        Read-only view. Generated by ${job ? `<a href="./job.html?id=${encodeURIComponent(job.job_id)}" style="color:var(--accent);">${job.job_id}</a>` : "an unknown job"}.
+        Each question carries the full <code>(persona, prompt_shape, scenario)</code> tag so a downstream Simulation result traces back to exactly the generator config.
+      </p>
+      <div class="meta-pills">
+        <span class="pill pill--accent"><b>${ss.length}</b> questions</span>
+        <span class="pill"><b>${new Set(ss.map(q => q.persona.id)).size}</b> personas</span>
+        <span class="pill"><b>${new Set(ss.map(q => (q.prompt_shape ?? q.strategy)?.id)).size}</b> prompt shapes</span>
+        ${job?.output ? `<span class="pill">novelty <b>${job.output.novelty_score.toFixed(2)}</b></span>` : ""}
+        ${job?.output ? `<span class="pill">coverage <b>${(job.output.diversity_coverage*100).toFixed(0)}%</b></span>` : ""}
+      </div>
+    `;
+
+    // populate filter selects
+    const personas = [...new Set(ss.map(q => q.persona.id))];
+    const shapes = [...new Set(ss.map(q => (q.prompt_shape ?? q.strategy)?.id).filter(Boolean))];
+    const scenarios = [...new Set(ss.map(q => q.scenario.length))];
+    const rubrics = [...new Set(ss.map(q => q.rubric_dimension))];
+    const fp = document.getElementById("f-persona");
+    personas.forEach(id => {
+      const o = document.createElement("option");
+      o.value = id;
+      o.textContent = QG.personaById(id)?.name ?? id;
+      fp.appendChild(o);
+    });
+    const fs = document.getElementById("f-strategy");
+    shapes.forEach(id => {
+      const o = document.createElement("option");
+      o.value = id;
+      o.textContent = QG.STRATEGIES.find(x => x.id === id)?.name ?? id;
+      fs.appendChild(o);
+    });
+    const fc = document.getElementById("f-scenario");
+    scenarios.forEach(len => { const o = document.createElement("option"); o.value = len; o.textContent = `length: ${len}`; fc.appendChild(o); });
+    const fr = document.getElementById("f-rubric");
+    rubrics.forEach(rid => { const o = document.createElement("option"); o.value = rid; o.textContent = rid; fr.appendChild(o); });
+
+    fp.addEventListener("change", e => { filters.persona = e.target.value; render(); });
+    fs.addEventListener("change", e => { filters.strategy = e.target.value; render(); });
+    fc.addEventListener("change", e => { filters.scenario = e.target.value; render(); });
+    fr.addEventListener("change", e => { filters.rubric = e.target.value; render(); });
+
+    render();
+  }
+
+  function render() {
+    const ss = QG.getSeedSet(seedSetId);
+    if (!ss) return;
+
+    const filtered = ss.filter(q => {
+      const shape = q.prompt_shape ?? q.strategy;
+      if (filters.persona  && q.persona.id !== filters.persona)   return false;
+      if (filters.strategy && shape?.id !== filters.strategy)     return false;
+      if (filters.scenario && q.scenario.length !== filters.scenario) return false;
+      if (filters.rubric   && q.rubric_dimension !== filters.rubric) return false;
+      return true;
+    });
+
+    document.getElementById("filter-meta").textContent = `${filtered.length} of ${ss.length} questions`;
+    document.getElementById("empty").style.display = filtered.length === 0 ? "" : "none";
+
+    document.getElementById("q-list").innerHTML = filtered.map(q => {
+      const p = QG.personaById(q.persona.id);
+      const shape = q.prompt_shape ?? q.strategy;
+      const s = QG.STRATEGIES.find(x => x.id === shape?.id);
+      const tags = [
+        p ? `<span class="qtag">${p.name} <small style="opacity:.7;">v${q.persona.version}</small></span>` : "",
+        s ? `<span class="qtag accent">${s.name} <small style="opacity:.7;">v${shape.version}</small></span>` : "",
+        q.scenario ? `<span class="qtag">${q.scenario.length} · ${q.scenario.style} · ${q.scenario.difficulty}</span>` : "",
+        q.archive_cell ? `<span class="qtag accent">${q.archive_cell.risk_category} × ${q.archive_cell.attack_style}</span>` : "",
+        q.expected_behavior ? `<span class="qtag">→ ${q.expected_behavior}</span>` : "",
+      ].join("");
+      return `
+        <div class="q-row">
+          <div class="qid">${q.question_id.slice(-6)}</div>
+          <div class="qbody">${escapeHtml(q.prompt)}<div class="qmeta">${tags}</div></div>
+          <div class="qside">${q.rubric_dimension}</div>
+        </div>`;
+    }).join("");
+  }
+
+  // Live mode: wait for the adapter's first hydrate so getSeedSet() is populated.
+  if (window.QG && QG.ready) QG.ready.then(init); else init();
+</script>
+
+</body>
+</html>

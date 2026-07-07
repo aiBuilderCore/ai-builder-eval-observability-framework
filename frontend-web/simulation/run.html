@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Simulation — Run · AIBuilderCore</title>
+<script>
+  (function () { try { var t = localStorage.getItem('aibc-theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Simulation</em></span>
+    </div>
+    <span class="product-name">
+      <a href="../index.html">Enterprise Eval Observability</a> ·
+      <a href="./index.html">Simulation</a> ·
+      <b id="crumb-run">Run</b>
+    </span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> <span id="head-id">sim_…</span></p>
+    <h1 id="head-title">Simulation run</h1>
+    <p class="subtitle" id="head-subtitle">—</p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <div class="progress-strip" id="progress-strip"></div>
+
+  <div class="row-2" style="margin-top:32px;">
+    <section class="panel">
+      <div class="panel-header"><h2>Stop reasons</h2><span class="meta" id="stop-meta">—</span></div>
+      <div class="stop-bar" id="stop-bar"></div>
+      <div class="stop-legend" id="stop-legend"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header"><h2>Throughput</h2><span class="meta" id="throughput-meta">—</span></div>
+      <dl class="kv-grid" id="throughput-kv"></dl>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-header"><h2>Inputs (frozen)</h2><span class="meta" id="hash-meta">config_hash: —</span></div>
+    <dl class="kv-grid" id="inputs-kv"></dl>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>Conversations</h2>
+      <span class="meta"><b id="conv-count">0</b> tiles · click to open trace</span>
+    </div>
+    <div class="conv-grid" id="conv-grid"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header"><h2>Audit trail</h2><span class="meta">events</span></div>
+    <ul class="timeline" id="events-list"></ul>
+  </section>
+
+  <div style="display:flex;justify-content:space-between;margin:32px 0 0;">
+    <a class="btn ghost" href="./index.html">← back to runs</a>
+    <div style="display:flex;gap:10px;">
+      <button class="btn ghost" id="abort-btn" style="display:none;">Abort run</button>
+      <a class="btn primary" id="eval-link" href="#" style="display:none;">View in Evaluation →</a>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / simulation / run.html</span>
+    <span><a href="./index.html">← back to runs</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const runId = params.get("id");
+  if (!runId) { location.href = "./index.html"; }
+
+  function render() {
+    const run = SIM.getRun(runId);
+    // Live mode: the run may not be in cache yet on the first paint — wait for a
+    // later hydrate/tick rather than bouncing to the index.
+    if (!run) { if (!window.EEOF) location.href = "./index.html"; return; }
+
+    document.title = `Simulation — ${run.run_id} · AIBuilderCore`;
+    document.getElementById("crumb-run").textContent = run.run_id;
+    document.getElementById("head-id").textContent = run.run_id;
+    document.getElementById("head-title").innerHTML = `Run <span class="qualifier">— ${run.adapter_snapshot?.transport?.toUpperCase() || "?"} · ${run.inputs?.mode}</span>`;
+    document.getElementById("head-subtitle").innerHTML = `
+      Submitted by <b>${run.created_by}</b> at <code>${SIM.fmtTs(run.created_at)}</code>.
+      Replays <code>${run.seed_set_id}</code> against <code>${run.adapter_snapshot?.id}</code> v${run.adapter_snapshot?.version}.
+    `;
+
+    const pills = document.getElementById("head-pills");
+    pills.innerHTML = `
+      <span class="pill pill--accent"><span class="state-pill ${run.state}" style="border:none;background:transparent;padding:0;font-size:11px;">${SIM.phaseLabel(run.state)}</span></span>
+      <span class="pill"><b>${run.progress.conversations_done}</b> / ${run.progress.conversations_total} convos</span>
+      <span class="pill"><b>${run.progress.turns_total}</b> turns</span>
+      <span class="pill"><b>${SIM.fmtTokens(run.progress.tokens_in + run.progress.tokens_out)}</b> tokens</span>
+      <span class="pill"><b>${SIM.fmtDur(run.progress.wallclock_s)}</b> wallclock</span>
+    `;
+
+    // Progress strip
+    renderProgressStrip(run);
+
+    // Stop reason histogram
+    renderStopBar(run);
+
+    // Throughput
+    document.getElementById("throughput-meta").textContent = `seed=${run.inputs?.seed ?? "—"} · concurrency=${run.inputs?.concurrency}`;
+    document.getElementById("throughput-kv").innerHTML = `
+      <dt>Conversations</dt><dd><code>${run.progress.conversations_done}</code> / <code>${run.progress.conversations_total}</code> · failed <code>${run.progress.conversations_failed ?? 0}</code></dd>
+      <dt>Turns total</dt><dd><code>${run.progress.turns_total}</code></dd>
+      <dt>Tokens in / out</dt><dd><code>${SIM.fmtTokens(run.progress.tokens_in)}</code> / <code>${SIM.fmtTokens(run.progress.tokens_out)}</code></dd>
+      <dt>Wallclock</dt><dd><code>${SIM.fmtDur(run.progress.wallclock_s)}</code></dd>
+      <dt>Failure reason</dt><dd>${run.failure_reason ? `<span style="color:var(--stop-err);">${SIM.escapeHtml(run.failure_reason)}</span>` : "—"}</dd>
+    `;
+
+    // Inputs
+    document.getElementById("hash-meta").textContent = "config_hash: " + run.config_hash;
+    const i = run.inputs || {};
+    document.getElementById("inputs-kv").innerHTML = `
+      <dt>Seed set</dt><dd><code>${i.seed_set_id}</code></dd>
+      <dt>Adapter</dt><dd><span class="transport-pill ${run.adapter_snapshot?.transport}">${run.adapter_snapshot?.transport}</span> <code>${i.target_adapter_id}</code> v${i.target_adapter_version}</dd>
+      <dt>Mode</dt><dd><code>${i.mode}</code></dd>
+      <dt>Max / min turns</dt><dd><code>${i.max_turns}</code> / <code>${i.min_turns}</code></dd>
+      <dt>Session policy</dt><dd><code>${i.session_policy}</code></dd>
+      <dt>Concurrency</dt><dd><code>${i.concurrency}</code></dd>
+      <dt>Stop conditions</dt><dd>${(i.stop_conditions || []).map(s => `<code style="margin:0 4px 4px 0;display:inline-block;">${s}</code>`).join("")}</dd>
+      <dt>Topic-drift threshold</dt><dd><code>${i.topic_drift_threshold}</code></dd>
+      <dt>Simulator model</dt><dd><code>${i.user_simulator_model}</code></dd>
+      <dt>Seed</dt><dd><code>${i.seed}</code></dd>
+      <dt>Per-question timeout</dt><dd><code>${i.per_question_timeout_s}s</code></dd>
+    `;
+
+    // Conversations grid
+    const traces = SIM.tracesForRun(run.run_id);
+    document.getElementById("conv-count").textContent = run.progress.conversations_total;
+    const grid = document.getElementById("conv-grid");
+    grid.innerHTML = "";
+    for (let idx = 0; idx < run.progress.conversations_total; idx++) {
+      const t = traces[idx];
+      const tile = document.createElement(t ? "a" : "div");
+      if (t) tile.href = `./trace.html?id=${encodeURIComponent(t.trace_id)}`;
+      const cls = t ? `conv-tile ${t.stop_reason}` : `conv-tile ${idx < run.progress.conversations_done ? "running" : "queued"}`;
+      tile.className = cls;
+      const personaName = t ? (SIM.PERSONAS[t.persona?.id]?.name || t.persona?.id) : "—";
+      const turns = t ? t.turns.length : 0;
+      tile.innerHTML = `
+        <div class="qid">${t ? t.question_id : `q · ${String(idx + 1).padStart(3, "0")}`}</div>
+        <div class="meta">
+          <b>${personaName}</b>
+          ${t ? `· ${turns} turns` : (idx < run.progress.conversations_done ? "· running…" : "· queued")}
+        </div>
+        ${t ? `<div class="meta" style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);margin-top:2px;">${t.stop_reason}</div>` : ""}
+      `;
+      grid.appendChild(tile);
+    }
+
+    // Audit trail
+    const list = document.getElementById("events-list");
+    list.innerHTML = "";
+    (run.events || []).forEach((ev, i) => {
+      const li = document.createElement("li");
+      if (i < run.events.length - 1 || run.state === "ready" || run.state === "failed") li.classList.add("done");
+      li.innerHTML = `<b>${SIM.escapeHtml(ev.state)}</b> · <span class="who">${SIM.escapeHtml(ev.by)}</span>${ev.note ? ` · <span class="who">${SIM.escapeHtml(ev.note)}</span>` : ""} <span style="color:var(--text-faint);float:right;">${SIM.fmtTsShort(ev.ts)}</span>`;
+      list.appendChild(li);
+    });
+
+    // Action buttons
+    const isInFlight = ["queued", "warming", "running", "finalizing"].includes(run.state);
+    document.getElementById("abort-btn").style.display = isInFlight ? "" : "none";
+    document.getElementById("eval-link").style.display = run.state === "ready" ? "" : "none";
+    document.getElementById("eval-link").href = `../evaluation/index.html?run=${encodeURIComponent(run.run_id)}`;
+  }
+
+  function renderProgressStrip(run) {
+    const host = document.getElementById("progress-strip");
+    host.innerHTML = "";
+    const order = SIM.STATE_ORDER;
+    const currentIdx = order.indexOf(run.state);
+    order.forEach((s, i) => {
+      const phase = SIM.PHASES.find(p => p.state === s);
+      const cls = run.state === "failed" && i > 0 ? "" :
+                  i < currentIdx ? "done" :
+                  i === currentIdx ? (run.state === "failed" ? "failed" : "active") : "";
+      const meta = i === currentIdx
+        ? (s === "running"
+            ? `${run.progress.conversations_done} / ${run.progress.conversations_total} convos`
+            : s === "finalizing"
+              ? "closing sessions"
+              : s === "ready"
+                ? `${run.output?.trace_count ?? "—"} traces`
+                : "")
+        : "";
+      const div = document.createElement("div");
+      div.className = "phase " + cls;
+      div.innerHTML = `<div class="num">${phase.num}</div><div class="label">${phase.label}</div>${meta ? `<div class="meta">${meta}</div>` : ""}`;
+      host.appendChild(div);
+    });
+  }
+
+  function renderStopBar(run) {
+    const breakdown = run.output?.stop_reason_breakdown || (() => {
+      const b = { goal_met: 0, max_turns: 0, user_gives_up: 0, adapter_error: 0, topic_drift: 0, manual_abort: 0 };
+      for (const t of SIM.tracesForRun(run.run_id)) if (b[t.stop_reason] != null) b[t.stop_reason]++;
+      return b;
+    })();
+    const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+    document.getElementById("stop-meta").textContent = total ? `${total} terminations` : "n/a (run pending)";
+
+    const bar = document.getElementById("stop-bar");
+    bar.innerHTML = "";
+    if (total === 0) {
+      bar.innerHTML = `<i class="manual_abort" style="width:100%;background:var(--surface-alt);"></i>`;
+    } else {
+      ["goal_met", "max_turns", "user_gives_up", "adapter_error", "topic_drift", "manual_abort"].forEach(k => {
+        const v = breakdown[k] || 0;
+        if (v === 0) return;
+        const seg = document.createElement("i");
+        seg.className = k;
+        seg.style.width = `${(100 * v / total).toFixed(2)}%`;
+        seg.title = `${k}: ${v}`;
+        bar.appendChild(seg);
+      });
+    }
+
+    const legend = document.getElementById("stop-legend");
+    legend.innerHTML = SIM.STOP_REASONS.map(r => `
+      <span class="item ${r.id}"><span class="swatch"></span><b>${breakdown[r.id] || 0}</b> · ${r.label}</span>
+    `).join("");
+  }
+
+  document.getElementById("abort-btn").addEventListener("click", async () => {
+    const ok = await SIM.confirmModal({
+      title: "Abort this run?",
+      body: "Currently running conversations will be marked as <code>manual_abort</code>. Already-completed traces are preserved. The adapter session will be closed.",
+      confirmLabel: "Abort",
+      danger: true,
+    });
+    if (ok) {
+      SIM.abortRun(runId, "user@team");
+      SIM.toast("Run aborted", "Simulation");
+      render();
+    }
+  });
+
+  // Live mode: wait for the adapter's first hydrate before the first render so
+  // getRun() resolves (otherwise the not-found guard redirects to the index).
+  if (window.SIM && SIM.ready) SIM.ready.then(() => { render(); SIM.startTicking(render); });
+  else { render(); SIM.startTicking(render); }
+</script>
+
+</body>
+</html>

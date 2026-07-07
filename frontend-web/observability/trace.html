@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Trace viewer · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="batches">
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name">
+      <a href="./index.html">batches</a> ·
+      <a id="crumb-batch" href="#">batch</a> ·
+      <b id="crumb-run">trace</b>
+    </span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> <span id="head-eyebrow">Trace</span></p>
+    <h1 id="head-title">Loading trace…</h1>
+    <p class="subtitle" id="head-subtitle"></p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <div class="trace-shell">
+    <div class="trace-main">
+
+      <div class="section-head">
+        <h2><em>Span tree</em></h2>
+        <div class="actions">
+          <span style="color:var(--text-faint);">Every LLM call, tool call, retrieval, and inline judge for this conversation.
+            <abbr title="Spans use OpenInference span kinds + OTel GenAI semconv. EVALUATOR spans are the inline judge verdicts, linked to the run they scored.">what's a span?</abbr>
+          </span>
+        </div>
+      </div>
+      <div class="span-viewer" id="span-viewer">
+        <div id="chart-host"></div>
+        <div class="span-viewer__legend" id="legend"></div>
+      </div>
+
+      <div id="root-cause-host"></div>
+
+      <div id="session-host"></div>
+
+      <div class="section-head">
+        <h2>Inline <em>verdicts</em></h2>
+        <div class="actions"><span style="color:var(--text-faint);">EVALUATOR spans · same <code>(judge_id @ version)</code> Evaluation uses</span></div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);box-shadow:0 1px 3px var(--shadow);" id="verdicts">
+        <div class="verdict-row" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);">
+          <div>Judge</div><div>Score</div><div>Threshold</div><div style="text-align:right;">Pass</div>
+        </div>
+        <div id="verdict-rows"></div>
+      </div>
+
+      <div class="section-head">
+        <h2>Span <em>attributes</em></h2>
+        <div class="actions">
+          <span style="color:var(--text-faint);">click any span in the chart above to inspect</span>
+        </div>
+      </div>
+      <div id="span-detail" class="span-attrs__empty">No span selected. Click a row in the span tree.</div>
+
+    </div>
+
+    <div id="rail"></div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / trace.html</span>
+    <span><a href="./index.html">← all batches</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script src="batches.js?v=2"></script>
+<script>
+  (function () {
+    const B = window.AIBC_BATCHES;
+    if (!B) return;
+
+    const params = new URLSearchParams(location.search);
+    const batchId = params.get('batch');
+    const runId = params.get('run');
+
+    let batch = batchId ? B.getBatch(batchId) : null;
+    // No batch requested → open the most recent one so nav lands on real content
+    // instead of an empty picker. The picker below stays as the not-found path.
+    if (!batch && !batchId) {
+      const all = B.loadBatches();
+      batch = (all && all[0]) || null;
+    }
+    if (!batch) {
+      document.getElementById('head-eyebrow').textContent = 'Trace not available';
+      document.getElementById('head-title').textContent = batchId ? 'Batch not found' : 'No batch specified';
+      const allBatches = B.loadBatches();
+      const chartHost = document.getElementById('chart-host');
+      if (chartHost) {
+        chartHost.innerHTML = `
+          <div class="trace-fallback">
+            <h3>Pick a batch to view its traces</h3>
+            <p class="lede">${batchId ? 'No batch with id <code>' + B.escapeHtml(batchId) + '</code>.' : 'The trace viewer needs a <code>?batch=</code> query param.'} Available batches:</p>
+            <ul>${allBatches.slice(0, 5).map(b => `
+              <li><a href="./batch.html?id=${encodeURIComponent(b.batch_id)}">
+                <span>${B.escapeHtml(b.batch_id)}</span>
+                <span class="persona">${B.escapeHtml(b.name)} · ${(b.pass_rate * 100).toFixed(0)}% pass</span>
+              </a></li>`).join('')}</ul>
+            <a class="back-link" href="./index.html">← all batches</a>
+          </div>`;
+      }
+      return;
+    }
+    const run = runId ? B.getRun(batch.batch_id, runId) : (batch.runs && batch.runs[0]);
+    if (!run) {
+      const crumbBatch = document.getElementById('crumb-batch');
+      crumbBatch.href = './batch.html?id=' + encodeURIComponent(batch.batch_id);
+      crumbBatch.textContent = batch.batch_id;
+      document.getElementById('crumb-run').textContent = 'not found';
+      document.getElementById('head-eyebrow').textContent = 'Trace · ' + batch.batch_id;
+      document.getElementById('head-title').textContent = 'Run not found';
+      document.getElementById('head-subtitle').innerHTML = 'No run with id <code>' + B.escapeHtml(runId || '(none)') + '</code> in <code>' + B.escapeHtml(batch.batch_id) + '</code>. Pick one below.';
+      const chartHost = document.getElementById('chart-host');
+      if (chartHost) {
+        const runs = (batch.runs || []).slice(0, 5);
+        chartHost.innerHTML = `
+          <div class="trace-fallback">
+            <h3>Did you mean one of these?</h3>
+            <p class="lede">The 5 nearest runs in this batch:</p>
+            <ul>${runs.map(r => `
+              <li><a href="./trace.html?batch=${encodeURIComponent(batch.batch_id)}&run=${encodeURIComponent(r.run_id)}">
+                <span>${B.escapeHtml(r.run_id)}</span>
+                <span class="persona">${r.persona ? B.escapeHtml(r.persona.name) : '—'} · ${B.escapeHtml(r.status)}</span>
+              </a></li>`).join('')}</ul>
+            <a class="back-link" href="./batch.html?id=${encodeURIComponent(batch.batch_id)}">← back to batch</a>
+          </div>`;
+      }
+      document.getElementById('rail').innerHTML = B.lineageRailHtml(batch, null);
+      return;
+    }
+
+    document.title = 'Trace · ' + run.run_id + ' — ' + batch.name;
+    const crumbBatch = document.getElementById('crumb-batch');
+    crumbBatch.href = './batch.html?id=' + encodeURIComponent(batch.batch_id);
+    crumbBatch.textContent = batch.batch_id;
+    document.getElementById('crumb-run').textContent = run.run_id;
+
+    document.getElementById('head-eyebrow').textContent = 'Trace · ' + run.run_id;
+    document.getElementById('head-title').innerHTML = '“' + B.escapeHtml(run.question) + '”';
+    const personaLabel = run.persona ? B.escapeHtml(run.persona.name) + ' (' + run.persona.id + ' v' + (run.persona.version || 1) + ')' : '—';
+    document.getElementById('head-subtitle').innerHTML =
+      'Persona <b>' + personaLabel + '</b> · status <b>' + B.escapeHtml(run.status) + '</b> · ' +
+      (run.duration_ms / 1000).toFixed(2) + 's · ' +
+      (run.tokens_total ? '~' + run.tokens_total + ' tokens · ' : '') +
+      (run.turn ? 'turn ' + run.turn + ' · ' : '') +
+      'session.id <b>' + B.escapeHtml(run.session_id) + '</b>' +
+      (run.trail_class ? ' · <span class="trail-tag" data-cat="' + run.trail_class.split('.')[0].replace('_coordination', 'planning') + '">' + B.escapeHtml(run.trail_class) + '</span>' : '');
+
+    const spans = run.spans || [];
+    const evalCount = spans.filter(s => s.kind === 'EVALUATOR').length;
+    document.getElementById('head-pills').innerHTML = `
+      <span class="pill pill--accent"><b>${spans.length}</b> spans</span>
+      <span class="pill"><b>${evalCount}</b> EVALUATOR</span>
+      <span class="pill">trace_id <b>${run.trace_id}</b></span>
+      <span class="pill">batch_id <b>${batch.batch_id}</b></span>
+    `;
+
+    // ---- span chart ----
+    document.getElementById('chart-host').innerHTML = B.renderSpanTree(spans, { w: 880 });
+
+    // legend
+    const usedKinds = Array.from(new Set(spans.map(s => s.kind)));
+    document.getElementById('legend').innerHTML = usedKinds.map(k => `
+      <span><span class="swatch" style="background: var(--span-${k});"></span>${B.SPAN_KIND_LABELS[k] || k}</span>
+    `).join('') + (evalCount > 0 ? '<span style="margin-left:auto;color:rgba(235,235,235,0.55);">EVALUATOR spans are bordered green; numbers in the bar are <code style="color:#fff;background:transparent;border:0;">evaluator.score</code></span>' : '');
+
+    // span click handler
+    document.getElementById('chart-host').addEventListener('click', (e) => {
+      const g = e.target.closest('g.span-row');
+      if (!g) return;
+      const id = g.getAttribute('data-id');
+      const span = spans.find(s => s.id === id);
+      if (!span) return;
+      const detail = document.getElementById('span-detail');
+      detail.classList.remove('span-attrs__empty');
+      detail.innerHTML = `
+        <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;">
+          <span class="span-chip" data-kind="${span.kind}">${B.SPAN_KIND_LABELS[span.kind] || span.kind}</span>
+          <span style="font-family:var(--font-display);font-weight:600;">${B.escapeHtml(span.name)}</span>
+          <span style="margin-left:auto;font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);">${span.start_ms}ms → ${span.start_ms + span.duration_ms}ms · Δ${span.duration_ms}ms</span>
+        </div>
+        ${B.spanAttrsHtml(span)}
+      `;
+    });
+
+    // ---- verdicts ----
+    document.getElementById('verdict-rows').innerHTML = (run.verdicts || []).map(v => `
+      <div class="verdict-row">
+        <div class="name">${B.escapeHtml(v.judge)}</div>
+        <div class="score">${v.score.toFixed(3)}</div>
+        <div class="threshold">≥ ${v.threshold.toFixed(2)}</div>
+        <div class="pass" data-pass="${v.pass}">${v.pass ? '✓ pass' : '✗ fail'}</div>
+      </div>
+    `).join('') || '<div class="verdict-row"><div style="color:var(--text-faint);grid-column:1/-1;text-align:center;font-family:var(--font-mono);">No inline verdicts captured for this run.</div></div>';
+
+    // ---- root-cause callout ----
+    const failingVerdicts = (run.verdicts || []).filter(v => !v.pass);
+    if (failingVerdicts.length > 0) {
+      const nonEvalSpans = spans.filter(s => s.kind !== 'EVALUATOR');
+      const rootCause = nonEvalSpans.length
+        ? nonEvalSpans.reduce((max, s) => s.duration_ms > max.duration_ms ? s : max, nonEvalSpans[0])
+        : null;
+      if (rootCause) {
+        const judgeNames = failingVerdicts.map(v => v.judge).join(', ');
+        document.getElementById('root-cause-host').innerHTML = `
+          <div class="cause-callout">
+            <div class="cause-icon">⚠</div>
+            <div class="cause-body">
+              <div class="cause-title">Root-cause attribution · ${B.escapeHtml(judgeNames)} failed</div>
+              <div class="cause-detail">
+                Highest-duration upstream span: <b>${B.escapeHtml(rootCause.name)}</b>
+                <span class="span-chip" data-kind="${B.escapeHtml(rootCause.kind)}" style="margin-left:6px;">${B.SPAN_KIND_LABELS[rootCause.kind] || rootCause.kind}</span>
+                · ${rootCause.duration_ms}ms · span_id ${B.escapeHtml(rootCause.id)}
+              </div>
+            </div>
+            <a class="cause-link" href="./datasets.html?from_batch=${encodeURIComponent(batch.batch_id)}&from_run=${encodeURIComponent(run.run_id)}">promote to dataset →</a>
+          </div>`;
+      }
+    }
+
+    // ---- session linkage (multi-turn) ----
+    const siblings = B.getSiblingTurns(batch.batch_id, run.session_id, run.run_id);
+    if (siblings.length > 0) {
+      const allTurns = [...siblings, run].sort((a, b) => (a.turn || 0) - (b.turn || 0));
+      document.getElementById('session-host').innerHTML = `
+        <div class="section-head">
+          <h2><em>Session</em> — multi-turn</h2>
+          <div class="actions">
+            <span style="color:var(--text-faint);">${allTurns.length} traces · same <code>session.id</code></span>
+          </div>
+        </div>
+        <div class="session-strip">
+          <span style="font-weight:600;color:var(--text);">session.id ${B.escapeHtml(run.session_id)}</span>
+          ${allTurns.map(t => {
+            const cls = t.run_id === run.run_id ? ' is-active' : '';
+            const label = (t.turn ? 'turn ' + t.turn : t.run_id);
+            return `<a class="${cls.trim()}" href="./trace.html?batch=${B.escapeHtml(batch.batch_id)}&run=${B.escapeHtml(t.run_id)}">${B.escapeHtml(label)} · ${B.escapeHtml(t.status)}</a>`;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // ---- lineage rail ----
+    document.getElementById('rail').innerHTML = B.lineageRailHtml(batch, run);
+  })();
+</script>
+
+</body>
+</html>

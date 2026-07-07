@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Settings · Team administration — Enterprise Eval Observability</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="_chrome.js"></script>
+</head>
+<body>
+
+<main class="wrap">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Settings · Team administration</p>
+    <h1>Teams &amp; access <span class="qualifier">— who can see which artifacts</span></h1>
+    <p class="subtitle">
+      Every artifact — personas, question sets, runs, verdicts, evidence packs — is created in a
+      <b>Sandbox</b> (private to its creator) or inside a <b>team</b> (shared with that team only).
+      Registering teams and onboarding members is limited to the workspace admin.
+    </p>
+  </section>
+
+  <!-- ── Admin gate banner ─────────────────────────────────────────────── -->
+  <div class="banner banner--admin">
+    <span class="banner__icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8 13 4v3.4c0 3.2-2.1 5.6-5 6.8-2.9-1.2-5-3.6-5-6.8V4l5-2.2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.8 8 7.3 9.5 10.4 6.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <span class="banner__body">
+      <b>You're the workspace admin.</b> Team registration and member onboarding are admin-only.
+      Members can create and switch between the teams they belong to, but only an admin can register a new team or invite people into one.
+    </span>
+    <span class="chip chip--ok">admin access</span>
+  </div>
+
+  <div class="grid-2 settings-grid">
+
+    <!-- Left column · admin actions -->
+    <div class="col">
+
+      <form class="card" id="registerTeamForm" novalidate>
+        <div class="card__head">
+          <h2 class="card__title">Register a team</h2>
+          <span class="card__link">admin only</span>
+        </div>
+        <div class="form">
+          <label class="field">
+            <span class="field__label">Team name</span>
+            <input class="input" name="teamName" type="text" placeholder="e.g. Payments Risk" required />
+          </label>
+          <label class="field">
+            <span class="field__label">Purpose <span class="field__opt">optional</span></span>
+            <textarea class="input textarea" name="teamPurpose" rows="2" placeholder="What this team evaluates — visible to members."></textarea>
+          </label>
+          <div class="form-row">
+            <label class="field">
+              <span class="field__label">Team admin</span>
+              <span class="select">
+                <select name="teamAdmin">
+                  <option>Alex Rivera (you)</option>
+                  <option>Marcus Bell</option>
+                  <option>Dana Cole</option>
+                </select>
+              </span>
+            </label>
+            <label class="field">
+              <span class="field__label">Default visibility</span>
+              <span class="select">
+                <select name="teamVisibility">
+                  <option>Team-only (recommended)</option>
+                  <option>Tenant-wide</option>
+                </select>
+              </span>
+            </label>
+          </div>
+          <p class="hint">New teams start empty. Artifacts created while the team is active are visible to its members only.</p>
+          <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Register team</button>
+            <span class="form-note" id="registerNote" hidden>Team registered · now available in the workspace switcher.</span>
+          </div>
+        </div>
+      </form>
+
+      <form class="card" id="onboardForm" novalidate>
+        <div class="card__head">
+          <h2 class="card__title">Onboard a member</h2>
+          <span class="card__link">admin only</span>
+        </div>
+        <div class="form">
+          <label class="field">
+            <span class="field__label">Work email</span>
+            <input class="input" name="email" type="email" placeholder="name@acme-corp.com" required />
+          </label>
+          <div class="form-row">
+            <label class="field">
+              <span class="field__label">Add to team</span>
+              <span class="select">
+                <select name="team" id="onboardTeam">
+                  <option value="trust-safety">Trust &amp; Safety</option>
+                  <option value="finance-copilot">Finance Copilot</option>
+                  <option value="support-platform">Support Platform</option>
+                </select>
+              </span>
+            </label>
+            <label class="field">
+              <span class="field__label">Role</span>
+              <span class="select">
+                <select name="role">
+                  <option>Member</option>
+                  <option>Team admin</option>
+                  <option>Viewer</option>
+                </select>
+              </span>
+            </label>
+          </div>
+          <p class="hint">The invitee gets access to that team's artifacts across all five stages once they accept.</p>
+          <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Send invite</button>
+            <span class="form-note" id="onboardNote" hidden>Invite sent · pending acceptance.</span>
+          </div>
+        </div>
+      </form>
+
+    </div>
+
+    <!-- Right column · state -->
+    <div class="col">
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Workspace admin</h2>
+          <span class="card__link">in charge of registration</span>
+        </div>
+        <div class="admin-card">
+          <span class="admin-card__avatar" aria-hidden="true">AR</span>
+          <div class="admin-card__meta">
+            <p class="admin-card__name">Alex Rivera <span class="chip chip--ok">admin</span></p>
+            <p class="admin-card__sub">Workspace Admin · acme-corp · alex.rivera@acme-corp.com</p>
+            <p class="admin-card__note">Sole role permitted to register teams and onboard members.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Registered teams</h2>
+          <span class="card__link" id="teamsCount">3 teams</span>
+        </div>
+        <table class="ltable">
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th class="num">Members</th>
+              <th class="hide-sm">Registered by</th>
+              <th>Visibility</th>
+            </tr>
+          </thead>
+          <tbody id="teamsBody">
+            <tr>
+              <td class="flow">Trust &amp; Safety</td>
+              <td class="num">8</td>
+              <td class="hide-sm mono">A. Rivera</td>
+              <td><span class="chip chip--idle">team-only</span></td>
+            </tr>
+            <tr>
+              <td class="flow">Finance Copilot</td>
+              <td class="num">5</td>
+              <td class="hide-sm mono">A. Rivera</td>
+              <td><span class="chip chip--idle">team-only</span></td>
+            </tr>
+            <tr>
+              <td class="flow">Support Platform</td>
+              <td class="num">12</td>
+              <td class="hide-sm mono">A. Rivera</td>
+              <td><span class="chip chip--idle">team-only</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">Pending invites</h2>
+          <span class="card__link" id="invitesCount">2 pending</span>
+        </div>
+        <table class="ltable">
+          <tbody id="invitesBody">
+            <tr>
+              <td class="flow">priya.nair@acme-corp.com</td>
+              <td class="hide-sm mono">Trust &amp; Safety</td>
+              <td><span class="chip chip--run">invited</span></td>
+            </tr>
+            <tr>
+              <td class="flow">sam.okoye@acme-corp.com</td>
+              <td class="hide-sm mono">Support Platform</td>
+              <td><span class="chip chip--run">invited</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+  // Demo-only interactivity — no backend. Registering a team appends a row and a
+  // toast; onboarding shows a pending invite. Purely to make the mock legible.
+  (function () {
+    var TEAM_LABELS = { 'trust-safety': 'Trust & Safety', 'finance-copilot': 'Finance Copilot', 'support-platform': 'Support Platform' };
+
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+    function flash(el) { if (!el) return; el.hidden = false; setTimeout(function () { el.hidden = true; }, 2600); }
+
+    var reg = document.getElementById('registerTeamForm');
+    if (reg) reg.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = (reg.teamName.value || '').trim();
+      if (!name) { reg.teamName.focus(); return; }
+      var body = document.getElementById('teamsBody');
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td class="flow">' + esc(name) + '</td><td class="num">1</td>' +
+        '<td class="hide-sm mono">A. Rivera</td><td><span class="chip chip--idle">team-only</span></td>';
+      body.appendChild(tr);
+      var cnt = document.getElementById('teamsCount');
+      if (cnt) cnt.textContent = body.querySelectorAll('tr').length + ' teams';
+      flash(document.getElementById('registerNote'));
+      reg.reset();
+    });
+
+    var onb = document.getElementById('onboardForm');
+    if (onb) onb.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = (onb.email.value || '').trim();
+      if (!email) { onb.email.focus(); return; }
+      var teamId = onb.team.value;
+      var body = document.getElementById('invitesBody');
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td class="flow">' + esc(email) + '</td>' +
+        '<td class="hide-sm mono">' + esc(TEAM_LABELS[teamId] || teamId) + '</td>' +
+        '<td><span class="chip chip--run">invited</span></td>';
+      body.appendChild(tr);
+      var cnt = document.getElementById('invitesCount');
+      if (cnt) cnt.textContent = body.querySelectorAll('tr').length + ' pending';
+      flash(document.getElementById('onboardNote'));
+      onb.reset();
+    });
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark">
+<title>Simulation — Palette · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>/* aibc-theme-toggle: applied */
+
+  /* =========================================================
+     Simulation — Unified AIBuilderCore design tokens
+     Theme: deepeval-inspired, violet accent on warm cream
+     ========================================================= */
+  :root {
+    --bg: #f9f8f5;
+    --surface: #ffffff;
+    --surface-alt: #f2f0ed;
+    --surface-soft: #eeece8;
+    --text: #171717;
+    --text-muted: #5a5a5a;
+    --text-faint: #858585;
+    --border: rgba(176, 168, 155, 0.45);
+    --border-strong: rgba(176, 168, 155, 0.70);
+    --accent: #7c3aed;
+    --accent-hover: #6d28d9;
+    --accent-soft: #ede9fe;
+    --shadow: rgba(23, 23, 23, 0.06);
+    --code-bg: #1a1a1a;
+    --code-text: #ebebeb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121212;
+      --surface: #1a1a1a;
+      --surface-alt: #212121;
+      --surface-soft: #292929;
+      --text: #ebebeb;
+      --text-muted: #b3b3b3;
+      --text-faint: #858585;
+      --border: rgba(102, 102, 102, 0.25);
+      --border-strong: rgba(102, 102, 102, 0.45);
+      --accent: #a78bfa;
+      --accent-hover: #c4b5fd;
+      --accent-soft: rgba(167, 139, 250, 0.12);
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+  }
+:root[data-theme="dark"] {
+      --bg: #121212;
+      --surface: #1a1a1a;
+      --surface-alt: #212121;
+      --surface-soft: #292929;
+      --text: #ebebeb;
+      --text-muted: #b3b3b3;
+      --text-faint: #858585;
+      --border: rgba(102, 102, 102, 0.25);
+      --border-strong: rgba(102, 102, 102, 0.45);
+      --accent: #a78bfa;
+      --accent-hover: #c4b5fd;
+      --accent-soft: rgba(167, 139, 250, 0.12);
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+
+
+  
+* { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Geist', 'Inter', -apple-system, sans-serif;
+    font-size: 16px; line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--accent-soft); color: var(--accent); }
+
+  .frame { max-width: 1240px; margin: 0 auto; padding: 0 40px; }
+
+  /* Back header */
+  .mock-back {
+    position: sticky; top: 0; z-index: 30;
+    height: 56px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+  }
+  .mock-back__link {
+    font-family: 'Space Grotesk', 'Geist', sans-serif;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0 40px;
+    display: inline-flex; align-items: center; gap: 10px;
+    transition: color 0.15s ease;
+  }
+  .mock-back__link:hover { color: var(--accent); }
+  .mock-back__arrow { font-size: 16px; line-height: 1; }
+
+  header.top { border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 56px; z-index: 20; }
+  header.top .row { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { display: flex; align-items: baseline; gap: 14px; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); transform: translateY(4px); }
+  .brand-text { font-family: 'Space Grotesk', 'Geist', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .brand-text em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .product-name { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); }
+  .product-name b { color: var(--text); font-weight: 500; }
+  .product-name a { color: inherit; text-decoration: none; transition: color 0.15s ease; }
+  .product-name a:hover { color: var(--accent); }
+
+  .page-head { padding: 20px 0 18px; max-width: 100%; }
+  .page-head .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 12px;
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .page-head .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .page-head h1 {
+    font-family: 'Space Grotesk', 'Geist', sans-serif;
+    font-size: clamp(24px, 2.6vw, 32px);
+    font-weight: 700; letter-spacing: -0.025em; line-height: 1.2;
+    margin: 0 0 0.6rem 0; color: var(--text);
+  }
+  .page-head h1 .qualifier { color: var(--text-muted); font-weight: 500; }
+  .page-head p.subtitle {
+    font-family: 'Geist', 'Inter', -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.65;
+    color: var(--text-muted); margin: 0; max-width: 60ch;
+  }
+  .page-head .meta-pills {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1rem;
+  }
+  .page-head .meta-pills .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface-alt); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.25rem 0.75rem;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; letter-spacing: 0.04em; color: var(--text-muted);
+  }
+  .page-head .meta-pills .pill b { color: var(--text); font-weight: 600; }
+  .page-head .meta-pills .pill--accent {
+    background: var(--accent-soft); border-color: transparent; color: var(--accent);
+  }
+  .page-head .meta-pills .pill--accent b { color: var(--accent); }
+
+  .hero { padding: 96px 0 24px; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: end; }
+  .eyebrow { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; display: inline-flex; align-items: center; gap: 10px; }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); animation: blink 1.6s infinite; }
+  @keyframes blink { 0%, 50% { opacity: 1; } 60%, 100% { opacity: 0.4; } }
+
+  h1.title {
+    font-family: 'Space Grotesk', 'Geist', sans-serif; font-weight: 600;
+    font-size: clamp(48px, 7vw, 96px); line-height: 1.0; letter-spacing: -0.025em; margin: 0; color: var(--text);
+  }
+  h1.title em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .lede { font-family: 'Geist', 'Inter', -apple-system, sans-serif; font-weight: 400; font-size: 18px; line-height: 1.7; color: var(--text-muted); max-width: 50ch; }
+  .meta-strip { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border); padding-top: 18px; margin-top: 18px; }
+  .meta-strip .row { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--text-muted); letter-spacing: 0.04em; }
+  .meta-strip .row b { color: var(--text); font-weight: 500; }
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 80px 0 8px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .section-head h2 { font-family: 'Space Grotesk', 'Geist', sans-serif; font-weight: 600; font-size: 32px; letter-spacing: -0.02em; margin: 0; color: var(--text); }
+  .section-head h2 em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .section-head .num { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.18em; color: var(--text-muted); text-transform: uppercase; }
+  .section-lede { font-family: 'Geist', 'Inter', -apple-system, sans-serif; font-size: 17px; color: var(--text-muted); max-width: 60ch; margin: 18px 0 0; line-height: 1.7; }
+
+  /* Swatch wall — unified token swatches */
+  .swatch-wall { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 32px 0 0; }
+  .swatch {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .swatch .chip { height: 120px; background: var(--sw-bg); border-bottom: 1px solid var(--border); }
+  .swatch .body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .swatch .name { font-family: 'Space Grotesk', 'Geist', sans-serif; font-weight: 600; font-size: 18px; color: var(--text); letter-spacing: -0.01em; }
+  .swatch .tokens { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .swatch.s1 { --sw-bg: var(--accent); }
+  .swatch.s2 { --sw-bg: var(--accent-hover); }
+  .swatch.s3 { --sw-bg: var(--accent-soft); }
+  .swatch.s4 { --sw-bg: var(--surface-alt); }
+  .swatch.s5 { --sw-bg: var(--bg); }
+  .swatch.s6 { --sw-bg: var(--surface); }
+  .swatch.s7 { --sw-bg: var(--text); }
+  .swatch.s8 { --sw-bg: var(--text-muted); }
+
+  /* type specimens */
+  .specimen {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    padding: 40px 40px 32px;
+    margin-top: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .specimen::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 3px; background: var(--accent); }
+  .specimen .meta { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); display: flex; gap: 18px; margin-bottom: 18px; flex-wrap: wrap; }
+  .specimen .meta b { color: var(--accent); font-weight: 600; }
+  .specimen .display { font-family: 'Space Grotesk', 'Geist', sans-serif; font-weight: 600; font-size: clamp(48px, 7vw, 96px); line-height: 1.05; letter-spacing: -0.025em; color: var(--text); }
+  .specimen .display em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .specimen .pangram { font-family: 'Geist', 'Inter', -apple-system, sans-serif; font-weight: 400; font-size: 17px; line-height: 1.7; color: var(--text-muted); margin-top: 14px; max-width: 60ch; }
+  .specimen.body .display { font-family: 'Geist', 'Inter', -apple-system, sans-serif; font-weight: 600; font-size: clamp(40px, 5.5vw, 72px); letter-spacing: -0.02em; }
+  .specimen.mono .display { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 500; font-size: clamp(28px, 4.5vw, 56px); letter-spacing: -0.01em; }
+  .specimen.mono .pangram { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.7; }
+
+  /* runtime panel mock — code-block dark surface */
+  .runtime {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 20px;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow: hidden;
+    position: relative;
+  }
+  .runtime .row { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+  .runtime .row + .row { margin-top: 4px; }
+  .runtime .ts { color: #858585; }
+  .runtime .ok { color: #a78bfa; }
+  .runtime .info { color: #ebebeb; }
+  .runtime .warn { color: #c4b5fd; }
+  .runtime .dim { opacity: 0.55; }
+
+  .gauges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+  .gauge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    padding: 18px;
+    position: relative;
+  }
+  .gauge .label { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
+  .gauge .value { font-family: 'Space Grotesk', 'Geist', sans-serif; font-weight: 600; font-size: 32px; color: var(--text); line-height: 1; margin: 8px 0 4px; letter-spacing: -0.02em; }
+  .gauge .value em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .gauge .delta { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: var(--accent); }
+  .gauge .bar { margin-top: 12px; height: 4px; border-radius: 999px; background: var(--surface-alt); overflow: hidden; }
+  .gauge .bar i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+
+  .components-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
+  .demo-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    padding: 22px;
+  }
+  .demo-card h4 { font-family: 'Space Grotesk', 'Geist', sans-serif; font-weight: 600; font-size: 18px; margin: 0 0 8px; color: var(--text); letter-spacing: -0.01em; }
+  .demo-card h4 em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .demo-card p { color: var(--text-muted); font-size: 14px; margin: 8px 0 0; line-height: 1.6; }
+
+  /* Buttons / inputs / pills shared specs */
+  .btn-primary {
+    font-family: 'Space Grotesk', 'Geist', sans-serif;
+    font-weight: 600; font-size: 14px;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    border: 0;
+    background: var(--accent); color: white;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary {
+    font-family: 'Space Grotesk', 'Geist', sans-serif;
+    font-weight: 600; font-size: 14px;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent; color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .pill-demo {
+    display: inline-block;
+    font-family: 'Space Grotesk', 'Geist', sans-serif;
+    font-size: 12px; font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+
+  .input-demo {
+    font-family: 'Geist', 'Inter', -apple-system, sans-serif;
+    font-size: 14px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.8rem;
+    width: 100%;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input-demo:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .chip-demo {
+    display: inline-block;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    background: var(--surface-alt);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.25rem 0.55rem;
+  }
+
+  .token-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 18px;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: var(--surface);
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .token-table th, .token-table td { text-align: left; padding: 0.75rem 1rem; vertical-align: middle; }
+  .token-table th { font-family: 'Space Grotesk', 'Geist', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); background: var(--surface-alt); }
+  .token-table tbody tr td { border-top: 1px solid var(--border); color: var(--text); }
+  .token-table tbody tr td:nth-child(2), .token-table tbody tr td:nth-child(3) { color: var(--text-muted); }
+  .token-table td .dot { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; margin-right: 8px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06); }
+
+  footer.foot { margin: 96px 0 48px; padding-top: 26px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: baseline; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--text-muted); letter-spacing: 0.04em; }
+  footer.foot a { color: var(--text-muted); }
+  footer.foot a:hover { color: var(--accent); }
+
+  @media (max-width: 880px) {
+    .hero { grid-template-columns: 1fr; padding: 56px 0 16px; }
+    .swatch-wall { grid-template-columns: 1fr 1fr; }
+    .gauges { grid-template-columns: 1fr 1fr; }
+    .components-grid { grid-template-columns: 1fr; }
+  }
+</style>
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Simulation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>03 · Simulation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Design tokens · Simulation</p>
+    <h1>Simulation Palette <span class="qualifier">— unified house style</span></h1>
+    <p class="subtitle">
+      The same AIBuilderCore tokens applied to the Simulation surface. Violet on warm cream — Space Grotesk for headlines, Geist for tables of runs, JetBrains Mono for the trace stream. Light is default; dark switches automatically on system preference.
+    </p>
+    <div class="meta-pills">
+      <span class="pill pill--accent"><b>--accent</b> #7c3aed</span>
+      <span class="pill"><b>--bg</b> #f9f8f5</span>
+      <span class="pill">Space Grotesk</span>
+      <span class="pill">Geist</span>
+      <span class="pill">JetBrains Mono</span>
+    </div>
+  </section>
+
+  <div class="section-head">
+    <h2><em>Colour</em>.</h2>
+    <span class="num">01 · runtime</span>
+  </div>
+  <p class="section-lede">Violet as the call-to-action and the running-state indicator. A soft violet wash carries pills, focus rings, and informational accents. The cream surfaces hold forms and tables; dark mode swaps to a charcoal stack on the same scale.</p>
+
+  <div class="swatch-wall">
+    <div class="swatch s1"><div class="chip"></div><div class="body"><div class="name">Accent</div><div class="tokens">--accent<br/>#7c3aed · CTA, focus</div></div></div>
+    <div class="swatch s2"><div class="chip"></div><div class="body"><div class="name">Accent hover</div><div class="tokens">--accent-hover<br/>#6d28d9</div></div></div>
+    <div class="swatch s3"><div class="chip"></div><div class="body"><div class="name">Accent soft</div><div class="tokens">--accent-soft<br/>#ede9fe · pills, ring</div></div></div>
+    <div class="swatch s4"><div class="chip"></div><div class="body"><div class="name">Surface alt</div><div class="tokens">--surface-alt<br/>#f2f0ed · tables, code</div></div></div>
+    <div class="swatch s5"><div class="chip"></div><div class="body"><div class="name">Background</div><div class="tokens">--bg<br/>#f9f8f5 · page</div></div></div>
+    <div class="swatch s6"><div class="chip"></div><div class="body"><div class="name">Surface</div><div class="tokens">--surface<br/>#ffffff · cards</div></div></div>
+    <div class="swatch s7"><div class="chip"></div><div class="body"><div class="name">Text</div><div class="tokens">--text<br/>#171717</div></div></div>
+    <div class="swatch s8"><div class="chip"></div><div class="body"><div class="name">Text muted</div><div class="tokens">--text-muted<br/>#5a5a5a</div></div></div>
+  </div>
+
+  <div class="section-head">
+    <h2><em>Typography</em>.</h2>
+    <span class="num">02 · display · body · mono</span>
+  </div>
+  <p class="section-lede">Space Grotesk for the headlines that announce a run; Geist for the operational body — adapter names, target IDs, run-set tables; JetBrains Mono for the trace stream that scrolls beneath every run in progress.</p>
+
+  <section class="specimen">
+    <div class="meta"><span>Aa — <b>Space Grotesk</b></span><span>500 / 600 / 700</span><span>display</span></div>
+    <div class="display">Run #4912, <em>complete</em>.</div>
+    <p class="pangram">A run is the act of taking a generated question-set, pushing it through the target adapter, capturing every turn, and writing the resulting RunTrace to the simulation index. Every run has an ID; every ID is a citation a judge can hang a verdict on.</p>
+  </section>
+
+  <section class="specimen body">
+    <div class="meta"><span>Aa — <b>Geist</b></span><span>400 / 500 / 600 / 700</span><span>body — tables, adapters</span></div>
+    <div class="display">Operational, by default.</div>
+    <p class="pangram">Geist carries the operational language of this product: adapter manifests, target IDs, latency tables, retry metadata. It's clear and characterful without becoming decorative — exactly the register a runner needs when the user is staring at six concurrent runs.</p>
+  </section>
+
+  <section class="specimen mono">
+    <div class="meta"><span>Aa — <b>JetBrains Mono</b></span><span>400 / 500</span><span>trace stream</span></div>
+    <div class="display">trace.span = "judge.score"</div>
+    <p class="pangram">[2026-04-28 14:32:01.241] runner.dispatch persona=persona_olivia question=q_4811 turn=1<br/>[2026-04-28 14:32:01.244] target.adapter=agent_factory.http req_id=ab9c-…<br/>[2026-04-28 14:32:02.601] target.response status=200 latency_ms=1357<br/>[2026-04-28 14:32:02.602] runner.capture trace_id=run_4912 turns=1</p>
+  </section>
+
+  <div class="section-head">
+    <h2><em>Runtime panel</em>.</h2>
+    <span class="num">03 · live trace</span>
+  </div>
+  <p class="section-lede">A dark code-surface panel hosts the live trace stream while a run is in flight. It uses the shared --code-bg / --code-text tokens, so it reads the same in light and dark themes — the only deliberately dark island on the page.</p>
+
+  <div class="runtime">
+    <div class="row"><span class="ts">14:32:01.241</span><span><span class="ok">runner.dispatch</span> <span class="dim">persona=</span>persona_olivia <span class="dim">question=</span>q_4811 <span class="dim">turn=</span>1</span></div>
+    <div class="row"><span class="ts">14:32:01.244</span><span><span class="info">target.adapter</span>=agent_factory.http <span class="dim">req_id=</span>ab9c-2e84-…</span></div>
+    <div class="row"><span class="ts">14:32:02.601</span><span><span class="ok">target.response</span> <span class="dim">status=</span>200 <span class="dim">latency_ms=</span>1357</span></div>
+    <div class="row"><span class="ts">14:32:02.602</span><span><span class="info">runner.capture</span> <span class="dim">trace_id=</span>run_4912 <span class="dim">turns=</span>1</span></div>
+    <div class="row"><span class="ts">14:32:02.611</span><span><span class="warn">runner.retry</span> <span class="dim">reason=</span>tool_call_truncated <span class="dim">attempt=</span>1/3</span></div>
+    <div class="row"><span class="ts">14:32:03.940</span><span><span class="ok">runner.complete</span> <span class="dim">trace_id=</span>run_4912 <span class="dim">turns=</span>2 <span class="dim">elapsed=</span>2.7s</span></div>
+  </div>
+
+  <div class="gauges">
+    <div class="gauge"><div class="label">runs · last 1h</div><div class="value">412</div><div class="delta">▲ 18 vs prev hr</div><div class="bar"><i style="width:78%"></i></div></div>
+    <div class="gauge"><div class="label">p50 · turns</div><div class="value">3.4</div><div class="delta">▼ 0.2 vs target</div><div class="bar"><i style="width:54%"></i></div></div>
+    <div class="gauge"><div class="label">retries</div><div class="value">2.1<em>%</em></div><div class="delta">▲ 0.4 vs baseline</div><div class="bar"><i style="width:24%"></i></div></div>
+    <div class="gauge"><div class="label">p95 · latency</div><div class="value">1.9<em>s</em></div><div class="delta">— flat vs target</div><div class="bar"><i style="width:62%"></i></div></div>
+  </div>
+
+  <div class="section-head">
+    <h2><em>Components</em>.</h2>
+    <span class="num">04 · the kit</span>
+  </div>
+  <div class="components-grid">
+    <div class="demo-card">
+      <h4><em>Buttons</em></h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;">
+        <button class="btn-primary">▶ Start run</button>
+        <button class="btn-secondary">Stop</button>
+      </div>
+      <p>8px radii. Primary uses --accent; secondary is a transparent button with a --border outline that picks up the accent on hover.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>State pills</em></h4>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px;">
+        <span class="pill-demo">● running</span>
+        <span class="pill-demo">complete</span>
+        <span class="pill-demo">queued</span>
+      </div>
+      <p>Pills use --accent-soft on --accent. 999px radius, Space Grotesk 600, 12px.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Inputs</em></h4>
+      <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0 6px;">
+        <input class="input-demo" placeholder="run id · e.g. run_4912"/>
+        <input class="input-demo" placeholder="adapter · agent_factory.http"/>
+      </div>
+      <p>Focus pulls --accent on the border with a 3px --accent-soft ring.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Adapter chip</em></h4>
+      <div style="display:flex;gap:6px;margin:10px 0 6px;flex-wrap:wrap;">
+        <span class="chip-demo">agent_factory.http</span>
+        <span class="chip-demo">local.python</span>
+      </div>
+      <p>Mono code-style chips: --surface-alt fill, --border outline, 5px radius, JetBrains Mono.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Card</em></h4>
+      <div style="margin:10px 0 6px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 3px var(--shadow);">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:var(--text);">RunTrace · run_4912</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);margin-top:4px;">2 turns · 1.4s · complete</div>
+      </div>
+      <p>--surface fill, --border, 12px radius, --shadow drop. The default card surface across the kit.</p>
+    </div>
+    <div class="demo-card">
+      <h4><em>Code</em></h4>
+      <div style="margin:10px 0 6px;">
+        <code style="display:inline-block;background:var(--surface-alt);border:1px solid var(--border);border-radius:5px;padding:0.2rem 0.4rem;font-family:'JetBrains Mono',monospace;font-size:0.88em;color:var(--text);">RunTrace[]</code>
+      </div>
+      <p>Inline code on --surface-alt with a --border outline at 5px radius. JetBrains Mono at 0.88em.</p>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2><em>Token reference</em>.</h2>
+    <span class="num">05 · the contract</span>
+  </div>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Value</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot" style="background:#f9f8f5;"></span>--bg</td><td>#f9f8f5</td><td>page background</td></tr>
+      <tr><td><span class="dot" style="background:#ffffff;"></span>--surface</td><td>#ffffff</td><td>cards, tables</td></tr>
+      <tr><td><span class="dot" style="background:#f2f0ed;"></span>--surface-alt</td><td>#f2f0ed</td><td>subnav, code, table headers</td></tr>
+      <tr><td><span class="dot" style="background:#eeece8;"></span>--surface-soft</td><td>#eeece8</td><td>resting backgrounds, secondary fills</td></tr>
+      <tr><td><span class="dot" style="background:#171717;"></span>--text</td><td>#171717</td><td>primary text</td></tr>
+      <tr><td><span class="dot" style="background:#5a5a5a;"></span>--text-muted</td><td>#5a5a5a</td><td>secondary copy, captions</td></tr>
+      <tr><td><span class="dot" style="background:#858585;"></span>--text-faint</td><td>#858585</td><td>timestamps, separators</td></tr>
+      <tr><td><span class="dot" style="background:rgba(176,168,155,0.45);"></span>--border</td><td>rgba(176,168,155,0.45)</td><td>card outlines, dividers</td></tr>
+      <tr><td><span class="dot" style="background:rgba(176,168,155,0.70);"></span>--border-strong</td><td>rgba(176,168,155,0.70)</td><td>emphasis dividers</td></tr>
+      <tr><td><span class="dot" style="background:#7c3aed;"></span>--accent</td><td>#7c3aed</td><td>violet — primary CTA, focus, run state</td></tr>
+      <tr><td><span class="dot" style="background:#6d28d9;"></span>--accent-hover</td><td>#6d28d9</td><td>primary hover</td></tr>
+      <tr><td><span class="dot" style="background:#ede9fe;"></span>--accent-soft</td><td>#ede9fe</td><td>pills, focus ring, eyebrow halo</td></tr>
+      <tr><td><span class="dot" style="background:#1a1a1a;"></span>--code-bg</td><td>#1a1a1a</td><td>runtime panel, code block</td></tr>
+      <tr><td><span class="dot" style="background:#ebebeb;"></span>--code-text</td><td>#ebebeb</td><td>code on dark</td></tr>
+    </tbody>
+  </table>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / ui-mock / simulation / palette.html</span>
+    <span><a href="../index.html">← back to UI Mocks</a></span>
+  </footer>
+
+</main>
+
+</body>
+</html>

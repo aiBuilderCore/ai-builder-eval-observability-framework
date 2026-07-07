@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Evaluation — Jobs · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+<style>
+  /* Aggregate thumbnail — small inline mini-bar for the table cell */
+  .agg-mini {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-right: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+  }
+  .agg-mini-bar {
+    display: inline-block;
+    width: 36px; height: 4px;
+    background: var(--surface-alt);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .agg-mini-bar i {
+    display: block; height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .agg-mini.high .agg-mini-bar i { background: #2f7a5b; }
+  .agg-mini.mid  .agg-mini-bar i { background: #b8853a; }
+  .agg-mini.low  .agg-mini-bar i { background: #b04444; }
+  .agg-mini-num {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+  /* "Report" column — leadership-friendly executive summary */
+  .exec-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    text-decoration: none;
+    border: 1px solid var(--accent);
+    transition: background 120ms ease, color 120ms ease;
+    white-space: nowrap;
+  }
+  .exec-link:hover {
+    background: var(--accent);
+    color: var(--surface);
+  }
+  .exec-link__icon { font-size: 13px; line-height: 1; }
+  .exec-link--disabled {
+    color: var(--text-faint);
+    background: var(--surface-alt);
+    border: 1px dashed var(--border);
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Stage 04 · Verdicts</p>
+    <h1>Evaluation <span class="qualifier">— score every run with judges</span></h1>
+    <p class="subtitle">
+      Panels of judges score Simulation runs into versioned verdict sets for audit and reporting.
+    </p>
+    <div class="aibc-kpis">
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num" id="pill-total">0</span><span class="aibc-stat__label">jobs</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-active">0</span><span class="aibc-stat__label">in flight</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-review">0</span><span class="aibc-stat__label">awaiting review</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="pill-shipped">0</span><span class="aibc-stat__label">shipped</span></div>
+    </div>
+  </section>
+
+  <div class="filter-bar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search by job ID, submitter, run, judge, dimension…" />
+    </div>
+    <div id="state-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <a class="btn primary" href="./create.html">＋ New evaluation</a>
+    <a class="btn ghost" href="./catalog.html">Judge catalog →</a>
+    <span class="count"><b id="filter-count">0</b> shown</span>
+  </div>
+
+  <table class="jobs-table" aria-label="Evaluation jobs">
+    <thead>
+      <tr>
+        <th>Job ID</th>
+        <th>Created</th>
+        <th>State</th>
+        <th>Mode</th>
+        <th>Judges</th>
+        <th>Progress</th>
+        <th class="num">Aggregate</th>
+        <th>Report</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div id="empty" class="empty" style="display:none;margin-top:18px;">
+    <p style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;">No matches</p>
+    <h3>No jobs match that filter.</h3>
+    <p>Clear the search, pick another state, or <a href="./create.html" style="color:var(--accent);text-decoration:underline;">submit a new evaluation</a>.</p>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / evaluation / index.html · spec at <a href="../../../implementation-guides/enterprise-eval-observability-framework/evaluation/" style="color:var(--text-muted);text-decoration:underline;">implementation-guides</a></span>
+    <span><a href="#" id="reset-link">⟲ reset jobs to seed</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const state = { search: "", filterState: null };
+
+  function aggregateThumbnail(scores) {
+    if (!scores || Object.keys(scores).length === 0) return "—";
+    const parts = Object.entries(scores).slice(0, 2).map(([k, v]) => {
+      const cls = v >= 0.8 ? "high" : v >= 0.65 ? "mid" : "low";
+      return `<span class="agg-mini ${cls}" title="${k}: ${v}"><span class="agg-mini-bar"><i style="width:${Math.round(v*100)}%"></i></span><span class="agg-mini-num">${v.toFixed(2)}</span></span>`;
+    });
+    return parts.join(" ");
+  }
+
+  function judgeBadges(judgeIds) {
+    if (!judgeIds || judgeIds.length === 0) return "—";
+    const max = 2;
+    const shown = judgeIds.slice(0, max).map(id => {
+      const j = EV.judgeById(id);
+      const dim = j?.dimension ?? id;
+      return `<span style="font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.04em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:0.15rem 0.5rem;">${dim}</span>`;
+    });
+    if (judgeIds.length > max) {
+      shown.push(`<span style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);">+${judgeIds.length - max}</span>`);
+    }
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap;">${shown.join("")}</div>`;
+  }
+
+  function render() {
+    const all = EV.loadJobs();
+
+    const counts = {
+      total: all.length,
+      active: all.filter(j => ["queued", "running", "aggregating"].includes(j.state)).length,
+      review: all.filter(j => j.state === "ready_for_review").length,
+      shipped: all.filter(j => j.state === "shipped").length,
+    };
+    document.getElementById("pill-total").textContent = counts.total;
+    document.getElementById("pill-active").textContent = counts.active;
+    document.getElementById("pill-review").textContent = counts.review;
+    document.getElementById("pill-shipped").textContent = counts.shipped;
+
+    const pillHost = document.getElementById("state-pills");
+    pillHost.innerHTML = "";
+    const stateOptions = [
+      ["All", null],
+      ["In flight", "_active"],
+      ["Review", "ready_for_review"],
+      ["Shipped", "shipped"],
+      ["Failed", "failed"],
+    ];
+    stateOptions.forEach(([text, val]) => {
+      const isActive = state.filterState === val;
+      const el = document.createElement("button");
+      el.className = "pill" + (isActive ? " active" : "");
+      el.textContent = text;
+      el.onclick = () => { state.filterState = val; render(); };
+      pillHost.appendChild(el);
+    });
+
+    const q = state.search.trim().toLowerCase();
+    const filtered = all.filter(j => {
+      if (state.filterState === "_active") {
+        if (!["queued", "running", "aggregating"].includes(j.state)) return false;
+      } else if (state.filterState && j.state !== state.filterState) {
+        return false;
+      }
+      if (!q) return true;
+      const blob = [
+        j.job_id, j.created_by, j.completed_by ?? "",
+        ...(j.inputs.run_ids || []),
+        ...(j.inputs.judge_ids || []),
+        j.inputs.mode, j.inputs.panel_id ?? "",
+      ].join(" ").toLowerCase();
+      return blob.includes(q);
+    });
+    document.getElementById("filter-count").textContent = filtered.length;
+
+    const rows = document.getElementById("rows");
+    rows.innerHTML = "";
+    document.getElementById("empty").style.display = filtered.length === 0 ? "" : "none";
+
+    filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
+    filtered.forEach(j => {
+      const tr = document.createElement("tr");
+      tr.onclick = () => location.href = `./job.html?id=${encodeURIComponent(j.job_id)}`;
+
+      const pct = j.progress.cells_total ? Math.round(100 * j.progress.cells_done / j.progress.cells_total) : 0;
+      const progress = `${j.progress.cells_done} / ${j.progress.cells_total} cells`;
+      const bar = j.state === "failed" ? "" :
+        `<span class="progress-bar"><i style="width:${pct}%"></i></span>`;
+
+      const runList = (j.inputs.run_ids || []).join(" · ");
+      const idCell = `
+        <span class="id">${j.job_id}</span>
+        <span class="row-meta">${runList}${runList ? " · " : ""}${j.created_by}</span>
+      `;
+
+      const modePill = j.inputs.mode === "jury"
+        ? `<span style="display:inline-block;white-space:nowrap;font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.04em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:0.15rem 0.55rem;">${j.inputs.panel_id ?? "jury"}</span>`
+        : `<span style="display:inline-block;white-space:nowrap;font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.04em;text-transform:uppercase;background:var(--surface-alt);border:1px solid var(--border);color:var(--text-muted);border-radius:999px;padding:0.15rem 0.55rem;">judge</span>`;
+
+      const aggregate = j.output?.aggregate_scores ? aggregateThumbnail(j.output.aggregate_scores) : "—";
+      const reportCell = j.state === "shipped"
+        ? `<a class="exec-link" href="./executive-report.html?id=${encodeURIComponent(j.job_id)}" onclick="event.stopPropagation();" title="Open executive report — leadership-friendly summary of every judge, dimension, and recommendation"><span class="exec-link__icon" aria-hidden="true">📊</span> Open report</a>`
+        : `<span class="exec-link exec-link--disabled" title="Available once the verdict set has been shipped"><span class="exec-link__icon" aria-hidden="true">📊</span> Pending</span>`;
+
+      tr.innerHTML = `
+        <td>${idCell}</td>
+        <td><span class="ts">${EV.fmtTsShort(j.created_at)}</span></td>
+        <td><span class="state-pill ${j.state}">${EV.phaseLabel(j.state)}</span></td>
+        <td>${modePill}</td>
+        <td>${judgeBadges(j.inputs.judge_ids)}</td>
+        <td><div class="progress-cell">${progress}${bar}</div></td>
+        <td class="num">${aggregate}</td>
+        <td>${reportCell}</td>
+      `;
+      rows.appendChild(tr);
+    });
+  }
+
+  document.getElementById("search").addEventListener("input", (e) => {
+    state.search = e.target.value;
+    render();
+  });
+  document.getElementById("reset-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    const ok = await EV.confirmModal({
+      title: "Reset jobs to seed?",
+      body: "All custom evaluation jobs and verdict sets in this browser will be discarded; the three seed jobs will be restored.",
+      confirmLabel: "Reset",
+      danger: true,
+    });
+    if (ok) { EV.resetSeed(); EV.toast("Jobs reset to seed", "Evaluation"); render(); }
+  });
+
+  render();
+  EV.startTicking(render);
+</script>
+
+</body>
+</html>

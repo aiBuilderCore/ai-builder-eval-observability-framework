@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Evidence · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body>
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<nav class="subnav">
+  <div class="frame row">
+    <div class="tabs">
+      <a href="./index.html">Batches</a>
+      <a href="./trajectory.html">Trajectory diff</a>
+      <a href="./calibration.html">Calibration</a>
+      <a href="./datasets.html">Datasets</a>
+      <a href="./gate.html">Gate</a>
+      <a class="active" href="./packs.html">Evidence</a>
+      <a href="./monitors.html">Live ingest</a>
+    </div>
+    <div class="meta"><a href="./packs.html" style="color:var(--accent);">← all evidence</a></div>
+  </div>
+</nav>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Evidence · <span id="head-id">—</span></p>
+    <h1 id="head-name">Loading…</h1>
+    <p class="subtitle">
+      Frozen at issue · <code>config_hash</code>-pinned · machine-readable bundle and regulator-readable
+      PDF both signed. Re-issue produces a superseding record with <code>supersedes: pack_id</code>; the
+      original is preserved.
+    </p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <!-- ============= COVER ============= -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;box-shadow:0 1px 3px var(--shadow);display:grid;grid-template-columns:2fr 1fr;gap:32px;">
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Cover</div>
+      <h2 style="margin:6px 0 14px;font-size:24px;letter-spacing:-0.02em;" id="cover-title">—</h2>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-family:var(--mono);font-size:12px;line-height:1.7;">
+        <div>
+          <div style="color:var(--text-faint);">Tenant</div>
+          <div style="color:var(--text);font-weight:500;" id="cover-tenant">—</div>
+        </div>
+        <div>
+          <div style="color:var(--text-faint);">Time range</div>
+          <div style="color:var(--text);font-weight:500;" id="cover-range">—</div>
+        </div>
+        <div>
+          <div style="color:var(--text-faint);">Issued at</div>
+          <div style="color:var(--text);font-weight:500;" id="cover-issued">—</div>
+        </div>
+        <div>
+          <div style="color:var(--text-faint);">Issued by</div>
+          <div style="color:var(--text);font-weight:500;" id="cover-issuer">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-left:1px solid var(--border);padding-left:24px;">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);">Signature</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.7;margin-top:8px;word-break:break-all;" id="sig-block">ed25519:—</div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
+        <a class="btn primary" id="dl-pdf" href="#" style="font-size:13px;justify-content:center;">↓ report.pdf</a>
+        <a class="btn ghost" id="dl-bundle" href="#" style="font-size:13px;justify-content:center;">↓ bundle.tar.zst</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= SECTIONS (per template) ============= -->
+  <div class="section-head"><h2><em>Sections</em> · per template</h2><div class="actions"><span style="color:var(--text-faint);">rendered against the embedded artifact set</span></div></div>
+  <div id="sections-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;"></div>
+
+  <!-- ============= EMBEDDED ARTIFACTS ============= -->
+  <div class="section-head"><h2><em>Embedded</em> artifacts</h2><div class="actions"><span style="color:var(--text-faint);">scope · frozen at issue</span></div></div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+    <div class="signal-card" style="cursor:default;">
+      <div class="label">Monitors</div>
+      <div class="value" id="art-monitors">—</div>
+      <div class="meta">authored rules pinned to config_hash</div>
+    </div>
+    <div class="signal-card" style="cursor:default;">
+      <div class="label">Incidents</div>
+      <div class="value" id="art-incidents">—</div>
+      <div class="meta">breaches over the time range</div>
+    </div>
+    <div class="signal-card" style="cursor:default;">
+      <div class="label">Calibration records</div>
+      <div class="value" id="art-cal">—</div>
+      <div class="meta">per-tenant judge κ over windows</div>
+    </div>
+    <div class="signal-card" style="cursor:default;">
+      <div class="label">Simulation runs</div>
+      <div class="value" id="art-sim">—</div>
+      <div class="meta">immutable run traces from Simulation</div>
+    </div>
+  </div>
+
+  <!-- ============= LINEAGE ============= -->
+  <div class="section-head"><h2><em>Lineage</em></h2><div class="actions"><span style="color:var(--text-faint);">re-issue replays bit-for-bit</span></div></div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;box-shadow:0 1px 3px var(--shadow);font-family:var(--mono);font-size:11.5px;line-height:1.7;color:var(--text-muted);">
+    <div style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;">config_hash</div>
+    <div style="word-break:break-all;color:var(--text);font-weight:500;" id="lin-hash">sha256:—</div>
+    <div style="height:1px;background:var(--border);margin:18px 0;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div><b style="color:var(--text);">pack_id</b> · <span id="lin-pack">—</span></div>
+      <div><b style="color:var(--text);">template</b> · <span id="lin-template">—</span></div>
+      <div><b style="color:var(--text);">scope.tenants</b> · <span id="lin-tenants">—</span></div>
+      <div><b style="color:var(--text);">scope.time_range</b> · <span id="lin-range">—</span></div>
+      <div><b style="color:var(--text);">pdf_uri</b> · <span id="lin-pdf">s3://evidence-packs/—/report.pdf</span></div>
+      <div><b style="color:var(--text);">bundle_uri</b> · <span id="lin-bundle">s3://evidence-packs/—/bundle.tar.zst</span></div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / pack.html</span>
+    <span><a href="./packs.html">all evidence →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  (function () {
+    const obs = window.AIBC_OBS;
+    if (!obs) return;
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    const packs = obs.State.packs();
+    const TEMPLATES = obs.State.templates();
+    const p = packs.find(x => x.id === id) || packs[0];
+    if (!p) return;
+    const template = TEMPLATES.find(t => t.id === p.template) || TEMPLATES[0];
+
+    function syntheticHash(s) {
+      let h = 0n;
+      for (let i = 0; i < s.length; i++) h = (h * 131n + BigInt(s.charCodeAt(i))) % (1n << 128n);
+      return 'sha256:' + h.toString(16).padStart(32, '0').slice(0, 64);
+    }
+    function syntheticSig(s) {
+      let h = 0n;
+      for (let i = 0; i < s.length; i++) h = (h * 167n + BigInt(s.charCodeAt(i))) % (1n << 128n);
+      return 'ed25519:' + h.toString(16).padStart(32, '0').slice(0, 64);
+    }
+
+    document.getElementById('head-id').textContent = p.id;
+    document.getElementById('head-name').innerHTML = obs.escapeHtml(p.template_label) +
+      ' <span class="qualifier">— ' + obs.escapeHtml(p.tenant) + '</span>';
+
+    const ready = p.assemble_state !== 'requested' && p.assemble_state !== 'assembling';
+    const stateClass = ready ? 'pill--ok' : 'pill--warn';
+    const stateLabel = ready ? (p.signed ? 'signed' : 'ready · unsigned') : (p.assemble_state || 'unknown');
+    document.getElementById('head-pills').innerHTML =
+      '<span class="' + stateClass + '"><b>' + stateLabel + '</b></span>' +
+      '<span class="pill"><b>' + p.monitors + '</b> monitors</span>' +
+      '<span class="pill"><b>' + p.incidents + '</b> incidents</span>' +
+      '<span class="pill"><b>' + p.calibration_records + '</b> calibration</span>' +
+      '<span class="pill"><b>' + p.simulation_runs + '</b> sim runs</span>' +
+      '<span class="pill"><b>' + (p.pages || '—') + '</b> pages</span>';
+
+    document.getElementById('cover-title').textContent = p.template_label;
+    document.getElementById('cover-tenant').textContent = p.tenant;
+    document.getElementById('cover-range').textContent = p.time_range;
+    document.getElementById('cover-issued').textContent = p.issued_at;
+    document.getElementById('cover-issuer').textContent = p.issued_by;
+
+    document.getElementById('sig-block').textContent = p.signed
+      ? syntheticSig(p.id + '|' + p.template + '|' + p.issued_at)
+      : 'unsigned · this evidence has not been signed yet';
+
+    document.getElementById('art-monitors').textContent = p.monitors;
+    document.getElementById('art-incidents').textContent = p.incidents;
+    document.getElementById('art-cal').textContent = p.calibration_records;
+    document.getElementById('art-sim').textContent = p.simulation_runs;
+
+    document.getElementById('lin-hash').textContent =
+      syntheticHash(p.id + '|' + p.template + '|' + p.tenant + '|' + p.time_range);
+    document.getElementById('lin-pack').textContent = p.id;
+    document.getElementById('lin-template').textContent = p.template + '@v3';
+    document.getElementById('lin-tenants').textContent = '[' + p.tenant + ']';
+    document.getElementById('lin-range').textContent = p.time_range;
+    document.getElementById('lin-pdf').textContent = 's3://evidence-packs/' + p.id + '/report.pdf';
+    document.getElementById('lin-bundle').textContent = 's3://evidence-packs/' + p.id + '/bundle.tar.zst';
+
+    // Sections (synthesized KPIs per section)
+    function syntheticKPI(s, idx) {
+      // deterministic-ish per section name + pack id
+      const seed = (idx + 1) * (p.id.length || 1);
+      const pass = (90 + (seed * 7) % 9) + '%';
+      const ck = (0.65 + ((seed * 3) % 30) / 100).toFixed(2);
+      const ki = (50 + (seed * 11) % 50);
+      return `<div style="display:flex;gap:14px;font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:10px;">
+        <span><b style="color:var(--text);">${pass}</b> rubric pass</span>
+        <span><b style="color:var(--text);">κ ${ck}</b> calibrated</span>
+        <span><b style="color:var(--text);">${ki}</b> KPIs</span>
+      </div>`;
+    }
+    document.getElementById('sections-grid').innerHTML = template.sections.map((s, i) => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:0 1px 3px var(--shadow);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-family:var(--display);font-weight:600;font-size:14px;">${i + 1}. ${obs.escapeHtml(s)}</div>
+          <span class="trail-tag" data-cat="reasoning">rendered</span>
+        </div>
+        ${syntheticKPI(s, i)}
+      </div>`).join('');
+
+    // Download buttons
+    const blocker = (e) => { e.preventDefault(); alert('Synthetic mock: this is a clickable demo. ' +
+      'Real download would stream the signed evidence bundle from S3.'); };
+    document.getElementById('dl-pdf').addEventListener('click', blocker);
+    document.getElementById('dl-bundle').addEventListener('click', blocker);
+  })();
+</script>
+</body>
+</html>

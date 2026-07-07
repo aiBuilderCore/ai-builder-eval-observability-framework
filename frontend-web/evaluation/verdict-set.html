@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Evaluation — Verdict Set · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      moon.style.display = isDark() ? 'none' : 'block';
+      sun.style.display  = isDark() ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <a href="./index.html" class="back-link"><span class="arrow">←</span> Back to jobs</a>
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Verdict set</p>
+    <h1 id="title">Loading… <span class="qualifier" id="title-meta"></span></h1>
+    <p class="subtitle" id="subtitle">Read-only view per (question × judge). Export verdicts as CSV for downstream analysis.</p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <div class="filter-bar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search by question, persona, dimension, reasoning…" />
+    </div>
+    <select id="filter-dim" class="input" style="max-width:200px;"><option value="">All dimensions</option></select>
+    <select id="filter-verdict" class="input" style="max-width:160px;">
+      <option value="">All verdicts</option>
+      <option value="pass">Pass</option>
+      <option value="fail">Fail</option>
+      <option value="abstain">Abstain</option>
+    </select>
+    <button class="btn ghost" id="btn-export">↓ Export CSV</button>
+    <span class="count"><b id="count">0</b> shown</span>
+  </div>
+
+  <section class="panel">
+    <div class="verdict-list" id="list"></div>
+  </section>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / evaluation / verdict-set.html</span>
+    <span><a href="../../../implementation-guides/enterprise-eval-observability-framework/evaluation/" style="color:var(--text-muted);text-decoration:underline;">View spec →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  function getQuery(name) {
+    return new URLSearchParams(location.search).get(name);
+  }
+  function classOfScore(v) { return v >= 0.8 ? "high" : v >= 0.65 ? "mid" : "low"; }
+
+  const state = { search: "", dim: "", verdict: "" };
+  let allVerdicts = [];
+  let vsId = "";
+
+  function render() {
+    const q = state.search.trim().toLowerCase();
+    const filtered = allVerdicts.filter(v => {
+      if (state.dim && v.dimension !== state.dim) return false;
+      if (state.verdict && v.verdict !== state.verdict) return false;
+      if (!q) return true;
+      const blob = [v.question_prompt, v.persona_name, v.dimension, v.reasoning].join(" ").toLowerCase();
+      return blob.includes(q);
+    });
+    document.getElementById("count").textContent = filtered.length;
+
+    const host = document.getElementById("list");
+    host.innerHTML = "";
+    if (filtered.length === 0) {
+      host.innerHTML = `<p style="color:var(--text-faint);font-style:italic;text-align:center;padding:40px 0;">No verdicts match those filters.</p>`;
+      return;
+    }
+    filtered.forEach(v => {
+      const cls = classOfScore(v.score);
+      const row = document.createElement("div");
+      row.className = "verdict-row";
+      const jurorRows = (v.judges && v.judges.length > 1) ? `
+        <div class="juror-list">
+          ${v.judges.map(j => `<div class="juror"><b>${j.model}</b><span class="num">${j.score.toFixed(2)}</span><span>${j.verdict}</span></div>`).join("")}
+        </div>
+      ` : "";
+      row.innerHTML = `
+        <div class="vid">${v.verdict_id.slice(-12)}</div>
+        <div class="vbody">
+          <p class="vprompt">${v.question_prompt}</p>
+          <div class="vmeta">
+            <span class="qtag dim">${v.dimension}</span>
+            <span class="qtag">${v.persona_name}</span>
+            <span class="qtag">${v.mode}${v.consensus_rate != null ? ` · consensus ${(v.consensus_rate*100).toFixed(0)}%` : ""}</span>
+            ${(v.mitigations_applied || []).map(m => `<span class="qtag">${m}</span>`).join("")}
+          </div>
+          <div class="vreasoning">${v.reasoning}</div>
+          ${jurorRows}
+        </div>
+        <div class="vscore"><div class="score-gauge ${cls}"><span class="bar"><i style="width:${Math.round(v.score*100)}%"></i></span><span class="num">${v.score.toFixed(2)}</span></div></div>
+        <div class="vverdict ${v.verdict}">${v.verdict}</div>
+      `;
+      host.appendChild(row);
+    });
+  }
+
+  function exportCsv() {
+    const headers = ["verdict_id", "verdict_set_id", "question_id", "dimension", "score", "verdict", "mode", "consensus_rate", "persona", "reasoning"];
+    const rows = [headers];
+    allVerdicts.forEach(v => {
+      rows.push([
+        v.verdict_id, v.verdict_set_id, v.question_id, v.dimension, v.score, v.verdict,
+        v.mode, v.consensus_rate ?? "", v.persona_name,
+        (v.reasoning || "").replace(/[\r\n]/g, " ").replace(/"/g, '""'),
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => /[",\n]/.test(String(c)) ? `"${c}"` : c).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${vsId}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    EV.toast(`Exported ${allVerdicts.length} verdicts`, "Evaluation");
+  }
+
+  function load() {
+    vsId = getQuery("id") || "";
+    const verdicts = EV.getVerdictSet(vsId);
+    if (!verdicts) {
+      document.getElementById("title").textContent = "Verdict set not found";
+      document.getElementById("subtitle").textContent = "Check the URL or return to the jobs list.";
+      return;
+    }
+    allVerdicts = verdicts;
+    document.title = `Verdict set ${vsId} · Evaluation`;
+    document.getElementById("title").innerHTML = `Verdict set <code style="font-size:0.6em;background:var(--surface-alt);padding:0.1em 0.35em;border-radius:4px;border:1px solid var(--border);">${vsId}</code>`;
+
+    // Populate dimension filter
+    const dims = Array.from(new Set(verdicts.map(v => v.dimension))).sort();
+    const sel = document.getElementById("filter-dim");
+    dims.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d; opt.textContent = d; sel.appendChild(opt);
+    });
+
+    // Aggregate pills
+    const pass = verdicts.filter(v => v.verdict === "pass").length;
+    const fail = verdicts.filter(v => v.verdict === "fail").length;
+    const abst = verdicts.filter(v => v.verdict === "abstain").length;
+    document.getElementById("head-pills").innerHTML = `
+      <span class="pill pill--accent"><b>${verdicts.length}</b> verdicts</span>
+      <span class="pill" style="color:#2f7a5b;"><b>${pass}</b> pass</span>
+      <span class="pill" style="color:#b04444;"><b>${fail}</b> fail</span>
+      <span class="pill"><b>${abst}</b> abstain</span>
+      <span class="pill"><b>${dims.length}</b> dimension${dims.length === 1 ? "" : "s"}</span>
+    `;
+
+    render();
+  }
+
+  document.getElementById("search").addEventListener("input", (e) => { state.search = e.target.value; render(); });
+  document.getElementById("filter-dim").addEventListener("change", (e) => { state.dim = e.target.value; render(); });
+  document.getElementById("filter-verdict").addEventListener("change", (e) => { state.verdict = e.target.value; render(); });
+  document.getElementById("btn-export").addEventListener("click", exportCsv);
+
+  // Live mode: wait for the adapter's first hydrate so getVerdictSet() resolves.
+  if (window.EV && EV.ready) EV.ready.then(load); else load();
+</script>
+
+</body>
+</html>

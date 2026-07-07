@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Persona Lab — Gallery · AIBuilderCore</title>
+<script>
+  // aibc-theme: apply persisted theme before paint (avoid FOUC).
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css" />
+<script src="../_chrome.js"></script>
+</head>
+<body>
+<!-- aibc-theme-toggle -->
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+<!-- /aibc-theme-toggle -->
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Persona Lab</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>01 · Persona Lab</b></span>
+  </div>
+</header>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Stage 01 · Personas</p>
+    <h1>Persona Lab <span class="qualifier">— the synthetic users you test</span></h1>
+    <p class="subtitle">
+      The reusable cast of synthetic users every downstream stage evaluates against.
+    </p>
+    <div class="aibc-kpis">
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num">6</span><span class="aibc-stat__label">personas</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">1</span><span class="aibc-stat__label">live</span></div>
+    </div>
+  </section>
+
+  <div class="filter-bar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search by name, role, tag, edge-case…" />
+    </div>
+    <div id="tag-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <a class="btn primary" href="./create.html">＋ New persona</a>
+    <span class="count"><b id="filter-count">0</b> shown</span>
+  </div>
+
+  <section id="shelf" class="shelf"></section>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / ui-mock / persona-lab / index.html</span>
+    <span><a href="#" id="reset-link">⟲ reset library to seed</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js"></script>
+<script>
+  const state = { search: "", tag: null };
+
+  function render() {
+    const all = PL.load();
+    const libCount = document.getElementById("lib-count");
+    if (libCount) libCount.textContent = all.length;
+
+    // tag pills (top-5 by frequency, plus an "All" pill to clear the filter)
+    const tagCounts = {};
+    all.forEach(p => p.tags.forEach(t => { tagCounts[t] = (tagCounts[t]||0)+1; }));
+    const popularTags = Object.entries(tagCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
+    const pillHost = document.getElementById("tag-pills");
+    pillHost.innerHTML = "";
+    const pillEntries = [["All", null], ...popularTags.map(([name]) => [`#${name}`, name])];
+    pillEntries.forEach(([text, tag]) => {
+      const isActive = state.tag === tag;
+      const el = document.createElement("button");
+      el.className = "pill" + (isActive ? " active" : "");
+      el.textContent = text;
+      el.onclick = () => { state.tag = tag; render(); };
+      pillHost.appendChild(el);
+    });
+
+    // filter
+    const q = state.search.trim().toLowerCase();
+    const filtered = all.filter(p => {
+      if (state.tag && !p.tags.includes(state.tag)) return false;
+      if (!q) return true;
+      const blob = [
+        p.name, p.role, p.quote, ...(p.tags||[]),
+        ...(p.edge_cases||[]), ...(p.goals||[]),
+      ].join(" ").toLowerCase();
+      return blob.includes(q);
+    });
+    document.getElementById("filter-count").textContent = filtered.length;
+
+    const shelf = document.getElementById("shelf");
+    shelf.innerHTML = "";
+
+    if (filtered.length === 0) {
+      shelf.innerHTML = `
+        <div class="empty" style="grid-column: span 12;">
+          <p style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;">No matches</p>
+          <h3>Nothing in the library matches that filter.</h3>
+          <p>Clear the search, pick another tag, or <a href="./create.html" style="color:var(--accent-deep);text-decoration:underline;">create a new persona</a>.</p>
+        </div>`;
+      return;
+    }
+
+    filtered.forEach(p => {
+      const card = document.createElement("article");
+      card.className = "persona";
+      card.dataset.hue = p.hue || "terracotta";
+      const tagsHtml = (p.tags || []).map(t => `<span class="tag">#${t}</span>`).join("");
+      card.innerHTML = `
+        <span class="ribbon-stripe"></span>
+        <div class="head">
+          <div class="monogram">${PL.monogramOf(p.name)}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="meta-line"><b>${PL.TONE_LABEL[p.tone] || p.tone}</b> · ${p.locale} · v${p.version}</div>
+            <h3>${p.name.split(" ").slice(0,-1).join(" ")} <em>${p.name.split(" ").slice(-1)[0]}</em></h3>
+            <p class="demo">${p.role} · ${p.age_band}</p>
+          </div>
+        </div>
+        <p class="quote">“${p.quote}”</p>
+        <div class="tags">${tagsHtml}</div>
+        <div class="actions">
+          <span class="stamp">updated ${p.updated_at}</span>
+          <span class="links">
+            <a href="./edit.html?id=${encodeURIComponent(p.id)}">Edit</a>
+            <a href="#" class="danger" data-del="${p.id}">Delete</a>
+          </span>
+        </div>`;
+      shelf.appendChild(card);
+    });
+
+    // wire delete links
+    shelf.querySelectorAll("[data-del]").forEach(a => {
+      a.onclick = async (e) => {
+        e.preventDefault();
+        const id = a.dataset.del;
+        const p = PL.get(id);
+        const ok = await PL.confirmModal({
+          title: `Delete ${p.name}?`,
+          body: `This persona will be removed from the library. Future eval runs that referenced <b>${p.id}</b> will be unable to reproduce.`,
+          confirmLabel: "Delete persona",
+          danger: true,
+        });
+        if (ok) {
+          PL.remove(id);
+          PL.toast(`Deleted ${p.name}`, "Persona Lab");
+          render();
+        }
+      };
+    });
+  }
+
+  document.getElementById("search").addEventListener("input", (e) => {
+    state.search = e.target.value;
+    render();
+  });
+  document.getElementById("reset-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    const ok = await PL.confirmModal({
+      title: "Reset library to seed?",
+      body: "All custom personas in this browser will be discarded and the six seed personas will be restored.",
+      confirmLabel: "Reset",
+      danger: true,
+    });
+    if (ok) { PL.resetSeed(); PL.toast("Library reset to seed", "Persona Lab"); render(); }
+  });
+
+  render();
+</script>
+
+</body>
+</html>

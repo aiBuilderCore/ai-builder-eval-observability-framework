@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Batch detail · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="batches">
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="./index.html">← all batches</a> · <b id="crumb-batch">batch</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> <span id="head-eyebrow">Simulation batch</span></p>
+    <h1 id="head-title">Loading…</h1>
+    <p class="subtitle" id="head-subtitle"></p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <div class="trace-shell">
+    <div class="trace-main">
+
+      <div class="batch-summary" id="summary"></div>
+
+      <!-- Decision layer: cohorts + next best action come BEFORE the dense runs table -->
+      <div class="cohort-strip" id="cohort-strip" hidden>
+        <div class="cohort-strip__head">
+          <h3>Top <em>failure cohorts</em></h3>
+          <span class="caption">click a chip to filter the runs table below</span>
+        </div>
+        <div id="cohort-chips"></div>
+      </div>
+
+      <div class="next-action-strip" id="nba-strip">
+        <a class="next-action-strip__cta" id="nba-investigate" href="#runs">
+          <span class="next-action-strip__label">Investigate</span>
+          <strong>Top failing run →</strong>
+          <small id="nba-investigate-hint">Jumps to the highest-priority failure trace.</small>
+        </a>
+        <a class="next-action-strip__cta" id="nba-promote" href="./datasets.html">
+          <span class="next-action-strip__label">Promote</span>
+          <strong>Failing runs → dataset →</strong>
+          <small>Turn this batch's regressions into a curated training set.</small>
+        </a>
+        <a class="next-action-strip__cta" id="nba-compare" href="./index.html">
+          <span class="next-action-strip__label">Compare</span>
+          <strong>To previous baseline →</strong>
+          <small id="nba-compare-hint">Diff signals against the prior batch in this experiment.</small>
+        </a>
+      </div>
+
+      <div class="section-head">
+        <h2><em>Span-kind</em> histogram</h2>
+        <div class="actions"><span style="color:var(--text-faint);">across every run in this batch</span></div>
+      </div>
+      <p class="viz-caption">
+        Every LLM call, tool call, retrieval, and inline judge (<abbr title="EVALUATOR spans are the inline judge verdicts, linked back to the run they scored.">EVALUATOR</abbr>)
+        in this batch, grouped by <b>OpenInference span kind</b>. Click a bar to filter the runs table below.
+      </p>
+      <div class="kind-hist" id="kind-hist"></div>
+
+      <div class="section-head" id="runs">
+        <h2>Runs <em>in this batch</em></h2>
+        <div class="actions">
+          <span style="color:var(--text-faint);" id="runs-filter-hint">click any row to open the trace viewer</span>
+          <a href="#" id="clear-filter" style="display:none;margin-left:10px;">clear filter ×</a>
+        </div>
+      </div>
+      <table class="runs-table" aria-label="Runs in this batch">
+        <thead>
+          <tr>
+            <th>Run · question</th>
+            <th>Persona</th>
+            <th>Verdicts (inline judges)</th>
+            <th class="num">Duration</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+
+      <div class="section-head" style="margin-top:42px;">
+        <h2>Cross-cutting <em>checks</em></h2>
+        <div class="actions"><span style="color:var(--text-faint);">these fire from any stage — not sequential</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+        <a class="milestone-stub" id="cta-traj" style="text-align:left;text-decoration:none;cursor:pointer;">
+          <span class="badge" style="background:rgba(31,143,94,0.14);color:var(--signal-ok);">live</span>
+          <h3 style="font-size:16px;">Trajectory diff</h3>
+          <p style="font-size:13px;line-height:1.55;">Compare tool-call sequences and planner-step histograms to the previous batch in the same experiment.</p>
+        </a>
+        <a class="milestone-stub" href="./calibration.html" style="text-align:left;text-decoration:none;cursor:pointer;">
+          <span class="badge" style="background:rgba(31,143,94,0.14);color:var(--signal-ok);">live</span>
+          <h3 style="font-size:16px;">Judge calibration</h3>
+          <p style="font-size:13px;line-height:1.55;">Per-tenant Cohen's <abbr title="κ (kappa) measures agreement between the inline judges and human-gold labels.">κ</abbr> between inline judges and the human-gold sample. Agree / disagree on labeled rows.</p>
+        </a>
+      </div>
+
+    </div>
+
+    <div id="rail"></div>
+  </div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / batch.html</span>
+    <span><a href="./index.html">← all batches</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script src="batches.js?v=2"></script>
+<script>
+  (function () {
+    const B = window.AIBC_BATCHES;
+    if (!B) return;
+
+    const params = new URLSearchParams(location.search);
+    const batchId = params.get('id');
+    const batch = batchId ? B.getBatch(batchId) : B.loadBatches()[0];
+    if (!batch) {
+      document.getElementById('head-title').textContent = 'Batch not found';
+      document.getElementById('head-subtitle').textContent = batchId ? 'No batch with id ' + batchId : 'Pass an ?id=… query param.';
+      return;
+    }
+
+    document.title = 'Observability — ' + batch.name;
+    document.getElementById('crumb-batch').textContent = batch.batch_id;
+    document.getElementById('head-eyebrow').textContent = 'Simulation batch · ' + batch.experiment_id;
+    document.getElementById('head-title').innerHTML = B.escapeHtml(batch.name) + ' <span class="qualifier">— ' + B.escapeHtml(batch.sut) + '</span>';
+
+    const startedShort = new Date(batch.started_at).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+    const finishedShort = new Date(batch.finished_at).toISOString().slice(11, 16) + 'Z';
+    document.getElementById('head-subtitle').innerHTML =
+      'Submitted <b>' + startedShort + '</b> · finished <b>' + finishedShort + '</b>. ' +
+      'Each run has a trace; built-in judges emit inline verdicts linked to that trace.' +
+      (batch.regression_note ? ' <span style="color:var(--signal-warn);"><b>Note:</b> ' + B.escapeHtml(batch.regression_note) + '</span>' : '');
+
+    const totalSpans = (batch.runs || []).reduce((m, r) => m + (r.spans ? r.spans.length : 0), 0);
+    const evalSpans = (batch.runs || []).reduce((m, r) => m + (r.spans ? r.spans.filter(s => s.kind === 'EVALUATOR').length : 0), 0);
+    // Identifiers only — the run/pass/span counts live in the summary tiles
+    // below, so we don't repeat them here.
+    document.getElementById('head-pills').innerHTML = `
+      <span class="pill">batch_id <b>${batch.batch_id}</b></span>
+      <span class="pill">experiment.id <b>${batch.experiment_id}</b></span>
+    `;
+
+    // ---- summary tiles ----
+    const summary = document.getElementById('summary');
+    const judgeCells = Object.entries(batch.judge_pass_rates || {}).map(([j, r]) =>
+      `<div class="tile">
+        <div class="label">${B.escapeHtml(j)} pass</div>
+        <div class="value">${(r * 100).toFixed(0)}<em>%</em></div>
+        <div class="meta">inline judge verdict</div>
+      </div>`).join('');
+    summary.innerHTML = `
+      <div class="tile">
+        <div class="label">Runs</div>
+        <div class="value">${batch.run_count}</div>
+        <div class="meta">${batch.pass_count} / ${batch.run_count} pass</div>
+      </div>
+      <div class="tile">
+        <div class="label">Span volume</div>
+        <div class="value">${totalSpans}<em>spans</em></div>
+        <div class="meta">${evalSpans} inline judge verdicts</div>
+      </div>
+      ${judgeCells}
+    `;
+
+    // ---- failure cohort strip ----
+    const cohorts = B.groupByFailureCohort(batch.batch_id);
+    const cohortStrip = document.getElementById('cohort-strip');
+    if (cohorts.length) {
+      cohortStrip.hidden = false;
+      document.getElementById('cohort-chips').innerHTML = cohorts.map(c => `
+        <a href="#runs" class="cohort-chip" data-cohort="${B.escapeHtml(c.key)}">
+          <span>${B.escapeHtml(c.label)}</span>
+          <span class="cohort-chip__count">${c.runs.length} run${c.runs.length === 1 ? '' : 's'}</span>
+        </a>`).join('');
+    }
+
+    // ---- next best action wiring ----
+    // Investigate → top failing run's trace (exemplar from largest cohort, else first failing run)
+    const topFailure = cohorts.length
+      ? cohorts[0].exemplar
+      : (batch.runs || []).find(r => r.status !== 'pass');
+    const invLink = document.getElementById('nba-investigate');
+    const invHint = document.getElementById('nba-investigate-hint');
+    if (topFailure) {
+      invLink.href = `./trace.html?batch=${encodeURIComponent(batch.batch_id)}&run=${encodeURIComponent(topFailure.run_id)}`;
+      invHint.textContent = cohorts.length
+        ? `${cohorts[0].label}: ${cohorts[0].runs.length} run${cohorts[0].runs.length === 1 ? '' : 's'}. Jump straight to the exemplar trace.`
+        : 'Open the failing run\'s trace.';
+    } else {
+      invLink.href = '#runs';
+      invHint.textContent = 'This batch has no failing runs — every judge cleared its threshold.';
+    }
+    document.getElementById('nba-promote').href = `./datasets.html?source=${encodeURIComponent(batch.batch_id)}`;
+
+    // Compare → prior batch in the same experiment
+    const allBatches = B.loadBatches().filter(b => b.experiment_id === batch.experiment_id);
+    allBatches.sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+    const myIdx = allBatches.indexOf(batch);
+    const prev = myIdx > 0 ? allBatches[myIdx - 1] : null;
+    const cmpLink = document.getElementById('nba-compare');
+    const cmpHint = document.getElementById('nba-compare-hint');
+    if (prev) {
+      cmpLink.href = `./index.html?compare=${encodeURIComponent(batch.batch_id)}&baseline=${encodeURIComponent(prev.batch_id)}#recent-batches`;
+      cmpHint.textContent = `Diff vs ${prev.batch_id.slice(0, 12)}… (${(prev.pass_rate * 100).toFixed(0)}% pass).`;
+    } else {
+      cmpLink.href = './index.html';
+      cmpHint.textContent = 'No prior batch in this experiment yet.';
+    }
+
+    // ---- kind histogram ----
+    const kh = batch.kind_histogram || {};
+    const maxCount = Math.max.apply(null, Object.values(kh).concat([1]));
+    document.getElementById('kind-hist').innerHTML =
+      Object.entries(kh)
+        .sort((a, b) => b[1] - a[1])
+        .map(([kind, n]) => `
+          <div class="kind-hist__row" data-kind="${kind}" style="cursor:pointer;">
+            <div class="name"><span class="span-chip" data-kind="${kind}">${B.SPAN_KIND_LABELS[kind] || kind}</span></div>
+            <div class="kind-hist__bar"><i data-kind="${kind}" style="width:${((n / maxCount) * 100).toFixed(1)}%"></i></div>
+            <div class="count">${n}</div>
+          </div>`).join('');
+
+    // ---- run rows + filter state ----
+    let activeFilter = null; // { type: 'cohort'|'kind', value }
+
+    function renderRows() {
+      const rows = document.getElementById('rows');
+      let runs = batch.runs || [];
+      if (activeFilter) {
+        if (activeFilter.type === 'cohort') {
+          const cohort = cohorts.find(c => c.key === activeFilter.value);
+          const ids = cohort ? new Set(cohort.runs.map(r => r.run_id)) : new Set();
+          runs = runs.filter(r => ids.has(r.run_id));
+        } else if (activeFilter.type === 'kind') {
+          runs = runs.filter(r => (r.spans || []).some(s => s.kind === activeFilter.value));
+        }
+      }
+      rows.innerHTML = runs.map(r => {
+        const verdicts = (r.verdicts || []).map(v => `
+          <span class="verdict-chip" data-pass="${v.pass}">
+            <b>${B.escapeHtml(v.judge)}</b> ${v.score.toFixed(2)}
+          </span>`).join(' ');
+        const turn = r.turn ? ` · turn ${r.turn}` : '';
+        const persona = r.persona
+          ? `<div>${B.escapeHtml(r.persona.name)}<br/><span style="color:var(--text-faint);">${B.escapeHtml(r.persona.id)} v${r.persona.version || 1}</span></div>`
+          : '—';
+        const openUrl = `./trace.html?batch=${encodeURIComponent(batch.batch_id)}&run=${encodeURIComponent(r.run_id)}`;
+        return `
+          <tr onclick="if(event.button===0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.target.closest('a')) location.href='${openUrl}'">
+            <td>
+              <a class="question-link question" href="${openUrl}">${B.escapeHtml(r.question)}</a>
+              <div class="persona">${B.escapeHtml(r.run_id)}${turn} · session.id <b style="color:var(--text);">${B.escapeHtml(r.session_id)}</b></div>
+            </td>
+            <td><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);">${persona}</span></td>
+            <td><div class="verdicts">${verdicts || '—'}</div></td>
+            <td class="num"><span style="font-family:var(--font-mono);font-size:13px;color:var(--text);">${(r.duration_ms / 1000).toFixed(2)}s</span></td>
+            <td><span class="run-status" data-st="${r.status}"><span class="dot"></span>${r.status}</span></td>
+          </tr>`;
+      }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No runs match this filter.</td></tr>';
+
+      const hint = document.getElementById('runs-filter-hint');
+      const clear = document.getElementById('clear-filter');
+      if (activeFilter) {
+        hint.textContent = `Filtered · ${activeFilter.type === 'cohort' ? 'cohort' : 'span kind'} = ${activeFilter.value} · ${runs.length} shown`;
+        clear.style.display = 'inline';
+      } else {
+        hint.textContent = 'click any row to open the trace viewer';
+        clear.style.display = 'none';
+      }
+    }
+
+    renderRows();
+
+    // Cohort chip + histogram bar wiring
+    document.getElementById('cohort-chips').addEventListener('click', function (e) {
+      const chip = e.target.closest('.cohort-chip');
+      if (!chip) return;
+      e.preventDefault();
+      activeFilter = { type: 'cohort', value: chip.getAttribute('data-cohort') };
+      renderRows();
+      document.getElementById('runs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('kind-hist').addEventListener('click', function (e) {
+      const row = e.target.closest('.kind-hist__row');
+      if (!row) return;
+      activeFilter = { type: 'kind', value: row.getAttribute('data-kind') };
+      renderRows();
+      document.getElementById('runs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('clear-filter').addEventListener('click', function (e) {
+      e.preventDefault();
+      activeFilter = null;
+      renderRows();
+    });
+
+    // ---- lineage rail ----
+    document.getElementById('rail').innerHTML = B.lineageRailHtml(batch, null);
+
+    // ---- trajectory CTA ----
+    const trajCta = document.getElementById('cta-traj');
+    if (trajCta) trajCta.href = './trajectory.html?batch=' + encodeURIComponent(batch.batch_id);
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Observability — Evidence · AIBuilderCore</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('aibc-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=2" />
+<script src="../_chrome.js?v=2"></script>
+</head>
+<body data-obs-tab="evidence">
+<button id="aibc-theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"
+  data-aibc-theme-injected
+  style="position:fixed;top:12px;left:12px;z-index:9999;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:rgba(127,127,127,0.10);border:1px solid rgba(127,127,127,0.30);border-radius:8px;color:currentColor;cursor:pointer;backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);">
+  <svg id="aibc-theme-toggle-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg id="aibc-theme-toggle-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:none;">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+</button>
+<script>
+  (function () {
+    var btn = document.getElementById('aibc-theme-toggle');
+    var moon = document.getElementById('aibc-theme-toggle-moon');
+    var sun = document.getElementById('aibc-theme-toggle-sun');
+    if (!btn) return;
+    function isDark() {
+      var attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'dark') return true;
+      if (attr === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function paintIcons() {
+      var dark = isDark();
+      moon.style.display = dark ? 'none' : 'block';
+      sun.style.display = dark ? 'block' : 'none';
+    }
+    paintIcons();
+    btn.addEventListener('click', function () {
+      var next = isDark() ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('aibc-theme', next); } catch (e) {}
+      paintIcons();
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintIcons);
+  })();
+</script>
+
+<header class="mock-back">
+  <a href="../../" class="mock-back__link">
+    <span class="mock-back__arrow" aria-hidden="true">←</span>
+    Back to Applications · AIBuilderCore
+  </a>
+</header>
+
+<header class="top">
+  <div class="frame row">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">AIBuilderCore <em>· Observability</em></span>
+    </div>
+    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>05 · Observability</b></span>
+  </div>
+</header>
+
+<script src="./_tabs.js"></script>
+
+<main class="frame">
+
+  <section class="page-head">
+    <p class="eyebrow"><span class="dot"></span> Regulator-aligned evidence · stage 7 of feedback loop · attest</p>
+    <h1>Evidence <span class="qualifier">— frozen, signed, reproducible</span></h1>
+    <p class="subtitle">
+      EU AI Act Article 12, SR 11-7 / OCC 2026-13, and NYC AEDT all converge on the same shape: a
+      regulator-readable PDF plus the underlying machine-readable evidence, both pinned to the exact
+      runs and signals they describe. Evidence is <b>frozen at issue</b>; corrections produce a
+      superseding record with <code>supersedes: pack_id</code>.
+    </p>
+    <div class="meta-pills" id="head-pills"></div>
+  </section>
+
+  <!-- ============= REQUEST WIZARD ============= -->
+  <div class="section-head"><h2>Request <em>new evidence</em></h2><div class="actions"><span style="color:var(--text-faint);">scope · template · time range · sign</span></div></div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;box-shadow:0 1px 3px var(--shadow);display:grid;grid-template-columns:repeat(4,1fr);gap:18px;">
+    <div class="field">
+      <label>Template</label>
+      <select class="input" id="req-template"></select>
+      <div class="hint">versioned config · sections render against the embedded artifacts</div>
+    </div>
+    <div class="field">
+      <label>Tenant</label>
+      <select class="input" id="req-tenant">
+        <option>acme-corp</option>
+        <option>finrobot</option>
+        <option>globex</option>
+        <option>hireright</option>
+      </select>
+      <div class="hint">scope is frozen at submit</div>
+    </div>
+    <div class="field">
+      <label>Time range</label>
+      <select class="input" id="req-range">
+        <option>2026-Q1</option>
+        <option selected>2026-04 · April</option>
+        <option>2026-05 · May (incomplete)</option>
+        <option>2025-Q4</option>
+      </select>
+      <div class="hint">scoped to embedded_artifacts</div>
+    </div>
+    <div class="field">
+      <label>&nbsp;</label>
+      <button class="btn primary" id="req-submit" style="margin-top:30px;">Request evidence →</button>
+      <div class="hint">assemble worker advances to <b>ready</b> in ~10s</div>
+    </div>
+  </div>
+
+  <!-- ============= IN-FLIGHT (assembling) ============= -->
+  <div class="section-head"><h2><em>In-flight</em></h2><div class="actions"><span style="color:var(--text-faint);">assembly worker advances on each tick</span></div></div>
+  <div id="inflight-list"></div>
+
+  <!-- ============= PACK GRID ============= -->
+  <div class="filter-bar" style="margin-top:36px;">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search by template, tenant, pack id…" />
+    </div>
+    <div id="template-pills" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <span class="count"><b id="filter-count">0</b> shown</span>
+  </div>
+  <div class="pack-grid" id="packs-grid"></div>
+
+  <footer class="foot">
+    <span>ai-builder-artifacts / applications / observability / packs.html</span>
+    <span><a href="./monitors.html">monitor catalogue →</a></span>
+  </footer>
+
+</main>
+
+<script src="../_api.js"></script>
+
+<script src="app.js?v=2"></script>
+<script>
+  (function () {
+    const obs = window.AIBC_OBS;
+    if (!obs) return;
+    const TEMPLATES = obs.State.templates();
+    let activeTemplates = new Set();
+    let q = '';
+
+    // Populate request template dropdown
+    document.getElementById('req-template').innerHTML =
+      TEMPLATES.map(t => '<option value="' + t.id + '">' + obs.escapeHtml(t.name) + '</option>').join('');
+
+    document.getElementById('req-submit').addEventListener('click', () => {
+      const tplId = document.getElementById('req-template').value;
+      const tpl = TEMPLATES.find(t => t.id === tplId);
+      const tenant = document.getElementById('req-tenant').value;
+      const range = document.getElementById('req-range').value.replace(/\s·.*/, '').trim();
+      const packs = obs.State.packs();
+      const id = 'pack_' + obs.ulid('');
+      packs.unshift({
+        id, template: tplId, template_label: tpl.name,
+        issued_at: new Date().toISOString(),
+        issued_by: 'you@aibcore.local',
+        time_range: range, tenant,
+        monitors: 4 + Math.floor(Math.random() * 8),
+        incidents: Math.floor(Math.random() * 16),
+        calibration_records: 1 + Math.floor(Math.random() * 5),
+        simulation_runs: 8 + Math.floor(Math.random() * 30),
+        pages: 0, signed: false,
+        assemble_state: 'requested', assemble_progress: 0,
+      });
+      obs.State.savePacks(packs);
+      // Kick the worker now so the user sees state advance immediately.
+      obs.tickWorker();
+      render();
+    });
+
+    // Template pill filters
+    const tpills = document.getElementById('template-pills');
+    tpills.innerHTML = TEMPLATES.map(t => `
+      <button class="pill" data-id="${t.id}" style="cursor:pointer;border-color:var(--border);">
+        <span style="font-weight:600;">${obs.escapeHtml(t.name.split('·')[0].trim())}</span>
+      </button>`).join('');
+    tpills.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const k = btn.getAttribute('data-id');
+        if (activeTemplates.has(k)) activeTemplates.delete(k); else activeTemplates.add(k);
+        btn.classList.toggle('pill--accent', activeTemplates.has(k));
+        render();
+      });
+    });
+
+    document.getElementById('search').addEventListener('input', (e) => {
+      q = e.target.value.toLowerCase(); render();
+    });
+
+    function render() {
+      const packs = obs.State.packs();
+      const tenants = new Set(packs.map(p => p.tenant));
+      const meta = document.getElementById('count-meta');
+      const cntTen = document.getElementById('count-tenants');
+      if (meta) meta.textContent = packs.length;
+      if (cntTen) cntTen.textContent = tenants.size;
+
+      // header pills
+      const ready = packs.filter(p => p.assemble_state !== 'requested' && p.assemble_state !== 'assembling').length;
+      const inflight = packs.filter(p => p.assemble_state === 'requested' || p.assemble_state === 'assembling').length;
+      document.getElementById('head-pills').innerHTML =
+        '<span class="pill pill--accent"><b>' + ready + '</b> ready</span>' +
+        '<span class="pill pill--warn"><b>' + inflight + '</b> in flight</span>' +
+        '<span class="pill"><b>' + tenants.size + '</b> tenants</span>' +
+        '<span class="pill"><b>' + TEMPLATES.length + '</b> templates</span>';
+
+      // in-flight panel
+      const inflightList = document.getElementById('inflight-list');
+      const inflightPacks = packs.filter(p => p.assemble_state === 'requested' || p.assemble_state === 'assembling');
+      inflightList.innerHTML = inflightPacks.length ? inflightPacks.map(p => `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:8px;box-shadow:0 1px 3px var(--shadow);">
+          <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">
+            <span><b>${obs.escapeHtml(p.template_label)}</b> · ${obs.escapeHtml(p.tenant)} · ${obs.escapeHtml(p.time_range)}</span>
+            <span style="color:var(--signal-warn);">${obs.escapeHtml(p.assemble_state)}…</span>
+          </div>
+          <div style="height:6px;background:var(--surface-alt);border-radius:999px;overflow:hidden;margin-top:10px;">
+            <div style="width:${Math.round((p.assemble_progress || 0) * 100)}%;height:100%;background:var(--accent);border-radius:999px;transition:width 360ms ease;"></div>
+          </div>
+          <div style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--text-faint);">
+            ${p.id} · ${Math.round((p.assemble_progress || 0) * 100)}% · ${p.monitors} monitors · ${p.incidents} incidents
+          </div>
+        </div>`).join('')
+        : '<div style="color:var(--text-faint);font-family:var(--mono);font-size:12px;padding:8px 0;">no evidence being assembled · request new evidence above</div>';
+
+      // pack grid (only ready / signed)
+      const filtered = packs.filter(p => {
+        if (p.assemble_state === 'requested' || p.assemble_state === 'assembling') return false;
+        if (activeTemplates.size && !activeTemplates.has(p.template)) return false;
+        const hay = (p.template_label + ' ' + p.tenant + ' ' + p.id + ' ' + p.time_range).toLowerCase();
+        if (q && !hay.includes(q)) return false;
+        return true;
+      });
+      document.getElementById('filter-count').textContent = filtered.length;
+
+      const grid = document.getElementById('packs-grid');
+      grid.innerHTML = filtered.length ? filtered.map(p => `
+        <a class="pack-card" href="./pack.html?id=${p.id}" style="text-decoration:none;color:inherit;">
+          <div class="top">
+            <div>
+              <div class="template-name" style="font-size:16px;line-height:1.3;">${obs.escapeHtml(p.template_label)} — ${obs.escapeHtml(p.tenant)}</div>
+              <div class="scope" style="margin-top:4px;font-size:12.5px;">
+                <b>${obs.escapeHtml(p.time_range)}</b> · issued to regulator
+              </div>
+            </div>
+            <span class="state-pill" data-state="${p.signed ? 'resolved' : 'armed'}"><span class="dot"></span>${p.signed ? 'signed' : 'unsigned'}</span>
+          </div>
+          <div class="scope">
+            <b>${p.monitors}</b> monitors · <b>${p.incidents}</b> incidents · <b>${p.calibration_records}</b> calibration · <b>${p.simulation_runs}</b> sim runs
+          </div>
+          <div class="footer">
+            <span class="pack-id" style="opacity:0.7;">${p.id} · ${p.pages || '—'}p</span>
+            <div class="links">
+              <a href="./pack.html?id=${p.id}">view</a>
+              <a href="#" onclick="event.preventDefault();event.stopPropagation();alert('Synthetic mock: would download report.pdf from S3.');">PDF</a>
+              <a href="#" onclick="event.preventDefault();event.stopPropagation();alert('Synthetic mock: would download bundle.tar.zst from S3.');">.tar.zst</a>
+            </div>
+          </div>
+        </a>`).join('')
+        : '<div style="grid-column:1/-1;background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:48px;text-align:center;color:var(--text-faint);font-family:var(--mono);font-size:12px;">no issued evidence matches the filter</div>';
+    }
+
+    render();
+    // Keep the page lively while packs are assembling.
+    setInterval(() => {
+      const packs = obs.State.packs();
+      const inflight = packs.some(p => p.assemble_state === 'requested' || p.assemble_state === 'assembling');
+      if (inflight) {
+        obs.tickWorker();
+        render();
+      }
+    }, 1500);
+  })();
+</script>
+</body>
+</html>
