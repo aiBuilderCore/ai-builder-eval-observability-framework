@@ -20,8 +20,10 @@ from .observability import (
     MonitorDraft,
     TraceEvent,
 )
+from .agent_catalog import CORE_AGENTS, agent_system_prompt, get_agent
 from .judge_catalog import CORE_JUDGES, CORE_PANELS
 from .persona import Persona, PersonaDraft, bump, slug
+from .persona_catalog import CORE_PERSONAS
 from .run import Adapter, AdapterDraft, Run, RunRequest, RunState, TraceRef, Turn
 from .seedset import PersonaRef, QGenRequest, Question, SeedSet
 from .verdict import (
@@ -38,8 +40,10 @@ __all__ = [
     "Adapter",
     "AdapterDraft",
     "Batch",
+    "CORE_AGENTS",
     "CORE_JUDGES",
     "CORE_PANELS",
+    "CORE_PERSONAS",
     "ErrorBody",
     "ErrorEnvelope",
     "EvalRequest",
@@ -71,7 +75,9 @@ __all__ = [
     "Turn",
     "Verdict",
     "VerdictSet",
+    "agent_system_prompt",
     "bump",
+    "get_agent",
     "iso",
     "slug",
     "utcnow",

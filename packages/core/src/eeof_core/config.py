@@ -29,12 +29,15 @@ class Settings(BaseSettings):
     s3_bucket: str = "eeof-blobs"
 
     # Model provider — every real backend is invoked over its HTTP/API surface.
-    #   echo         -> deterministic, offline, reproducible (default)
+    #   azure_openai -> Azure OpenAI Chat Completions (REST) — the default (GPT-4)
     #   anthropic    -> Anthropic Messages API
     #   bedrock      -> AWS Bedrock Converse API (boto3)
-    #   azure_openai -> Azure OpenAI Chat Completions (REST)
-    model_provider: Literal["echo", "anthropic", "bedrock", "azure_openai"] = "echo"
-    model_name: str = "claude-opus-4-8"
+    #   echo         -> deterministic, offline, reproducible fallback
+    # When azure_openai is selected but its credentials are absent, the provider
+    # factory transparently falls back to `echo` so a from-scratch checkout still
+    # boots offline (see providers/__init__.py).
+    model_provider: Literal["echo", "anthropic", "bedrock", "azure_openai"] = "azure_openai"
+    model_name: str = "gpt-4"
 
     # Anthropic
     anthropic_api_key: str = ""
@@ -45,11 +48,19 @@ class Settings(BaseSettings):
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
 
-    # Azure OpenAI
+    # Azure OpenAI — the default backend. Point these at your GPT-4 deployment.
     azure_openai_endpoint: str = ""  # https://<resource>.openai.azure.com
     azure_openai_api_key: str = ""
-    azure_openai_deployment: str = ""  # deployment name
+    azure_openai_deployment: str = "gpt-4"  # deployment name
     azure_openai_api_version: str = "2024-08-01-preview"
+
+    @property
+    def azure_openai_ready(self) -> bool:
+        return bool(
+            self.azure_openai_endpoint
+            and self.azure_openai_api_key
+            and self.azure_openai_deployment
+        )
 
     # Ports — the orchestrator is the only public edge; the rest are in-cluster.
     api_orchestration_port: int = 8080
@@ -59,6 +70,12 @@ class Settings(BaseSettings):
     simulation_svc_port: int = 8094
     evaluation_svc_port: int = 8095
     observability_svc_port: int = 8096
+    # The demo agent-under-test (401k retirement planner) served over REST.
+    agent_under_test_port: int = 8097
+
+    @property
+    def agent_under_test_url(self) -> str:
+        return f"http://127.0.0.1:{self.agent_under_test_port}/chat"
 
     # Dev auth: any bearer token resolves to this tenant/workspace in local mode.
     dev_tenant: str = "acme"

@@ -10,7 +10,7 @@ from eeof_core.context import principal_from_headers
 from eeof_core.dataplane import get_blob, get_bus, get_table, keys
 from eeof_core.models import Adapter, AdapterDraft, Principal, Run
 
-from .adapters import list_adapters, register_adapter
+from .adapters import ensure_builtin_adapters, list_adapters, register_adapter
 from .worker import worker
 
 
@@ -36,6 +36,7 @@ async def health() -> dict:
 # --- Adapters (sync) ---
 @app.get("/adapters")
 async def get_adapters(p: Principal = Depends(principal)) -> list[dict]:
+    await ensure_builtin_adapters(p.tenant)
     return [a.model_dump(mode="json") for a in await list_adapters(p.tenant)]
 
 

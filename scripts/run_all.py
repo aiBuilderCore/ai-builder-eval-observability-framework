@@ -1,7 +1,7 @@
 """Boot the whole platform in one process (local mode).
 
 In APP_ENV=local every service shares the same in-memory table/bus/blob
-singletons, so the eight services form a working pipeline with zero external
+singletons, so the services form a working pipeline with zero external
 infra. Each service's lifespan binds its workers/subscribers on startup.
 
     uv run python scripts/run_all.py
@@ -26,6 +26,7 @@ def _server(app, port: int) -> uvicorn.Server:
 
 
 async def main() -> None:
+    from agent_under_test.app import app as agent_under_test
     from api_orchestration.app import app as orchestration
     from evaluation_svc.app import app as evaluation
     from observability_svc.app import app as observability
@@ -39,13 +40,15 @@ async def main() -> None:
         _server(simulation, settings.simulation_svc_port),
         _server(evaluation, settings.evaluation_svc_port),
         _server(observability, settings.observability_svc_port),
+        _server(agent_under_test, settings.agent_under_test_port),
         _server(orchestration, settings.api_orchestration_port),
     ]
-    print("eeof platform up (local mode):")
+    print(f"eeof platform up ({settings.app_env} mode, model={settings.model_provider}):")
     print(f"  edge (REST+WS): http://127.0.0.1:{settings.api_orchestration_port}/api/v1")
     print(f"  persona :{settings.persona_svc_port}  qgen :{settings.qgen_svc_port}  "
           f"sim :{settings.simulation_svc_port}  eval :{settings.evaluation_svc_port}  "
           f"obs :{settings.observability_svc_port}")
+    print(f"  agent-under-test (401k, REST): http://127.0.0.1:{settings.agent_under_test_port}/chat")
     await asyncio.gather(*(s.serve() for s in servers))
 
 

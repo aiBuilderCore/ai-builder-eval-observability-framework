@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from functools import lru_cache
 
 from ..config import settings
@@ -23,6 +24,17 @@ def get_provider() -> ModelProvider:
 
         return BedrockProvider()
     if kind == "azure_openai":
+        # Default backend (GPT-4). If the deployment credentials aren't set,
+        # degrade gracefully to the deterministic echo provider so a
+        # from-scratch checkout / bootstrap still runs fully offline.
+        if not settings.azure_openai_ready:
+            print(
+                "[providers] MODEL_PROVIDER=azure_openai but AZURE_OPENAI_ENDPOINT/"
+                "_API_KEY/_DEPLOYMENT are not all set — falling back to the offline "
+                "'echo' provider. Set them in .env to use real GPT-4.",
+                file=sys.stderr,
+            )
+            return EchoProvider()
         from .azure_openai import AzureOpenAIProvider
 
         return AzureOpenAIProvider()

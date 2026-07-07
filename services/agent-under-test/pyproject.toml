@@ -1,0 +1,16 @@
+[project]
+name = "eeof-agent-under-test"
+version = "0.1.0"
+description = "Demo agent-under-test — a 401(k) retirement-planning assistant served over REST."
+requires-python = ">=3.13"
+dependencies = ["eeof-core", "fastapi>=0.115", "uvicorn[standard]>=0.30"]
+
+[tool.uv.sources]
+eeof-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_under_test"]

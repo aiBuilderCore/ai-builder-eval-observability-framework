@@ -117,3 +117,101 @@ async def test_builtin_judge_catalogue_is_sync_and_complete():
     # Non-LLM judges are a first-class catalogue category (AlignScore / Detoxify).
     assert judges["factual_consistency"].family == "non-LLM"
     assert judges["hallucination"].family == "specialist-LLM"
+
+
+@pytest.mark.asyncio
+async def test_finance_guardrail_judges_are_catalogued():
+    """The finance-domain guardrail judges ship in the built-in catalogue."""
+    from eeof_core.models import CORE_JUDGES
+    from evaluation_svc.judges import ensure_builtin_judges, list_judges
+
+    await ensure_builtin_judges(TENANT)
+    judges = {j.name: j for j in await list_judges(TENANT)}
+
+    for name in ("no_financial_advice", "regulatory_disclosure", "numeric_accuracy"):
+        assert name in {spec["name"] for spec in CORE_JUDGES}
+        assert name in judges
+    # The numeric verifier is deterministic / non-LLM; the advice guardrail is a
+    # high-bar frontier judge.
+    assert judges["numeric_accuracy"].family == "non-LLM"
+    assert judges["no_financial_advice"].threshold >= 0.85
+    assert judges["no_financial_advice"].family == "frontier-LLM"
+
+
+@pytest.mark.asyncio
+async def test_core_persona_library_seeded_and_diverse():
+    """The core persona library seeds idempotently and covers the intended mix:
+    diverse agent-testing profiles + financial personas, and no multilingual ones."""
+    from eeof_core.models import CORE_PERSONAS
+    from persona_svc.app import ensure_builtin_personas
+
+    await ensure_builtin_personas(TENANT)
+    await ensure_builtin_personas(TENANT)  # idempotent — no dup versions
+
+    rows = await get_table().query(keys.persona_pk(TENANT), "PERSONA#")
+    seeded = {r["data"]["name"] for r in rows}
+    assert {spec["name"] for spec in CORE_PERSONAS} <= seeded
+
+    finance = [p for p in CORE_PERSONAS if "finance" in p.get("tags", [])]
+    assert len(finance) >= 3  # at least three financial-domain personas
+    assert any("adversarial" in p.get("tags", []) for p in CORE_PERSONAS)
+    # No multilingual/locale coverage was added.
+    assert not any("multilingual" in p.get("tags", []) for p in CORE_PERSONAS)
+    assert all(not p.get("locale") for p in CORE_PERSONAS)
+
+
+@pytest.mark.asyncio
+async def test_builtin_401k_agent_onboarded_as_rest_adapter():
+    """The 401(k) agent is catalogued and onboarded as a REST adapter pointing at
+    the agent-under-test endpoint — idempotently."""
+    from eeof_core.config import settings
+    from eeof_core.models import get_agent
+    from simulation_svc.adapters import ensure_builtin_adapters, list_adapters
+
+    agent = get_agent("retirement-401k")
+    assert agent and agent["transport"] == "rest"
+
+    await ensure_builtin_adapters(TENANT)
+    await ensure_builtin_adapters(TENANT)  # idempotent
+
+    adapters = {a.name: a for a in await list_adapters(TENANT)}
+    assert "retirement-401k" in adapters
+    rest = adapters["retirement-401k"]
+    assert rest.transport == "rest"
+    assert rest.config["endpoint"] == settings.agent_under_test_url
+    assert len([a for a in await list_adapters(TENANT) if a.name == "retirement-401k"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_multiturn_followup_is_grounded_in_history():
+    """Each follow-up user turn is generated from the full running transcript, so
+    turn n sees turns 1..n-1 — not just the opener."""
+    from eeof_core.models import PersonaRef, Question
+    from simulation_svc.sim import simulate_conversation
+
+    calls: list[tuple[str, int]] = []
+
+    class RecordingProvider:
+        name = "recording"
+
+        async def chat(self, *, system, messages, max_tokens=1024, temperature=0.7):
+            calls.append((system, len(messages)))
+            # Alternate plausible text so turns aren't empty.
+            return "agent reply" if "agent under test" in system else "and what about X?"
+
+    q = Question(
+        id="q1", seed_set_id="ss1", prompt="How does the employer match work?",
+        persona=PersonaRef(id="persona_femi", version="1.0.0", name="First-Timer Femi",
+                           tone="casual", tech_savviness="novice"),
+        rubric="numeric_accuracy",
+    )
+    turns = await simulate_conversation(q, {}, RecordingProvider(), max_turns=6)
+
+    # user, agent, user, agent, user, agent
+    assert [t.role for t in turns] == ["user", "agent", "user", "agent", "user", "agent"]
+
+    # The user-simulator calls (not the agent calls) must see a growing history.
+    sim_calls = [n for (system, n) in calls if "role-playing" in system]
+    assert sim_calls, "the user simulator was never invoked for a follow-up"
+    assert all(n > 1 for n in sim_calls)  # more than just the opening prompt
+    assert sim_calls == sorted(sim_calls)  # history grows across turns

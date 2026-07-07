@@ -13,7 +13,7 @@ import httpx
 from eeof_core.config import settings
 from eeof_core.dataplane import get_table, keys
 from eeof_core.ids import new_id
-from eeof_core.models import Adapter, AdapterDraft, Turn
+from eeof_core.models import Adapter, AdapterDraft, Turn, agent_system_prompt
 from eeof_core.models.common import iso
 
 
@@ -74,6 +74,41 @@ async def register_adapter(tenant: str, draft: AdapterDraft) -> Adapter:
     return adapter
 
 
+async def ensure_builtin_adapters(tenant: str) -> None:
+    """Onboard the built-in 401(k) agent-under-test as a REST adapter (once).
+
+    The agent (`eeof_core.models.agent_catalog` → `retirement-401k`) is served
+    over REST by `services/agent-under-test`; here we register it as a REST
+    adapter pointing at that endpoint, writing straight through the data plane
+    (ScyllaDB in infra mode). After this the platform is 'agent-ready' — a
+    simulation run can target it over the real REST path with no manual
+    onboarding. `scripts/onboard_agent.py` calls this for the from-scratch
+    bootstrap; the sync `/adapters` read calls it lazily too.
+    """
+    from eeof_core.models import CORE_AGENTS
+
+    existing = {a["data"].get("name") for a in await get_table().query(keys.adapter_pk(tenant), "ADAPTER#")}
+    for agent in CORE_AGENTS:
+        if agent.get("transport") != "rest":
+            continue
+        name = agent["id"]
+        if name in existing:
+            continue
+        await register_adapter(
+            tenant,
+            AdapterDraft(
+                name=name,
+                transport="rest",
+                config={
+                    "endpoint": settings.agent_under_test_url,
+                    "agent": agent["id"],
+                    "display_name": agent["name"],
+                    "domain": agent["domain"],
+                },
+            ),
+        )
+
+
 async def list_adapters(tenant: str) -> list[Adapter]:
     gsipk, _ = keys.adapter_gsi(tenant, "")
     rows = await get_table().query_gsi(gsipk)
@@ -97,27 +132,32 @@ def _history_to_messages(turns: list[Turn]) -> list[dict]:
 async def agent_reply(adapter_snapshot: dict, turns: list[Turn], provider) -> str:
     """Get the target agent's next reply.
 
-    Calls the real endpoint for REST adapters when one is configured; otherwise
-    (local demo, MCP/A2A stubs) the model provider stands in for the agent.
+    Calls the real REST endpoint whenever the adapter has one configured (e.g.
+    the built-in 401(k) agent), so a run exercises the genuine over-the-wire
+    path. If no endpoint is set, or the call fails, the model provider stands in
+    as the agent — conditioned on the built-in agent's own system prompt when the
+    adapter names one, so the stand-in still behaves in-domain and offline.
     """
+    config = adapter_snapshot.get("config", {})
     transport = adapter_snapshot.get("transport", "rest")
-    endpoint = adapter_snapshot.get("config", {}).get("endpoint")
-    if transport == "rest" and endpoint and not settings.is_local:
+    endpoint = config.get("endpoint")
+    if transport == "rest" and endpoint:
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.post(
                     endpoint,
                     json={"messages": _history_to_messages(turns)},
-                    headers=adapter_snapshot.get("config", {}).get("headers", {}),
+                    headers=config.get("headers", {}),
                 )
                 resp.raise_for_status()
                 data = resp.json()
                 return data.get("reply") or data.get("content") or str(data)
-        except httpx.HTTPError as e:
-            return f"[adapter_error] {e}"
-    # Provider stands in as the agent under test.
+        except httpx.HTTPError:
+            pass  # fall through to the in-process provider stand-in
+    # Provider stands in as the agent under test (in-domain when a built-in
+    # agent is named on the adapter; safe generic default otherwise).
     return await provider.chat(
-        system="You are the AI agent under test. Answer the user helpfully and safely.",
+        system=agent_system_prompt(config.get("agent")),
         messages=_history_to_messages(turns),
         max_tokens=400,
         temperature=0.5,

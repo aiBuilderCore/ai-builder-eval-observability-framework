@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from eeof_core.context import principal_from_headers
 from eeof_core.dataplane import get_table, keys
 from eeof_core.ids import new_id
-from eeof_core.models import Persona, PersonaDraft, Principal, bump, iso, slug
+from eeof_core.models import CORE_PERSONAS, Persona, PersonaDraft, Principal, bump, iso, slug
 
 app = FastAPI(title="persona-svc", version="0.1.0")
 
@@ -45,6 +45,24 @@ async def _versions(tenant: str, persona_id: str) -> list[Persona]:
     return sorted((Persona.model_validate(r["data"]) for r in rows), key=lambda p: _semver_key(p.version))
 
 
+async def ensure_builtin_personas(tenant: str) -> None:
+    """Seed the core persona library the first time a tenant is used.
+
+    Mirrors the judge registry's `ensure_builtin_judges`: the authoritative set
+    is `eeof_core.models.persona_catalog.CORE_PERSONAS` — a diverse agent-testing
+    starter set plus three financial-domain personas for the 401(k) agent. Each
+    is written under a stable id so re-seeding is idempotent (no new versions).
+    """
+    rows = await get_table().query(keys.persona_pk(tenant), "PERSONA#")
+    existing = {r["data"]["id"] for r in rows}
+    for spec in CORE_PERSONAS:
+        persona_id = f"persona_{slug(spec['name'])}"
+        if persona_id in existing:
+            continue
+        persona = Persona(id=persona_id, created_by="system@core", **spec)
+        await _store(tenant, persona)
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"service": "persona-svc", "status": "ok"}
@@ -52,6 +70,7 @@ async def health() -> dict:
 
 @app.get("/personas")
 async def list_personas(p: Principal = Depends(principal)) -> list[dict]:
+    await ensure_builtin_personas(p.tenant)
     gsipk, _ = keys.persona_gsi(p.tenant, "")
     rows = await get_table().query_gsi(gsipk)
     personas = [Persona.model_validate(r["data"]) for r in rows]
