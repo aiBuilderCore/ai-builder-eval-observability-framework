@@ -108,7 +108,6 @@
 
   <footer class="foot">
     <span>ai-builder-artifacts / ui-mock / persona-lab / index.html</span>
-    <span><a href="#" id="reset-link">⟲ reset library to seed</a></span>
   </footer>
 
 </main>
@@ -218,17 +217,6 @@
     state.search = e.target.value;
     render();
   });
-  document.getElementById("reset-link").addEventListener("click", async (e) => {
-    e.preventDefault();
-    const ok = await PL.confirmModal({
-      title: "Reset library to seed?",
-      body: "All custom personas in this browser will be discarded and the six seed personas will be restored.",
-      confirmLabel: "Reset",
-      danger: true,
-    });
-    if (ok) { PL.resetSeed(); PL.toast("Library reset to seed", "Persona Lab"); render(); }
-  });
-
   render();
 </script>
 

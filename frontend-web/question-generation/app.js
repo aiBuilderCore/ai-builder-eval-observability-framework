@@ -1,5 +1,5 @@
 // ============================================================
-// Question Generation — clickable mock data + fake job worker
+// Question Generation — live-wired to the /question-sets edge (no bundled mock; empty when idle)
 // Eval & Observability Framework · synthetic data only
 // ============================================================
 //
@@ -12,8 +12,8 @@
 // (personas are duplicated here so flows render even when the
 // Persona Lab tab has not been opened in this browser).
 
-const JOBS_KEY     = "aibcore.qgen.jobs.v1";
-const SEEDSETS_KEY = "aibcore.qgen.seedsets.v1";
+const JOBS_KEY     = "aibcore.qgen.jobs.v2";
+const SEEDSETS_KEY = "aibcore.qgen.seedsets.v2";
 
 // ---------- Reference data --------------------------------------------
 
@@ -152,166 +152,7 @@ const ATTACK_STYLES   = ["jailbreak", "social-eng", "encoded", "multi-turn"];
 // ---------- Seed jobs --------------------------------------------------
 // Five jobs spanning the lifecycle so the jobs list reads as a real demo.
 
-const SEED_JOBS = [
-  {
-    job_id: "qgen_01HX5K2A",
-    seed_set_id: "ssid_01HX5K2A",
-    created_by: "mohit@aibuildercore.com",
-    created_at: "2026-05-02T14:22:11Z",
-    completed_by: "worker-7",
-    completed_at: "2026-05-02T14:31:48Z",
-    config_hash: "sha256:9e2f4c6a8b1d3e7f0a2c4b6d8e0f1a2b3c4d5e6f7081927384afbc1d2e3f4a5b",
-    inputs: {
-      persona_ids:    ["persona_olivia", "persona_aaron", "persona_priya"],
-      rubric_id:      "rub_safety",
-      prompt_shapes:  ["adversify", "code_switch"],
-      count_per_cell: 6,
-      evolution_passes: 2,
-      jailbreak_budget: 12,
-      novelty_floor: 0.5,
-      language: "en",
-    },
-    state: "shipped",
-    progress: {
-      phase: "shipped",
-      cells_total: 48,
-      cells_done: 48,
-      questions_generated: 312,
-      questions_kept_after_filter: 287,
-      evolution_passes_applied: 2,
-    },
-    output: {
-      seed_set_id: "ssid_01HX5K2A",
-      question_count: 287,
-      novelty_score: 0.71,
-      diversity_coverage: 0.94,
-      storage_uri: "s3://eval-seeds/ssid_01HX5K2A/",
-    },
-    events: [
-      { ts: "2026-05-02T14:22:11Z", state: "queued",           by: "mohit@aibuildercore.com" },
-      { ts: "2026-05-02T14:22:42Z", state: "running",          by: "worker-7" },
-      { ts: "2026-05-02T14:27:10Z", state: "evolving",         by: "worker-7" },
-      { ts: "2026-05-02T14:29:18Z", state: "filtering",        by: "worker-7" },
-      { ts: "2026-05-02T14:30:05Z", state: "ready_for_review", by: "worker-7" },
-      { ts: "2026-05-02T14:31:48Z", state: "shipped",          by: "mohit@aibuildercore.com" },
-    ],
-  },
-  {
-    job_id: "qgen_01HX5K2B",
-    seed_set_id: null,
-    created_by: "nitin@aibuildercore.com",
-    created_at: "2026-05-02T14:35:02Z",
-    completed_by: null,
-    completed_at: null,
-    config_hash: "sha256:1a2b3c4d5e6f7081927384afbc1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293",
-    inputs: {
-      persona_ids: ["persona_mei", "persona_hari"],
-      rubric_id:   "rub_faithfulness",
-      prompt_shapes: ["hallucinate_bait", "ambiguate"],
-      count_per_cell: 8,
-      evolution_passes: 1,
-      jailbreak_budget: 0,
-      novelty_floor: 0.5,
-      language: "en",
-    },
-    state: "running",
-    progress: {
-      phase: "running",
-      cells_total: 48,
-      cells_done: 12,
-      questions_generated: 76,
-      questions_kept_after_filter: 0,
-      evolution_passes_applied: 0,
-    },
-    output: null,
-    events: [
-      { ts: "2026-05-02T14:35:02Z", state: "queued",  by: "nitin@aibuildercore.com" },
-      { ts: "2026-05-02T14:35:31Z", state: "running", by: "worker-3" },
-    ],
-  },
-  {
-    job_id: "qgen_01HX5K2C",
-    seed_set_id: null,
-    created_by: "asha@aibuildercore.com",
-    created_at: "2026-05-02T14:40:18Z",
-    completed_by: null,
-    completed_at: null,
-    config_hash: "sha256:7f8e9d0c1b2a394857463c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0918273645a4",
-    inputs: {
-      persona_ids: ["persona_olivia", "persona_carlos"],
-      rubric_id:   "rub_helpfulness",
-      prompt_shapes: ["ambiguate"],
-      count_per_cell: 5,
-      evolution_passes: 1,
-      jailbreak_budget: 0,
-      novelty_floor: 0.5,
-      language: "en",
-    },
-    state: "queued",
-    progress: { phase: "queued", cells_total: 10, cells_done: 0, questions_generated: 0, questions_kept_after_filter: 0, evolution_passes_applied: 0 },
-    output: null,
-    events: [
-      { ts: "2026-05-02T14:40:18Z", state: "queued", by: "asha@aibuildercore.com" },
-    ],
-  },
-  {
-    job_id: "qgen_01HX5K1Z",
-    seed_set_id: "ssid_01HX5K1Z",
-    created_by: "mohit@aibuildercore.com",
-    created_at: "2026-05-02T13:48:01Z",
-    completed_by: null,
-    completed_at: null,
-    config_hash: "sha256:5c4b3a2918f7e6d5c4b3a2918f7e6d5c4b3a2918f7e6d5c4b3a2918f7e6d5c4b",
-    inputs: {
-      persona_ids:    ["persona_priya", "persona_aaron"],
-      rubric_id:      "rub_refusal",
-      prompt_shapes:  ["adversify"],
-      count_per_cell: 6,
-      evolution_passes: 1,
-      jailbreak_budget: 8,
-      novelty_floor: 0.55,
-      language: "hi-en",
-    },
-    state: "ready_for_review",
-    progress: { phase: "ready_for_review", cells_total: 12, cells_done: 12, questions_generated: 84, questions_kept_after_filter: 71, evolution_passes_applied: 1 },
-    output: { seed_set_id: "ssid_01HX5K1Z", question_count: 71, novelty_score: 0.66, diversity_coverage: 0.81, storage_uri: "s3://eval-seeds/ssid_01HX5K1Z/" },
-    events: [
-      { ts: "2026-05-02T13:48:01Z", state: "queued",  by: "mohit@aibuildercore.com" },
-      { ts: "2026-05-02T13:48:36Z", state: "running", by: "worker-1" },
-      { ts: "2026-05-02T13:53:12Z", state: "evolving", by: "worker-1" },
-      { ts: "2026-05-02T13:55:48Z", state: "filtering", by: "worker-1" },
-      { ts: "2026-05-02T13:56:21Z", state: "ready_for_review", by: "worker-1" },
-    ],
-  },
-  {
-    job_id: "qgen_01HX5K1Y",
-    seed_set_id: null,
-    created_by: "nitin@aibuildercore.com",
-    created_at: "2026-05-02T11:12:09Z",
-    completed_by: "worker-2",
-    completed_at: "2026-05-02T11:14:33Z",
-    config_hash: "sha256:c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f9081726354a5b6",
-    inputs: {
-      persona_ids:    ["persona_aaron"],
-      rubric_id:      "rub_safety",
-      prompt_shapes:  ["adversify", "hallucinate_bait"],
-      count_per_cell: 10,
-      evolution_passes: 2,
-      jailbreak_budget: 20,
-      novelty_floor: 0.7,
-      language: "en",
-    },
-    state: "failed",
-    progress: { phase: "failed", cells_total: 30, cells_done: 4, questions_generated: 12, questions_kept_after_filter: 0, evolution_passes_applied: 0 },
-    output: null,
-    failure_reason: "novelty_floor unsatisfiable — produced set ranked too similar to seed-set ssid_01HX4M9P (novelty 0.41 < floor 0.70).",
-    events: [
-      { ts: "2026-05-02T11:12:09Z", state: "queued",  by: "nitin@aibuildercore.com" },
-      { ts: "2026-05-02T11:12:42Z", state: "running", by: "worker-2" },
-      { ts: "2026-05-02T11:14:33Z", state: "failed",  by: "worker-2" },
-    ],
-  },
-];
+const SEED_JOBS = [];
 
 // ---------- Seed sets (questions, attached to shipped jobs) ----------
 
@@ -358,10 +199,7 @@ function buildSeedSet(jobId, seedSetId, sample) {
   return out;
 }
 
-const SEED_SEEDSETS = {
-  ssid_01HX5K2A: buildSeedSet("qgen_01HX5K2A", "ssid_01HX5K2A", SAMPLE_QUESTIONS_SHIPPED),
-  ssid_01HX5K1Z: buildSeedSet("qgen_01HX5K1Z", "ssid_01HX5K1Z", SAMPLE_QUESTIONS_REVIEW),
-};
+const SEED_SEEDSETS = {};
 
 // ---------- Storage ---------------------------------------------------
 

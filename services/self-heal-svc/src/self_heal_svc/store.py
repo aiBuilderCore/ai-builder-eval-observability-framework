@@ -29,8 +29,13 @@ def _status_of(inc: dict) -> str:
 
 
 async def ensure_seeded(tenant: str) -> None:
-    """Write the synthetic seed once. Safe to call on every startup/request."""
-    existing = await get_table().query(keys.heal_incident_pk(tenant), "HEAL_INCIDENT#")
+    """Write the synthetic seed once. Safe to call on every startup/request.
+
+    The idempotency guard keys on *policies* (always-seeded built-in config), not
+    incidents: the evaluation worker's breach detector also writes incident rows,
+    so an incident may exist before this ever runs — guarding on incidents would
+    then wrongly skip seeding the policy + action vocabulary."""
+    existing = await get_table().query(keys.heal_policy_pk(tenant), "HEAL_POLICY#")
     if existing:
         return
     # Clean-slate mode: no synthetic incident backlog — incidents should only

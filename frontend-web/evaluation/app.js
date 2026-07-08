@@ -1,5 +1,5 @@
 // ============================================================
-// Evaluation — clickable mock data + fake job worker
+// Evaluation — live-wired to the /evaluation edge (no bundled mock; empty when idle)
 // Eval & Observability Framework · synthetic data only
 // ============================================================
 //
@@ -12,8 +12,8 @@
 // upstream Simulation runs (these are duplicated here so the
 // flows render even when Simulation has not been opened).
 
-const JOBS_KEY          = "aibcore.eval.jobs.v1";
-const VERDICTSETS_KEY   = "aibcore.eval.verdictsets.v1";
+const JOBS_KEY          = "aibcore.eval.jobs.v2";
+const VERDICTSETS_KEY   = "aibcore.eval.verdictsets.v2";
 const CUSTOM_JUDGES_KEY = "aibcore.eval.customjudges.v1";
 
 // BYOJ — Bring Your Own Judge. Per-user quota; opt-in extension path
@@ -229,113 +229,7 @@ const RUNS = [
 // Per the user request: one shipped (verdict table populated) + one running
 // (progress UI exercisable). Plus one queued so the in-flight count > 0.
 
-const SEED_JOBS = [
-  {
-    job_id: "evjob_01HX6P2A",
-    verdict_set_id: "vs_01HX6P2A",
-    created_by: "mohit@aibuildercore.com",
-    created_at: "2026-05-04T14:22:11Z",
-    completed_by: "mohit@aibuildercore.com",
-    completed_at: "2026-05-04T14:48:02Z",
-    config_hash: "sha256:3b9c8a7f1e2d4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f9081726354",
-    inputs: {
-      run_ids: ["run_01HX5M1F"],
-      judge_ids: ["judge.faithfulness@v1", "judge.refusal_correctness@v1"],
-      mode: "jury",
-      panel_id: "diverse-3",
-      panel_judges: null,
-      aggregation: "majority",
-      mitigations: ["position_swap", "length_normalization", "refusal_awareness", "self_exclusion"],
-      score_threshold: { faithfulness: 0.75, refusal: 0.85 },
-      sample_n: null,
-    },
-    state: "shipped",
-    progress: {
-      phase: "shipped",
-      cells_total: 574,           // 287 questions × 2 judges
-      cells_done: 574,
-      verdicts_emitted: 574,
-      judge_call_count: 1722,     // 3× cells in jury mode
-      consensus_rate: 0.91,
-    },
-    output: {
-      verdict_set_id: "vs_01HX6P2A",
-      verdict_count: 574,
-      aggregate_scores: { faithfulness: 0.83, refusal: 0.74 },
-      pass_count: 481,
-      fail_count: 78,
-      abstain_count: 15,
-      storage_uri: "s3://eval-verdicts/vs_01HX6P2A/",
-    },
-    events: [
-      { ts: "2026-05-04T14:22:11Z", state: "queued",           by: "mohit@aibuildercore.com" },
-      { ts: "2026-05-04T14:22:42Z", state: "running",          by: "worker-12" },
-      { ts: "2026-05-04T14:46:30Z", state: "aggregating",      by: "worker-12" },
-      { ts: "2026-05-04T14:47:21Z", state: "ready_for_review", by: "worker-12" },
-      { ts: "2026-05-04T14:48:02Z", state: "shipped",          by: "mohit@aibuildercore.com" },
-    ],
-  },
-  {
-    job_id: "evjob_01HX6P2B",
-    verdict_set_id: null,
-    created_by: "nitin@aibuildercore.com",
-    created_at: "2026-05-04T15:11:09Z",
-    completed_by: null,
-    completed_at: null,
-    config_hash: "sha256:c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f9081726354a5b6",
-    inputs: {
-      run_ids: ["run_01HX5M2H"],
-      judge_ids: ["judge.coherence_multiturn@v1", "judge.role_adherence@v1", "judge.tool_call_correctness@v1"],
-      mode: "judge",
-      panel_id: null,
-      panel_judges: null,
-      aggregation: "mean",
-      mitigations: ["length_normalization", "refusal_awareness", "self_exclusion"],
-      score_threshold: { coherence_multiturn: 0.7, role_adherence: 0.75, tool_call_correctness: 0.75 },
-      sample_n: null,
-    },
-    state: "running",
-    progress: {
-      phase: "running",
-      cells_total: 861,
-      cells_done: 142,
-      verdicts_emitted: 142,
-      judge_call_count: 142,
-      consensus_rate: null,
-    },
-    output: null,
-    events: [
-      { ts: "2026-05-04T15:11:09Z", state: "queued",  by: "nitin@aibuildercore.com" },
-      { ts: "2026-05-04T15:11:38Z", state: "running", by: "worker-7" },
-    ],
-  },
-  {
-    job_id: "evjob_01HX6P2C",
-    verdict_set_id: null,
-    created_by: "asha@aibuildercore.com",
-    created_at: "2026-05-04T15:34:52Z",
-    completed_by: null,
-    completed_at: null,
-    config_hash: "sha256:9e2f4c6a8b1d3e7f0a2c4b6d8e0f1a2b3c4d5e6f7081927384afbc1d2e3f4a5b",
-    inputs: {
-      run_ids: ["run_01HX5M2G"],
-      judge_ids: ["judge.hallucination@v1"],
-      mode: "jury",
-      panel_id: "cheap-5",
-      panel_judges: null,
-      aggregation: "majority",
-      mitigations: ["length_normalization", "self_exclusion", "family_diversity"],
-      score_threshold: { hallucination: 0.8 },
-      sample_n: null,
-    },
-    state: "queued",
-    progress: { phase: "queued", cells_total: 71, cells_done: 0, verdicts_emitted: 0, judge_call_count: 0, consensus_rate: null },
-    output: null,
-    events: [
-      { ts: "2026-05-04T15:34:52Z", state: "queued", by: "asha@aibuildercore.com" },
-    ],
-  },
-];
+const SEED_JOBS = [];
 
 // ---------- Sample verdicts (seed for the shipped job) ----------
 
@@ -418,13 +312,7 @@ function buildVerdictSet(jobId, vsId, judgeIds, panelId) {
   return out;
 }
 
-const SEED_VERDICTSETS = {
-  vs_01HX6P2A: buildVerdictSet(
-    "evjob_01HX6P2A", "vs_01HX6P2A",
-    ["judge.faithfulness@v1", "judge.refusal_correctness@v1"],
-    "diverse-3",
-  ),
-};
+const SEED_VERDICTSETS = {};
 
 // ---------- Storage ----------------------------------------------------
 

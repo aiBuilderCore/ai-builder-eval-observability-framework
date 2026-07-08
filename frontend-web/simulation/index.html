@@ -99,7 +99,6 @@
 
   <footer class="foot">
     <span>ai-builder-artifacts / applications / simulation / index.html</span>
-    <span><a href="#" id="reset-link">⟲ reset runs to seed</a></span>
   </footer>
 
 </main>
@@ -244,16 +243,6 @@
   document.getElementById("search").addEventListener("input", (e) => {
     state.search = e.target.value;
     render();
-  });
-  document.getElementById("reset-link").addEventListener("click", async (e) => {
-    e.preventDefault();
-    const ok = await SIM.confirmModal({
-      title: "Reset runs to seed?",
-      body: "All custom adapters, runs, and traces in this browser will be discarded; the seed adapters and runs will be restored.",
-      confirmLabel: "Reset",
-      danger: true,
-    });
-    if (ok) { SIM.resetSeed(); SIM.toast("Runs reset to seed", "Simulation"); render(); }
   });
 
   render();

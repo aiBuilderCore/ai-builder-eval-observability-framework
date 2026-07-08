@@ -148,13 +148,18 @@ async def agent_reply(adapter_snapshot: dict, turns: list[Turn], provider) -> st
     config = adapter_snapshot.get("config", {})
     transport = adapter_snapshot.get("transport", "rest")
     endpoint = config.get("endpoint")
+    # A breach scenario (e.g. a "guardrail-regression" variant of the agent) is
+    # carried on the adapter config and forwarded to the agent so the run
+    # exercises the genuine regressed behaviour end-to-end.
+    scenario = config.get("scenario")
     if transport == "rest" and endpoint:
         try:
+            body: dict = {"messages": _history_to_messages(turns)}
+            if scenario:
+                body["scenario"] = scenario
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.post(
-                    endpoint,
-                    json={"messages": _history_to_messages(turns)},
-                    headers=config.get("headers", {}),
+                    endpoint, json=body, headers=config.get("headers", {}),
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -164,7 +169,7 @@ async def agent_reply(adapter_snapshot: dict, turns: list[Turn], provider) -> st
     # Provider stands in as the agent under test (in-domain when a built-in
     # agent is named on the adapter; safe generic default otherwise).
     return await provider.chat(
-        system=agent_system_prompt(config.get("agent")),
+        system=agent_system_prompt(config.get("agent"), scenario),
         messages=_history_to_messages(turns),
         max_tokens=400,
         temperature=0.5,

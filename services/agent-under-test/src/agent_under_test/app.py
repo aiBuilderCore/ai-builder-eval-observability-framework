@@ -31,6 +31,9 @@ app = FastAPI(title="agent-under-test", version="0.1.0")
 
 class ChatRequest(BaseModel):
     messages: list[dict]  # [{"role": "user"|"assistant", "content": str}]
+    # Optional breach scenario (e.g. "advice_leak") — swaps in a guardrail-weakened
+    # variant so the agent deterministically fails a guardrail judge. Demo-only.
+    scenario: str | None = None
 
 
 @app.get("/health")
@@ -61,7 +64,7 @@ async def chat(req: ChatRequest) -> dict:
         for m in req.messages
     ]
     reply = await provider.chat(
-        system=agent_system_prompt(AGENT_ID),
+        system=agent_system_prompt(AGENT_ID, req.scenario),
         messages=history or [{"role": "user", "content": "Hello"}],
         max_tokens=400,
         temperature=0.4,

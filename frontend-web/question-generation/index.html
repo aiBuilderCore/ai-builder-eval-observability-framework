@@ -130,7 +130,6 @@
 
   <footer class="foot">
     <span>ai-builder-artifacts / applications / question-generation / index.html</span>
-    <span><a href="#" id="reset-link">⟲ reset jobs to seed</a></span>
   </footer>
 
 </main>
@@ -251,16 +250,6 @@
   document.getElementById("search").addEventListener("input", (e) => {
     state.search = e.target.value;
     render();
-  });
-  document.getElementById("reset-link").addEventListener("click", async (e) => {
-    e.preventDefault();
-    const ok = await QG.confirmModal({
-      title: "Reset jobs to seed?",
-      body: "All custom jobs and shipped seed sets in this browser will be discarded; the five seed jobs will be restored.",
-      confirmLabel: "Reset",
-      danger: true,
-    });
-    if (ok) { QG.resetSeed(); QG.toast("Jobs reset to seed", "Question Generation"); render(); }
   });
 
   render();

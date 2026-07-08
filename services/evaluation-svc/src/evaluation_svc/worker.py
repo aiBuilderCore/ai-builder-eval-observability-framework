@@ -20,6 +20,7 @@ from eeof_core.ids import new_id
 from eeof_core.models import Job, TraceRef, Verdict, VerdictSet
 from eeof_core.models.common import iso
 from eeof_core.providers import get_provider
+from eeof_core.self_heal_detect import detect_incidents
 from eeof_core.worker import BaseWorker
 
 def _h(s: str) -> int:
@@ -139,12 +140,29 @@ class EvalWorker(BaseWorker):
         for ref, cons in judge_consensus.items():
             await self._save_calibration(job.tenant, ref, cons, len(verdicts))
 
+        # Breach → Self-Heal: open an incident for any judge that failed its
+        # guardrail on this run. Derived entirely from the real verdicts above.
+        agent_name = await self._agent_name(job.tenant, run_ids)
+        await detect_incidents(job.tenant, vset, verdicts, agent_name)
+
         return {
             "verdict_set_id": vs_id, "pass_rate": pass_rate, "verdicts": len(verdicts),
             "verdict_count": len(verdicts), "pass_count": pass_count,
             "aggregate_scores": aggregate_scores, "consensus_rate": overall_consensus,
             "judge_call_count": judge_calls,
         }
+
+    async def _agent_name(self, tenant: str, run_ids: list[str]) -> str:
+        """Resolve the evaluated agent's display name from the first run's frozen
+        adapter snapshot, for attributing a self-heal incident."""
+        for run_id in run_ids:
+            row = await get_table().get(keys.run_pk(tenant), keys.run_sk(run_id))
+            if row:
+                snap = (row.get("data") or {}).get("adapter_snapshot") or {}
+                name = snap.get("name")
+                if name:
+                    return name
+        return "Agent under test"
 
     async def _progress(self, job, done, total, verdicts, judge_calls):
         job.progress.done = done
