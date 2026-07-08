@@ -634,7 +634,7 @@
     const min = Math.min.apply(null, values);
     const max = Math.max.apply(null, values);
     const range = (max - min) || 1;
-    const dx = (w - 2 * pad) / (values.length - 1);
+    const dx = values.length > 1 ? (w - 2 * pad) / (values.length - 1) : 0;
     const pts = values.map((v, i) => {
       const x = pad + i * dx;
       const y = pad + (h - 2 * pad) * (1 - (v - min) / range);
@@ -658,9 +658,10 @@
     const pad = { l: 36, r: 14, t: 14, b: 26 };
     const min = 0.4, max = 1.0;
     const range = max - min;
-    const dx = (w - pad.l - pad.r) / (series.length - 1);
+    const dx = series.length > 1 ? (w - pad.l - pad.r) / (series.length - 1) : 0;
     const yAt = v => pad.t + (h - pad.t - pad.b) * (1 - (v - min) / range);
-    const xAt = i => pad.l + i * dx;
+    // A single κ sample sits at "today" (right edge) rather than the left.
+    const xAt = i => series.length > 1 ? pad.l + i * dx : (w - pad.r);
 
     const okBand = `M ${pad.l} ${yAt(0.75)} L ${w - pad.r} ${yAt(0.75)} L ${w - pad.r} ${yAt(1.0)} L ${pad.l} ${yAt(1.0)} Z`;
     const warnBand = `M ${pad.l} ${yAt(0.65)} L ${w - pad.r} ${yAt(0.65)} L ${w - pad.r} ${yAt(0.75)} L ${pad.l} ${yAt(0.75)} Z`;
@@ -872,30 +873,98 @@
   const State = window.AIBC_OBS.State;
 
   let monitorsCache = [], packsCache = [], calibrationCache = [], batchesCache = [];
+  let judgesCache = {};          // name -> judge (for thresholds)
+  let gateHistoryCache = [];     // real deploy-gate decisions
+  let datasetsCache = null;      // null until first hydrate; then a live array
+  let vsByRunCache = {};         // run_id -> verdict set (for real evidence packs)
 
-  // Map a live ingest batch (+ its run and verdict set) into the batch-table row
-  // shape. Deep OpenInference span trees have no backend source, so `runs`/spans
-  // stay empty — the list, counts, pass-rate and lineage are all real.
-  const mapBatch = (b, runsById, vsByRun) => {
+  // First-hydrate barrier — read-once detail pages (batch.html, trace.html,
+  // calibration.html, gate.html) defer their render until this resolves so they
+  // never paint seed data before the real pipeline data has landed.
+  let resolveReady;
+  const ready = new Promise((r) => { resolveReady = r; });
+
+  const judgeName = (ref) => String(ref == null ? "" : ref).split("@")[0];
+
+  // Build the real per-trace "run rows" for a batch: each simulation trace is one
+  // persona×question conversation, scored by inline judges. The conversation
+  // turns and judge verdicts are all real backend data; OpenInference span trees
+  // (LLM/TOOL/RETRIEVER geometry) have no backend source, so `spans` stays empty
+  // and the detail page renders the real transcript instead.
+  async function buildRuns(runId) {
+    const [verdicts, traceList] = await Promise.all([
+      EEOF.get(`/runs/${runId}/verdicts`).catch(() => []),
+      EEOF.get(`/simulation/runs/${runId}/traces`).catch(() => []),
+    ]);
+    const traces = Array.isArray(traceList) ? traceList : [];
+    const vByTrace = {};
+    (verdicts || []).forEach((v) => {
+      (vByTrace[v.trace_id] = vByTrace[v.trace_id] || []).push(v);
+    });
+    const full = await Promise.all(
+      traces.map((t) => EEOF.get(`/simulation/traces/${t.id}`).catch(() => null))
+    );
+    return traces.map((t, i) => {
+      const detail = full[i] || {};
+      const turns = detail.turns || [];
+      const vs = vByTrace[t.id] || [];
+      const persona = detail.persona || {
+        id: t.persona_id, name: t.persona_id, version: t.persona_version,
+      };
+      const mapped = vs.map((v) => {
+        const nm = judgeName(v.judge_ref);
+        const thr = (judgesCache[nm] && judgesCache[nm].threshold) || 0.8;
+        return { judge: nm, score: v.score, threshold: thr, pass: v.passed };
+      });
+      const anyFail = mapped.some((v) => !v.pass);
+      const question =
+        (vs[0] && vs[0].question_prompt) ||
+        (turns.find((x) => x.role === "user") || {}).text ||
+        t.question_id || "(question unavailable)";
+      const durationMs = turns.reduce((m, x) => m + (x.latency_ms || 0), 0);
+      const tokensTotal = turns.reduce(
+        (m, x) => m + ((x.tokens && (x.tokens.in || 0) + (x.tokens.out || 0)) || 0), 0);
+      return {
+        run_id: t.id, trace_id: t.id, session_id: detail.session_id_used || t.id,
+        persona: { id: persona.id, name: persona.name || persona.id, version: persona.version || 1 },
+        question,
+        status: mapped.length ? (anyFail ? "fail" : "pass") : "pass",
+        duration_ms: durationMs, tokens_total: tokensTotal,
+        verdicts: mapped, turns, spans: [],
+      };
+    });
+  }
+
+  // Map a live ingest batch (+ its run, verdict set and real trace rows) into the
+  // batch-table shape. The list, counts, pass-rate, lineage, per-trace runs,
+  // verdicts and conversation transcripts are all real; only the OpenInference
+  // span geometry (histogram beyond EVALUATOR) has no backend source.
+  const mapBatch = (b, runsById, vsByRun, runs) => {
     const run = runsById[b.run_id] || {};
     const snap = run.adapter_snapshot || {};
     const agent = snap.name || snap.id || "agent-under-test";
     const vs = vsByRun[b.run_id];
-    const runCount = b.traces || run.completed || 0;
+    const rows = runs || [];
+    const passCount = rows.length
+      ? rows.filter((r) => r.status === "pass").length
+      : (vs ? vs.pass_count : 0);
+    const runCount = rows.length || b.traces || run.completed || 0;
+    const evalSpans = rows.reduce((m, r) => m + (r.verdicts ? r.verdicts.length : 0), 0);
     return {
       batch_id: b.run_id, experiment_id: agent, name: `${agent} · run`, sut: agent,
       lineage: {
         persona_set_version: "core-personas",
         question_strategy_version: "rainbow",
         target_version: `${agent}@v${snap.version || 1}`,
-        rubric_version: vs && vs.judge_refs ? vs.judge_refs.join(" + ") : "—",
+        rubric_version: vs && vs.judge_refs ? vs.judge_refs.map(judgeName).join(" + ") : "—",
       },
-      started_at: b.first_seen || run.created_at, finished_at: b.last_seen,
+      started_at: b.first_seen || run.created_at, finished_at: b.last_seen || b.first_seen,
       run_count: runCount,
-      pass_count: vs ? vs.pass_count : 0,
-      pass_rate: vs ? vs.pass_rate : 0,
+      pass_count: passCount,
+      pass_rate: rows.length ? passCount / runCount : (vs ? vs.pass_rate : 0),
       judge_pass_rates: vs ? vs.aggregate_scores || {} : {},
-      kind_histogram: {}, pass_sparkline: [], runs: [],
+      kind_histogram: evalSpans ? { EVALUATOR: evalSpans } : {},
+      pass_sparkline: rows.map((r) => (r.status === "pass" ? 1 : 0)), runs: rows,
     };
   };
 
@@ -918,16 +987,43 @@
     candidate: p.candidate, gate: p.gate,
   });
 
+  // Real deploy-gate decision for a candidate verdict set → the gate-history row
+  // shape the gate page renders. Signals come straight from the backend decision.
+  const mapGate = (g, vs) => ({
+    id: `gate_${(g.candidate || "").slice(-10) || "live"}`,
+    experiment_id: (vs && vs.run_ids && vs.run_ids[0]) || g.candidate || "—",
+    verdict: g.decision === "pass" ? "PASS" : g.decision === "fail" ? "BLOCK" : "NO DATA",
+    baseline_batch: null,
+    candidate_batch: (vs && vs.run_ids && vs.run_ids[0]) || g.candidate,
+    evaluated_at: g.evaluated_at || (vs && vs.created_at) || new Date().toISOString(),
+    deltas: [{
+      signal: "pass_rate", baseline: null,
+      candidate: g.pass_rate != null ? g.pass_rate : (vs ? vs.pass_rate : 0),
+      delta: null, threshold_min: g.threshold != null ? g.threshold : 0.8,
+      threshold_max: null, pass: g.decision === "pass",
+    }],
+    blocking_signals: g.decision === "pass" ? []
+      : [`pass_rate ${((g.pass_rate || 0) * 100).toFixed(0)}% < threshold ${((g.threshold || 0.8) * 100).toFixed(0)}%`],
+  });
+
   async function hydrate() {
     try {
-      const [mons, packs, cal, batches, runs, vsets] = await Promise.all([
+      const [mons, packs, cal, batches, runs, vsets, judges] = await Promise.all([
         EEOF.get("/observability/monitors").catch(() => null),
         EEOF.get("/observability/evidence").catch(() => null),
         EEOF.get("/observability/calibration").catch(() => null),
         EEOF.get("/observability/batches").catch(() => null),
         EEOF.get("/simulation/runs").catch(() => null),
         EEOF.get("/verdict-sets").catch(() => null),
+        EEOF.get("/judges").catch(() => null),
       ]);
+      if (Array.isArray(judges)) {
+        judgesCache = {};
+        judges.forEach((j) => {
+          const cur = judgesCache[j.name];
+          if (!cur || j.version > cur.version) judgesCache[j.name] = j;
+        });
+      }
       if (cal) calibrationCache = cal;
       if (mons) monitorsCache = mons.map(mapMonitor);
       if (packs) packsCache = packs.map(mapPack);
@@ -936,28 +1032,77 @@
         (runs || []).forEach((r) => { runsById[r.id] = r; });
         const vsByRun = {};
         (vsets || []).forEach((v) => { (v.run_ids || []).forEach((rid) => { vsByRun[rid] = v; }); });
-        batchesCache = batches
-          .map((b) => mapBatch(b, runsById, vsByRun))
-          .sort((a, b2) => (b2.started_at || "").localeCompare(a.started_at || ""));
-        // Override the batch data seam so the index list shows the real run.
+        vsByRunCache = vsByRun;
+        // Enrich each batch with its real per-trace runs (verdicts + transcript).
+        const enriched = await Promise.all(
+          batches.map(async (b) => mapBatch(b, runsById, vsByRun, await buildRuns(b.run_id)))
+        );
+        batchesCache = enriched.sort((a, b2) => (b2.started_at || "").localeCompare(a.started_at || ""));
+        // Override the batch data seam so every batch page shows the real run.
         if (window.AIBC_BATCHES && batchesCache.length) {
-          const seedLoad = window.AIBC_BATCHES.loadBatches;
           const seedGet = window.AIBC_BATCHES.getBatch;
           window.AIBC_BATCHES.loadBatches = () => batchesCache;
           window.AIBC_BATCHES.getBatch = (id) =>
             batchesCache.find((x) => x.batch_id === id) || seedGet(id);
+          window.AIBC_BATCHES.getRun = (batchId, runId) => {
+            const bt = window.AIBC_BATCHES.getBatch(batchId);
+            return bt ? (bt.runs || []).find((r) => r.run_id === runId) : null;
+          };
           if (typeof window.AIBC_OBS_renderBatches === "function") window.AIBC_OBS_renderBatches();
-          void seedLoad;
         }
+        // Real deploy-gate history: evaluate the gate for each candidate verdict set.
+        const gateRows = await Promise.all(
+          (vsets || []).map(async (v) => {
+            const g = await EEOF.get(`/observability/gate/${v.id}`).catch(() => null);
+            return g ? mapGate(g, v) : null;
+          })
+        );
+        gateHistoryCache = gateRows.filter(Boolean)
+          .sort((a, b2) => (b2.evaluated_at || "").localeCompare(a.evaluated_at || ""));
       }
       if (typeof window.render === "function") window.render();
     } catch {}
+    finally { resolveReady(); }
   }
 
-  // Override the State getters so the pages read live data.
+  // Override the State getters so the pages read live data. Surfaces with no
+  // backend source (datasets) start empty rather than showing seed storylines.
   State.monitors = () => monitorsCache;
   State.packs = () => packsCache;
   State.calibration = () => calibrationCache;
+  // Requesting evidence POSTs a real assembly job (candidate run + its verdict
+  // set) rather than fabricating a pack; the list re-hydrates from the backend.
+  State.savePacks = (arr) => {
+    const known = new Set(packsCache.map((p) => p.id));
+    (arr || []).filter((p) => p && !known.has(p.id) && !p._posted).forEach((p) => {
+      const run = batchesCache[0];
+      const candidate = run && run.batch_id;
+      const vs = candidate && vsByRunCache[candidate];
+      if (candidate && vs) {
+        p._posted = true;
+        EEOF.post("/observability/evidence", {
+          candidate, verdict_set_ids: [vs.id], title: p.template_label || "Evaluation evidence",
+        }).then(() => hydrate()).catch(() => {});
+      }
+    });
+  };
+  State.gateHistory = () => gateHistoryCache;
+  State.saveGateHistory = (v) => { gateHistoryCache = v || []; };
+  State.datasets = () => (datasetsCache = datasetsCache || []);
+  State.saveDatasets = (v) => { datasetsCache = v || []; };
+  // Real judge-calibration tiles: map each backend record into the judge shape
+  // the calibration page renders. Point-in-time κ (no rolling series yet), so the
+  // series is a single real sample rather than a fabricated 30-window trend.
+  State.judges = () => calibrationCache.map((c) => {
+    const nm = judgeName(c.judge_ref);
+    return {
+      id: nm, name: nm, tenant: "acme", ref: c.judge_ref,
+      kappa_now: c.kappa, kappa_target: 0.75, kappa_threshold: 0.65,
+      paired_labels_30d: c.sample_size, window_days: 30,
+      agreement: c.agreement, ts: c.ts,
+      drift_alert: c.kappa < 0.65, series: [c.kappa],
+    };
+  });
   State.saveMonitors = (arr) => {
     const known = new Set(monitorsCache.map((m) => m.name));
     (arr || []).filter((m) => !known.has(m.name)).forEach((m) => {
@@ -970,6 +1115,7 @@
   };
 
   window.AIBC_OBS.liveHydrate = hydrate;
+  window.AIBC_OBS.ready = ready;
   if (document.readyState !== "loading") setTimeout(hydrate, 0);
   else document.addEventListener("DOMContentLoaded", hydrate);
 })();

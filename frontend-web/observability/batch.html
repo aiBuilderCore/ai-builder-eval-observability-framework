@@ -149,6 +149,7 @@
     const B = window.AIBC_BATCHES;
     if (!B) return;
 
+    function boot() {
     const params = new URLSearchParams(location.search);
     const batchId = params.get('id');
     const batch = batchId ? B.getBatch(batchId) : B.loadBatches()[0];
@@ -171,7 +172,10 @@
       (batch.regression_note ? ' <span style="color:var(--signal-warn);"><b>Note:</b> ' + B.escapeHtml(batch.regression_note) + '</span>' : '');
 
     const totalSpans = (batch.runs || []).reduce((m, r) => m + (r.spans ? r.spans.length : 0), 0);
-    const evalSpans = (batch.runs || []).reduce((m, r) => m + (r.spans ? r.spans.filter(s => s.kind === 'EVALUATOR').length : 0), 0);
+    // Inline judge verdicts: real EVALUATOR spans when present, else the real
+    // per-run verdict count (live runs carry verdicts but no span geometry).
+    const evalSpans = (batch.runs || []).reduce((m, r) =>
+      m + (r.spans && r.spans.length ? r.spans.filter(s => s.kind === 'EVALUATOR').length : (r.verdicts ? r.verdicts.length : 0)), 0);
     // Identifiers only — the run/pass/span counts live in the summary tiles
     // below, so we don't repeat them here.
     document.getElementById('head-pills').innerHTML = `
@@ -338,6 +342,11 @@
     // ---- trajectory CTA ----
     const trajCta = document.getElementById('cta-traj');
     if (trajCta) trajCta.href = './trajectory.html?batch=' + encodeURIComponent(batch.batch_id);
+    }
+
+    // Defer to first live hydrate so the real run (not seed) is what renders.
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(boot);
   })();
 </script>
 

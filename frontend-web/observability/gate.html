@@ -197,6 +197,7 @@
     const B = window.AIBC_BATCHES;
     if (!obs || !B) return;
 
+    function boot() {
     // Render "what changed" — the four-tuple lineage diff between baseline and candidate.
     // Highlights the axis that actually differs (target_version, rubric, etc.).
     function renderLineageDiff() {
@@ -484,6 +485,11 @@
       document.getElementById('delta-host').innerHTML = '';
     }
     renderHistory();
+    }
+
+    // Defer to first live hydrate so real batches + real gate history render.
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(boot);
   })();
 </script>
 </body>

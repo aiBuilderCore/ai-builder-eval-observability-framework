@@ -207,6 +207,7 @@
     const B = window.AIBC_BATCHES;
     if (!obs || !B) return;
 
+    function boot() {
     // Suggested promotions: auto-pick the failing cohorts from the most recent
     // batch that has any. Chips pre-fill the form below when clicked.
     (function renderSuggested() {
@@ -304,7 +305,7 @@
         '<span class="pill"><b>' + totalRows + '</b> total rows</span>' +
         '<span class="pill pill--ok"><b>' + ready + '</b> fine-tune ready</span>' +
         (skewAlert ? '<span class="pill pill--warn"><b>' + skewAlert + '</b> skew alert</span>' : '') +
-        '<span class="pill">localStorage · synthetic</span>';
+        '<span class="pill">local scratchpad · no backend store</span>';
 
       const grid = document.getElementById('datasets-grid');
       grid.innerHTML = datasets.map(d => {
@@ -380,7 +381,19 @@
       const batch = document.getElementById('prm-batch').value;
       const filter = document.getElementById('prm-filter').value.trim();
       if (!name) { document.getElementById('prm-feedback').textContent = '⚠ enter a dataset name'; return; }
-      const rows = 2 + Math.floor(Math.random() * 10);
+      // Row count is derived from the real runs the filter selects in the chosen
+      // batch — not fabricated. cohort=… and status=fail resolve against live data.
+      const bt = B.getBatch(batch);
+      const allRuns = bt ? (bt.runs || []) : [];
+      let matched = allRuns;
+      const cohortMatch = /cohort=([\w.]+)/.exec(filter);
+      if (cohortMatch) {
+        const c = B.groupByFailureCohort(batch).find(x => x.key === cohortMatch[1]);
+        matched = c ? c.runs : [];
+      } else if (/status=fail/.test(filter)) {
+        matched = allRuns.filter(r => r.status !== 'pass');
+      }
+      const rows = matched.length;
       const source = fromIncident ? 'live_monitor' : 'batch_promotion';
       const datasets = obs.State.datasets();
       datasets.unshift({
@@ -391,12 +404,18 @@
         source_incident: fromIncident || null,
         filter: filter || 'status=fail',
         rows,
-        health: {
-          staleness_days: 0,
-          persona_coverage: 0.4 + Math.random() * 0.5,
-          skew_alert: Math.random() < 0.3,
-          diversity_score: 0.4 + Math.random() * 0.5,
-        },
+        health: (function () {
+          const personas = new Set(matched.map(r => r.persona && r.persona.id).filter(Boolean));
+          const questions = new Set(matched.map(r => r.question));
+          const cov = matched.length ? personas.size / matched.length : 0;
+          const div = matched.length ? questions.size / matched.length : 0;
+          return {
+            staleness_days: 0,
+            persona_coverage: cov,
+            skew_alert: matched.length > 0 && personas.size === 1,
+            diversity_score: div,
+          };
+        })(),
         last_updated: new Date().toISOString(),
         ready_for_finetune: rows >= 5,
         exports: 0,
@@ -416,6 +435,11 @@
     });
 
     renderAll();
+    }
+
+    // Defer to first live hydrate so batch pickers + promotions use real runs.
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(boot);
   })();
 </script>
 </body>

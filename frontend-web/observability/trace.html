@@ -151,6 +151,7 @@
     const B = window.AIBC_BATCHES;
     if (!B) return;
 
+    function boot() {
     const params = new URLSearchParams(location.search);
     const batchId = params.get('batch');
     const runId = params.get('run');
@@ -229,15 +230,43 @@
 
     const spans = run.spans || [];
     const evalCount = spans.filter(s => s.kind === 'EVALUATOR').length;
+    const primaryPills = spans.length
+      ? `<span class="pill pill--accent"><b>${spans.length}</b> spans</span>
+         <span class="pill"><b>${evalCount}</b> EVALUATOR</span>`
+      : `<span class="pill pill--accent"><b>${(run.turns || []).length}</b> turns</span>
+         <span class="pill"><b>${(run.verdicts || []).length}</b> inline verdicts</span>`;
     document.getElementById('head-pills').innerHTML = `
-      <span class="pill pill--accent"><b>${spans.length}</b> spans</span>
-      <span class="pill"><b>${evalCount}</b> EVALUATOR</span>
+      ${primaryPills}
       <span class="pill">trace_id <b>${run.trace_id}</b></span>
       <span class="pill">batch_id <b>${batch.batch_id}</b></span>
     `;
 
-    // ---- span chart ----
-    document.getElementById('chart-host').innerHTML = B.renderSpanTree(spans, { w: 880 });
+    // ---- span chart / transcript ----
+    // Live runs carry the real conversation turns but no OpenInference span
+    // geometry (no backend source). Render the real transcript in that case;
+    // fall back to the span-tree Gantt for any run that does carry spans.
+    const turns = run.turns || [];
+    if (!spans.length && turns.length) {
+      document.getElementById('chart-host').innerHTML =
+        '<div style="display:flex;flex-direction:column;gap:10px;">' + turns.map(t => {
+          const agent = t.role === 'agent';
+          const meta = [
+            t.latency_ms ? (t.latency_ms + 'ms') : '',
+            (t.tokens && (t.tokens.in != null || t.tokens.out != null))
+              ? ('↓' + (t.tokens.in || 0) + ' ↑' + (t.tokens.out || 0) + ' tok') : '',
+            t.is_seed_prompt ? 'seed prompt' : '',
+          ].filter(Boolean).join(' · ');
+          const border = agent ? 'var(--accent, #6a7)' : 'var(--border, #ccc)';
+          return `
+            <div style="border:1px solid var(--border);border-left:3px solid ${border};border-radius:8px;padding:12px 14px;background:var(--surface);${agent ? '' : 'margin-right:48px;'}${agent ? 'margin-left:48px;' : ''}">
+              <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">${agent ? 'agent-under-test' : 'simulated user'}${meta ? ' · <span style="color:var(--text-faint);text-transform:none;letter-spacing:0;">' + B.escapeHtml(meta) + '</span>' : ''}</div>
+              <div style="font-size:13.5px;line-height:1.6;white-space:pre-wrap;color:var(--text);">${B.escapeHtml(t.text || '')}</div>
+            </div>`;
+        }).join('') + '</div>' +
+        '<p class="span-empty" style="margin-top:14px;">Real conversation transcript · OpenInference span geometry has no backend source for live runs.</p>';
+    } else {
+      document.getElementById('chart-host').innerHTML = B.renderSpanTree(spans, { w: 880 });
+    }
 
     // legend
     const usedKinds = Array.from(new Set(spans.map(s => s.kind)));
@@ -323,6 +352,11 @@
 
     // ---- lineage rail ----
     document.getElementById('rail').innerHTML = B.lineageRailHtml(batch, run);
+    }
+
+    // Defer to first live hydrate so the real trace (not seed) is what renders.
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(boot);
   })();
 </script>
 

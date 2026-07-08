@@ -89,13 +89,17 @@
       latency and cost look fine. This is the failure mode that's invisible everywhere else in the market.
     </p>
     <div class="meta-pills">
-      <span class="pill pill--err"><b>z=4.7</b> tool-call sequence</span>
-      <span class="pill pill--warn"><b>0.42</b> planner-step KL</span>
-      <span class="pill pill--err"><b>+38%</b> delegation-edge churn</span>
-      <span class="pill"><b>billing-agent</b> · prompt v2.4</span>
-      <span class="pill"><b>24h</b> baseline</span>
+      <span class="pill pill--warn"><b>illustrative</b> · no backend telemetry source</span>
+      <span class="pill">span-level tool/plan/delegation traces not yet emitted</span>
     </div>
   </section>
+
+  <div style="background:rgba(201,122,31,0.10);border:1px solid rgba(201,122,31,0.35);border-radius:var(--r-3);padding:14px 18px;margin:0 0 22px;font-size:13px;line-height:1.6;color:var(--text-muted);">
+    <b style="color:var(--signal-warn);">Illustrative screen.</b> Trajectory drift needs per-span tool-call, planner-step
+    and delegation-edge telemetry, which the pipeline does not emit yet — so the heatmap, distribution diff and
+    delegation graphs below are seed illustrations, not this run's data. The batch pickers are wired to real runs;
+    the drift visualisations light up once span-level telemetry lands.
+  </div>
 
   <!-- ============= EXPERIMENT PAIR PICKER ============= -->
   <div class="exp-picker" id="exp-picker">
@@ -288,9 +292,10 @@
     const B = window.AIBC_BATCHES;
     if (!obs) return;
 
-    // Drive the baseline / candidate pickers from real batches.js entries so
-    // adding a new batch surfaces here automatically.
-    if (B) {
+    // Drive the baseline / candidate pickers from the real batches (after the
+    // first live hydrate) so adding a run surfaces here automatically.
+    function populatePickers() {
+      if (!B) return;
       const batches = B.loadBatches().slice().sort((a, b) =>
         new Date(b.started_at) - new Date(a.started_at));
       function label(b) {
@@ -311,6 +316,8 @@
         baseSel.value = batches[1].batch_id;
       }
     }
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(populatePickers);
 
     function applyExperiment() {
       const baseSel = document.getElementById('pick-baseline');

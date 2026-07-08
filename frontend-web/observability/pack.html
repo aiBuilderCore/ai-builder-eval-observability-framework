@@ -199,6 +199,7 @@
   (function () {
     const obs = window.AIBC_OBS;
     if (!obs) return;
+    function boot() {
     const params = new URLSearchParams(location.search);
     const id = params.get('id');
     const packs = obs.State.packs();
@@ -284,6 +285,11 @@
       'Real download would stream the signed evidence bundle from S3.'); };
     document.getElementById('dl-pdf').addEventListener('click', blocker);
     document.getElementById('dl-bundle').addEventListener('click', blocker);
+    }
+
+    // Defer to first live hydrate so the real evidence pack resolves.
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(boot);
   })();
 </script>
 </body>

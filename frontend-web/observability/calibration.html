@@ -88,12 +88,7 @@
       Without per-tenant calibration, every score the platform emits is suspect — and no leading vendor in May 2026 ships
       this as a primary product surface.
     </p>
-    <div class="meta-pills">
-      <span class="pill pill--err"><b>faithfulness_v3</b> · κ=0.59 · drifting</span>
-      <span class="pill pill--ok"><b>safety_v2</b> · κ=0.81</span>
-      <span class="pill pill--warn"><b>helpfulness_v4</b> · κ=0.72</span>
-      <span class="pill"><b>3</b> judges tracked</span>
-    </div>
+    <div class="meta-pills" id="calib-pills"></div>
   </section>
 
   <div class="calib-tabs" role="tablist" aria-label="Calibration views">
@@ -115,19 +110,19 @@
   <div class="kappa-card">
     <div class="head">
       <div>
-        <h3>faithfulness_v3 · acme-corp</h3>
-        <div style="font-family:var(--mono);font-size:12px;color:var(--text-faint);margin-top:6px;">
-          318 paired labels · last 30 days · target κ ≥ 0.75 · alert on κ &lt; 0.65 (drift Δ &gt; 0.10)
+        <h3 id="kappa-title">judge · —</h3>
+        <div id="kappa-sub" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);margin-top:6px;">
+          target κ ≥ 0.75 · alert on κ &lt; 0.65
         </div>
       </div>
-      <div class="now"><span style="color:var(--signal-err);">0.59</span> <em>now</em></div>
+      <div class="now"><span id="kappa-now">—</span> <em>now</em></div>
     </div>
     <svg class="kappa-svg" id="kappa-chart"></svg>
     <div style="display:flex;gap:18px;margin-top:14px;font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">
       <span><span style="display:inline-block;width:12px;height:6px;background:rgba(31,143,94,0.20);vertical-align:middle;margin-right:6px;"></span>target band κ ≥ 0.75</span>
       <span><span style="display:inline-block;width:12px;height:6px;background:rgba(201,122,31,0.30);vertical-align:middle;margin-right:6px;"></span>warn 0.65 ≤ κ &lt; 0.75</span>
       <span><span style="display:inline-block;width:12px;height:6px;background:rgba(184,61,43,0.30);vertical-align:middle;margin-right:6px;"></span>breach κ &lt; 0.65</span>
-      <span style="margin-left:auto;color:var(--signal-err);">↓ −0.06 in 30d</span>
+      <span id="kappa-note" style="margin-left:auto;color:var(--text-faint);"></span>
     </div>
   </div>
 
@@ -235,71 +230,59 @@
 <script src="../_api.js"></script>
 <script src="app.js?v=2"></script>
 <script>
-  const REVIEW_ITEMS = [
-    { id: 'q_01HXC1', version: 'v3.1.2', text: '"…the case opened on April 14th, with three open invoices totaling $4,212.40. The customer\'s pattern of late filings…"', judge_verdict: 'PASS', judge_score: 0.92, judge_color: 'var(--signal-ok)' },
-    { id: 'q_01HXC2', version: 'v3.1.2', text: '"Yes — based on the KB article you cited, the 30-day grace period applies. I\'ve drafted a refund authorization for $128.00."', judge_verdict: 'PASS', judge_score: 0.88, judge_color: 'var(--signal-ok)' },
-    { id: 'q_01HXC3', version: 'v3.1.2', text: '"Per our policy, all enterprise customers receive a 90-day warranty extension automatically." <span style="color:var(--signal-err);font-style:italic;">[no source cited]</span>', judge_verdict: 'PASS', judge_score: 0.81, judge_color: 'var(--signal-ok)' },
-    { id: 'q_01HXC4', version: 'v3.1.2', text: '"I cannot find documentation that supports your claim about the 60-day window — could you share the article reference?"', judge_verdict: 'FAIL', judge_score: 0.42, judge_color: 'var(--signal-warn)' },
-  ];
-  const labels = {};
-
+  // The human-gold review queue has no backend source yet — labelling isn't wired
+  // to a persistence endpoint — so it starts empty rather than showing mock rows.
   function renderReviewList() {
     const list = document.getElementById('review-list');
-    const pending = REVIEW_ITEMS.filter(it => !labels[it.id]);
-    if (!pending.length) {
-      list.innerHTML = '';
-      const agreed = Object.values(labels).filter(l => l === 'agree').length;
-      const disagreed = Object.values(labels).filter(l => l === 'disagree').length;
-      const skipped = Object.values(labels).filter(l => l === 'skip').length;
-      document.getElementById('review-summary').style.display = '';
-      document.getElementById('review-summary-text').textContent =
-        'Queue complete · ' + agreed + ' agreed · ' + disagreed + ' disagreed · ' + skipped + ' skipped — κ contribution recorded.';
-      return;
-    }
+    if (!list) return;
     document.getElementById('review-summary').style.display = 'none';
-    list.innerHTML = pending.map(it => `
-      <div class="review-row" id="row-${it.id}">
-        <div class="qid">${it.id}<br/>${it.version}</div>
-        <div class="text">${it.text}</div>
-        <div class="judge"><b>faithfulness</b><br/><span style="color:${it.judge_color};">${it.judge_verdict} · ${it.judge_score.toFixed(2)}</span></div>
-        <div class="judge"><b>your call?</b></div>
-        <div class="actions">
-          <button class="agree" onclick="label('${it.id}','agree',this)">agree</button>
-          <button class="disagree" onclick="label('${it.id}','disagree',this)">disagree</button>
-          <button onclick="label('${it.id}','skip',this)">skip</button>
-        </div>
-      </div>`).join('');
+    list.innerHTML =
+      '<div style="background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-3);padding:40px;text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">' +
+      'No human-gold review items queued. Paired labels are collected during evaluation; κ above is computed from the real judge-vs-gold sample.' +
+      '</div>';
   }
+  function resetReview() { renderReviewList(); }
 
-  function label(id, choice, btn) {
-    labels[id] = choice;
-    const row = document.getElementById('row-' + id);
-    if (row) {
-      const msg = choice === 'agree' ? '✓ agreed' : (choice === 'disagree' ? '✗ disagreed' : '— skipped');
-      const clr = choice === 'agree' ? 'var(--signal-ok)' : (choice === 'disagree' ? 'var(--signal-err)' : 'var(--text-faint)');
-      row.style.opacity = '0.5';
-      row.querySelectorAll('button').forEach(b => { b.disabled = true; });
-      row.querySelector('.actions').innerHTML = '<span style="font-family:var(--font-mono);font-size:12px;color:' + clr + ';">' + msg + '</span>';
-      setTimeout(() => { row.remove(); renderReviewList(); }, 600);
-    }
-  }
-
-  function resetReview() {
-    Object.keys(labels).forEach(k => delete labels[k]);
-    renderReviewList();
-  }
-
-  (function () {
+  function boot() {
     const obs = window.AIBC_OBS;
     if (!obs) return;
     renderReviewList();
     const judges = obs.State.judges();
-    const primary = judges[0];
 
-    // primary chart
+    // Header pills — one per real calibrated judge.
+    const pillCls = (j) => j.kappa_now < j.kappa_threshold ? 'pill--err'
+      : (j.kappa_now < j.kappa_target ? 'pill--warn' : 'pill--ok');
+    document.getElementById('calib-pills').innerHTML = judges.length
+      ? judges.map(j => `<span class="pill ${pillCls(j)}"><b>${obs.escapeHtml(j.id)}</b> · κ=${j.kappa_now.toFixed(2)}${j.drift_alert ? ' · drifting' : ''}</span>`).join('') +
+        `<span class="pill"><b>${judges.length}</b> judge${judges.length === 1 ? '' : 's'} tracked</span>`
+      : '<span class="pill">no calibration records yet · run an evaluation to populate κ</span>';
+
+    if (!judges.length) {
+      document.getElementById('kappa-title').textContent = 'No judge calibrated yet';
+      document.getElementById('kappa-now').textContent = '—';
+      document.getElementById('kappa-sub').textContent = 'κ is computed per judge from the human-gold sample during evaluation.';
+      document.getElementById('judges-grid').innerHTML =
+        '<div style="grid-column:1/-1;background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-3);padding:40px;text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">no judges tracked</div>';
+      return;
+    }
+
+    // Primary κ card — the lowest-κ (most at-risk) judge.
+    const primary = judges.slice().sort((a, b) => a.kappa_now - b.kappa_now)[0];
+    const nowColor = primary.kappa_now < primary.kappa_threshold ? 'var(--signal-err)'
+      : (primary.kappa_now < primary.kappa_target ? 'var(--signal-warn)' : 'var(--signal-ok)');
+    document.getElementById('kappa-title').textContent = primary.id + ' · ' + primary.tenant;
+    document.getElementById('kappa-sub').textContent =
+      primary.paired_labels_30d + ' paired label' + (primary.paired_labels_30d === 1 ? '' : 's') +
+      ' · agreement ' + (primary.agreement != null ? (primary.agreement * 100).toFixed(0) + '%' : '—') +
+      ' · target κ ≥ 0.75 · alert on κ < 0.65';
+    const nowEl = document.getElementById('kappa-now');
+    nowEl.textContent = primary.kappa_now.toFixed(2);
+    nowEl.style.color = nowColor;
+    document.getElementById('kappa-note').textContent =
+      primary.series.length < 2 ? 'single sample · no rolling trend yet' : '';
     obs.renderKappaChart(document.getElementById('kappa-chart'), primary.series, { w: 1100, h: 200 });
 
-    // secondary judge tiles
+    // Secondary judge tiles.
     const grid = document.getElementById('judges-grid');
     grid.innerHTML = judges.map(j => {
       const cls = j.kappa_now < j.kappa_threshold ? 'spark--err' :
@@ -323,6 +306,11 @@
       const j = judges.find(x => x.id === id);
       obs.renderSparkline(svg, j.series, { w: 220, h: 30 });
     });
+  }
+
+  (function () {
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(boot);
   })();
 </script>
 </body>

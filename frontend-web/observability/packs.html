@@ -156,6 +156,7 @@
   (function () {
     const obs = window.AIBC_OBS;
     if (!obs) return;
+    function boot() {
     const TEMPLATES = obs.State.templates();
     let activeTemplates = new Set();
     let q = '';
@@ -280,6 +281,8 @@
         : '<div style="grid-column:1/-1;background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:48px;text-align:center;color:var(--text-faint);font-family:var(--mono);font-size:12px;">no issued evidence matches the filter</div>';
     }
 
+    // Let the live hydrate re-render this page once real evidence lands.
+    window.render = render;
     render();
     // Keep the page lively while packs are assembling.
     setInterval(() => {
@@ -290,6 +293,10 @@
         render();
       }
     }, 1500);
+    }
+
+    const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
+    R.then(boot);
   })();
 </script>
 </body>
