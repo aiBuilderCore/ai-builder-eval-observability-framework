@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     # pipeline by hand and watch real data appear only after each stage runs.
     seed_demo: bool = True
 
+    # Sub-switch: whether the *fabricated* self-heal incident backlog (the
+    # INC-99x narratives) seeds alongside the rest of the demo lineage. Defaults
+    # on for backwards-compatibility, but `bootstrap.sh` turns it OFF so Self-Heal
+    # is populated only by the real breach detector (`self_heal_detect`) — no
+    # hand-written incidents. Policies + the action registry always seed either
+    # way (they are built-in config, not fabricated runtime data).
+    seed_heal_incidents: bool = True
+
     # Data plane (infra mode)
     scylla_endpoint: str = "http://localhost:8000"
     scylla_region: str = "us-east-1"

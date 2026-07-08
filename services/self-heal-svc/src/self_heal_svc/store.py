@@ -42,7 +42,9 @@ async def ensure_seeded(tenant: str) -> None:
     # appear once a real quality breach is detected from an actual run. The
     # policy + action-registry vocabulary still loads: it is built-in config
     # (like the persona/judge libraries), not runtime data.
-    seed_incidents = SEED_INCIDENTS if settings.seed_demo else []
+    seed_incidents = (
+        SEED_INCIDENTS if (settings.seed_demo and settings.seed_heal_incidents) else []
+    )
     for inc in seed_incidents:
         model = SelfHealIncident.model_validate(inc)
         gsipk, gsisk = keys.heal_incident_gsi(tenant, model.status, model.opened_at)

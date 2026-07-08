@@ -11,6 +11,7 @@ without a live model.
 from __future__ import annotations
 
 import hashlib
+import json
 
 from .base import Message, ModelProvider, ScoreResult
 
@@ -42,9 +43,18 @@ class EchoProvider(ModelProvider):
     ) -> str:
         last = messages[-1]["content"] if messages else ""
         seed = _h(system, last)
-        # A user-simulator turn: reply as the persona would.
-        if "USER PROMPT" in system:  # judge path handled by score()
-            return ""
+        # Judge path: the base `score()` prompts for a JSON verdict via chat().
+        # `EchoProvider.score()` overrides that when echo is the *sole* provider,
+        # but when echo is only the fallback link the wrapper calls base.score →
+        # chat here, so return a valid, parseable JSON verdict (same distribution
+        # as `score()`) rather than an empty string that scores 0.0.
+        if "USER PROMPT" in system:
+            score = round(0.55 + (seed % 45) / 100.0, 2)  # 0.55..0.99
+            return json.dumps({
+                "score": score,
+                "passed": score >= 0.7,
+                "rationale": "Deterministic offline judge verdict (echo).",
+            })
         if "simulate" in system.lower() or "persona" in system.lower():
             tail = ["Okay, that helps.", "Wait, that's not what I asked.",
                     "Can you be more concrete?", "Fine, and then what?"]

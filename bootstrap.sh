@@ -124,14 +124,50 @@ cat <<EOF
     401k agent  : http://127.0.0.1:8097/chat        (REST agent-under-test)
     model       : Azure GPT-4 primary -> Groq fallback -> echo (set keys in .env)
 
-  In another shell you can drive the full pipeline end-to-end:
+  Initial data is seeded automatically: the dashboard + observability rollups
+  (SEED_DEMO) and — once the edge is live — a real question-generation /
+  simulation / evaluation / self-heal lineage driven through the API
+  (scripts/seed_pipeline.py). Judge catalogue + persona lab come from the core
+  library. To drive another lineage yourself:
     uv run python scripts/demo.py
 
 EOF
 
 if [ "$RUN" = 1 ]; then
-  log "starting all services (Ctrl-C to stop) …"
-  exec uv run python scripts/run_all.py
+  # Start the whole stack in the background so we can seed the interactive
+  # surfaces (question-generation / simulation / evaluation / self-heal) through
+  # the real edge once it is live, then hand the terminal back to the running
+  # stack. SEED_HEAL_INCIDENTS=0 keeps Self-Heal populated only by the real
+  # breach detector (no hand-written INC-99x incidents); SEED_DEMO (default on)
+  # still seeds the dashboard/observability rollups + onboards the agent adapter.
+  log "starting all services in the background …"
+  SEED_HEAL_INCIDENTS=0 uv run python scripts/run_all.py &
+  RUN_PID=$!
+  # Stop the stack if bootstrap is interrupted before hand-off.
+  trap 'kill "$RUN_PID" 2>/dev/null || true' INT TERM
+
+  log "waiting for the edge on :8080 …"
+  EDGE_UP=0
+  for i in $(seq 1 60); do
+    if ! kill -0 "$RUN_PID" 2>/dev/null; then
+      warn "the stack exited during startup — see the logs above"; exit 1
+    fi
+    if curl -sf http://127.0.0.1:8080/health >/dev/null 2>&1; then EDGE_UP=1; break; fi
+    sleep 1
+  done
+  if [ "$EDGE_UP" = 1 ]; then
+    log "seeding interactive pipeline data (qgen · sim · eval · self-heal) …"
+    uv run python scripts/seed_pipeline.py || warn "pipeline seed skipped/failed (stack still up)"
+  else
+    warn "edge did not become ready in time — skipping pipeline seed"
+  fi
+
+  # Hand off: keep the stack in the foreground (Ctrl-C stops it).
+  trap - INT TERM
+  log "platform ready — http://127.0.0.1:8080/  (Ctrl-C to stop)"
+  wait "$RUN_PID"
 else
-  log "--no-run: setup complete. Start with: uv run python scripts/run_all.py"
+  log "--no-run: setup complete."
+  log "  start the stack : uv run python scripts/run_all.py"
+  log "  then seed it    : uv run python scripts/seed_pipeline.py"
 fi
