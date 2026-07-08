@@ -85,6 +85,13 @@ async def ensure_builtin_adapters(tenant: str) -> None:
     onboarding. `scripts/onboard_agent.py` calls this for the from-scratch
     bootstrap; the sync `/adapters` read calls it lazily too.
     """
+    # Clean-slate mode: operator onboards the agent-under-test by hand (UI/API)
+    # so the adapter list starts empty and every downstream row is earned by a
+    # real run, not seeded. `scripts/onboard_agent.py` still calls this directly
+    # for the infra bootstrap, where SEED_DEMO defaults to on.
+    if not settings.seed_demo:
+        return
+
     from eeof_core.models import CORE_AGENTS
 
     existing = {a["data"].get("name") for a in await get_table().query(keys.adapter_pk(tenant), "ADAPTER#")}

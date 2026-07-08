@@ -343,29 +343,39 @@
 
   // ---------- Step 1 — persona pick ----------
   const personaHost = document.getElementById("persona-pick");
-  QG.PERSONAS.forEach(p => {
-    const lab = document.createElement("label");
-    lab.dataset.id = p.id;
-    lab.innerHTML = `
-      <input type="checkbox" />
-      <span class="mono-tile" style="background:var(--hue-${p.hue}, var(--accent));">${QG.monogramOf(p.name)}</span>
-      <span class="body">
-        <span class="name">${p.name}</span>
-        <span class="role">${p.role}</span>
-      </span>`;
-    lab.onclick = (e) => {
-      e.preventDefault();
-      const idx = draft.personas.indexOf(p.id);
-      if (idx >= 0) draft.personas.splice(idx, 1); else draft.personas.push(p.id);
-      lab.classList.toggle("checked");
-      lab.querySelector("input").checked = draft.personas.includes(p.id);
-      paintRubric();
-      reapplyShapes();
-      reapplyScenarios();
-      renderSummary();
-    };
-    personaHost.appendChild(lab);
-  });
+  function buildPersonaPicker() {
+    personaHost.innerHTML = "";
+    QG.PERSONAS.forEach(p => {
+      const lab = document.createElement("label");
+      lab.dataset.id = p.id;
+      lab.innerHTML = `
+        <input type="checkbox" />
+        <span class="mono-tile" style="background:var(--hue-${p.hue}, var(--accent));">${QG.monogramOf(p.name)}</span>
+        <span class="body">
+          <span class="name">${p.name}</span>
+          <span class="role">${p.role}</span>
+        </span>`;
+      lab.onclick = (e) => {
+        e.preventDefault();
+        const idx = draft.personas.indexOf(p.id);
+        if (idx >= 0) draft.personas.splice(idx, 1); else draft.personas.push(p.id);
+        lab.classList.toggle("checked");
+        lab.querySelector("input").checked = draft.personas.includes(p.id);
+        paintRubric();
+        reapplyShapes();
+        reapplyScenarios();
+        renderSummary();
+      };
+      personaHost.appendChild(lab);
+    });
+  }
+  buildPersonaPicker();
+  // The initial paint uses the static seed list; once the LIVE wiring hydrates
+  // QG.PERSONAS from the real core-library personas, rebuild so the picker (and
+  // every ref it produces) matches what the backend actually has.
+  if (QG.ready && typeof QG.ready.then === "function") {
+    QG.ready.then(() => { draft.personas = []; buildPersonaPicker(); renderSummary(); });
+  }
 
   // ---------- Step 3 — scenario chips ----------
   // Build a chip for every (length × style × difficulty) tuple in the

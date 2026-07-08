@@ -104,41 +104,54 @@
 
     document.getElementById("head-id").textContent = trace.trace_id;
     const persona = SIM.PERSONAS[trace.persona?.id] || {};
-    document.getElementById("head-title").innerHTML = `${SIM.escapeHtml(persona.name || trace.persona?.id)} <span class="qualifier">— ${trace.scenario?.length}.${trace.scenario?.style}.${trace.scenario?.difficulty}</span>`;
+    const dash = (v) => (v === undefined || v === null || v === "" ? "—" : v);
+    // Persona name is carried on the live trace; fall back to the seed map, then id.
+    const personaName = trace.persona?.name || persona.name || trace.persona?.id;
+    // Scenario is a "length.style.difficulty" string on the live trace but an
+    // object on seed traces — normalise both to a display string.
+    const scenarioLabel = typeof trace.scenario === "string"
+      ? trace.scenario
+      : [trace.scenario?.length, trace.scenario?.style, trace.scenario?.difficulty].filter(Boolean).join(".") || "—";
+    // Adapter id/version live on the run snapshot, not the trace.
+    const adapterId = dash(run?.adapter_snapshot?.id ?? trace.adapter_id);
+    const adapterVer = dash(run?.adapter_snapshot?.version ?? trace.adapter_version);
+    document.getElementById("head-title").innerHTML = `${SIM.escapeHtml(personaName)} <span class="qualifier">— ${scenarioLabel}</span>`;
     document.getElementById("head-subtitle").innerHTML = `
       <code>${trace.question_id}</code> · <code>${trace.prompt_shape?.id}@v${trace.prompt_shape?.version}</code> · expected
       <code>${trace.expected_behavior}</code> · rubric <code>${trace.rubric_dimension}</code>
     `;
+    // A turn is a user↔agent exchange, so count agent replies, not raw messages.
+    const exchangeCount = (trace.turns || []).filter(t => t.role === "agent").length;
     const pills = document.getElementById("head-pills");
     pills.innerHTML = `
-      <span class="pill pill--accent"><b>${trace.turns.length}</b> turns</span>
+      <span class="pill pill--accent"><b>${exchangeCount}</b> turns</span>
       <span class="pill"><span class="stop-pill ${trace.stop_reason}">${trace.stop_reason}</span></span>
       <span class="pill"><span class="transport-pill ${run?.adapter_snapshot?.transport || ""}">${run?.adapter_snapshot?.transport || "?"}</span></span>
-      <span class="pill"><b>${trace.mode}</b></span>
-      <span class="pill"><b>${trace.session_policy}</b> · <code>${trace.session_id_used || "—"}</code></span>
+      <span class="pill"><b>${dash(trace.mode)}</b></span>
+      <span class="pill"><b>${dash(trace.session_policy)}</b> · <code>${trace.session_id_used || "—"}</code></span>
     `;
 
     // Persona / scenario panel
     document.getElementById("persona-kv").innerHTML = `
-      <dt>Persona</dt><dd><b>${SIM.escapeHtml(persona.name || trace.persona?.id)}</b> · v${trace.persona?.version}</dd>
-      <dt>Description</dt><dd>${SIM.escapeHtml(persona.description || "—")}</dd>
+      <dt>Persona</dt><dd><b>${SIM.escapeHtml(personaName)}</b> · v${dash(trace.persona?.version)}</dd>
+      <dt>Description</dt><dd>${SIM.escapeHtml(persona.description || persona.role || trace.persona?.role || "—")}</dd>
       <dt>Primary rubric</dt><dd><code>${persona.primary_rubric || trace.rubric_dimension || "—"}</code></dd>
-      <dt>Scenario</dt><dd><code>${trace.scenario?.length}.${trace.scenario?.style}.${trace.scenario?.difficulty}</code></dd>
-      <dt>Prompt shape</dt><dd><code>${trace.prompt_shape?.id}@v${trace.prompt_shape?.version}</code></dd>
+      <dt>Scenario</dt><dd><code>${scenarioLabel}</code></dd>
+      <dt>Prompt shape</dt><dd><code>${dash(trace.prompt_shape?.id)}@v${dash(trace.prompt_shape?.version)}</code></dd>
       ${trace.archive_cell ? `<dt>Archive cell</dt><dd>risk: <code>${trace.archive_cell.risk_category}</code> · style: <code>${trace.archive_cell.attack_style}</code></dd>` : ""}
     `;
 
     // Run config panel
     document.getElementById("run-kv").innerHTML = `
       <dt>Run</dt><dd><a href="./run.html?id=${encodeURIComponent(trace.run_id)}" style="color:var(--accent);text-decoration:underline;"><code>${trace.run_id}</code></a></dd>
-      <dt>Adapter</dt><dd><span class="transport-pill ${run?.adapter_snapshot?.transport || ""}">${run?.adapter_snapshot?.transport || "?"}</span> <code>${trace.adapter_id}</code> v${trace.adapter_version}</dd>
-      <dt>Mode</dt><dd><code>${trace.mode}</code></dd>
-      <dt>Session policy</dt><dd><code>${trace.session_policy}</code></dd>
+      <dt>Adapter</dt><dd><span class="transport-pill ${run?.adapter_snapshot?.transport || ""}">${run?.adapter_snapshot?.transport || "?"}</span> <code>${adapterId}</code> v${adapterVer}</dd>
+      <dt>Mode</dt><dd><code>${dash(trace.mode)}</code></dd>
+      <dt>Session policy</dt><dd><code>${dash(trace.session_policy)}</code></dd>
       <dt>Session ID</dt><dd><code>${trace.session_id_used || "—"}</code></dd>
       <dt>Stop reason</dt><dd><span class="stop-pill ${trace.stop_reason}">${trace.stop_reason}</span></dd>
     `;
 
-    document.getElementById("turn-count").textContent = trace.turns.length;
+    document.getElementById("turn-count").textContent = exchangeCount;
     document.getElementById("stop-pill-host").innerHTML = `<span class="stop-pill ${trace.stop_reason}">${trace.stop_reason}</span>`;
 
     // Stream
@@ -148,7 +161,9 @@
       const div = document.createElement("div");
       div.className = "turn " + t.role;
       const tsShort = (t.ts || "").slice(11, 19);
-      const body = SIM.escapeHtml(t.text).replace(/\n/g, "<br/>");
+      const body = (t.text || "").trim()
+        ? SIM.escapeHtml(t.text).replace(/\n/g, "<br/>")
+        : `<span style="color:var(--text-faint);font-style:italic;">no message content (simulator produced an empty turn)</span>`;
       const latencyLine = t.latency_ms || (t.tokens && (t.tokens.in || t.tokens.out)) ? `
         <div class="latency">
           ${t.latency_ms ? `<span><b>latency</b> ${t.latency_ms}ms</span>` : ""}

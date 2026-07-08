@@ -69,12 +69,14 @@ if ! command -v uv >/dev/null 2>&1; then
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
 
-GROUPS=(--group dev)
+# NB: do not name this array `GROUPS` — that is a reserved bash variable (the
+# current user's group IDs) and assignments to it are silently ignored.
+SYNC_GROUPS=(--group dev)
 if [ "$MODE" = "infra" ]; then
-  GROUPS+=(--group infra --group llm)   # nats/boto3 + real-LLM extras
+  SYNC_GROUPS+=(--group infra --group llm)   # nats/boto3 + real-LLM extras
 fi
-log "uv sync ${GROUPS[*]}"
-uv sync "${GROUPS[@]}"
+log "uv sync ${SYNC_GROUPS[*]}"
+uv sync "${SYNC_GROUPS[@]}"
 # The frontend is static (served by the edge) — no separate JS build/install.
 
 # ---------------------------------------------------------------------------

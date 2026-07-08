@@ -110,7 +110,7 @@
     document.title = `Simulation — ${run.run_id} · AIBuilderCore`;
     document.getElementById("crumb-run").textContent = run.run_id;
     document.getElementById("head-id").textContent = run.run_id;
-    document.getElementById("head-title").innerHTML = `Run <span class="qualifier">— ${run.adapter_snapshot?.transport?.toUpperCase() || "?"} · ${run.inputs?.mode}</span>`;
+    document.getElementById("head-title").innerHTML = `Run <span class="qualifier">— ${run.adapter_snapshot?.transport?.toUpperCase() || "?"} · ${run.inputs?.mode || "—"}</span>`;
     document.getElementById("head-subtitle").innerHTML = `
       Submitted by <b>${run.created_by}</b> at <code>${SIM.fmtTs(run.created_at)}</code>.
       Replays <code>${run.seed_set_id}</code> against <code>${run.adapter_snapshot?.id}</code> v${run.adapter_snapshot?.version}.
@@ -144,18 +144,22 @@
     // Inputs
     document.getElementById("hash-meta").textContent = "config_hash: " + run.config_hash;
     const i = run.inputs || {};
+    // Render only the inputs the run actually froze; fall back to "—" so a field
+    // the backend doesn't carry never leaks a literal "undefined". Turn progress
+    // is a run-level metric (turns_total in the pills / throughput), so the frozen
+    // config shows only the *cap* (max turns per conversation), not a min.
+    const dash = (v) => (v === undefined || v === null || v === "" ? "—" : v);
+    const stopConds = i.stop_conditions && i.stop_conditions.length
+      ? i.stop_conditions.map(s => `<code style="margin:0 4px 4px 0;display:inline-block;">${s}</code>`).join("")
+      : "—";
     document.getElementById("inputs-kv").innerHTML = `
-      <dt>Seed set</dt><dd><code>${i.seed_set_id}</code></dd>
-      <dt>Adapter</dt><dd><span class="transport-pill ${run.adapter_snapshot?.transport}">${run.adapter_snapshot?.transport}</span> <code>${i.target_adapter_id}</code> v${i.target_adapter_version}</dd>
-      <dt>Mode</dt><dd><code>${i.mode}</code></dd>
-      <dt>Max / min turns</dt><dd><code>${i.max_turns}</code> / <code>${i.min_turns}</code></dd>
-      <dt>Session policy</dt><dd><code>${i.session_policy}</code></dd>
-      <dt>Concurrency</dt><dd><code>${i.concurrency}</code></dd>
-      <dt>Stop conditions</dt><dd>${(i.stop_conditions || []).map(s => `<code style="margin:0 4px 4px 0;display:inline-block;">${s}</code>`).join("")}</dd>
-      <dt>Topic-drift threshold</dt><dd><code>${i.topic_drift_threshold}</code></dd>
-      <dt>Simulator model</dt><dd><code>${i.user_simulator_model}</code></dd>
-      <dt>Seed</dt><dd><code>${i.seed}</code></dd>
-      <dt>Per-question timeout</dt><dd><code>${i.per_question_timeout_s}s</code></dd>
+      <dt>Seed set</dt><dd><code>${dash(i.seed_set_id || run.seed_set_id)}</code></dd>
+      <dt>Adapter</dt><dd><span class="transport-pill ${run.adapter_snapshot?.transport}">${dash(run.adapter_snapshot?.transport)}</span> <code>${dash(run.adapter_snapshot?.id)}</code> v${dash(run.adapter_snapshot?.version)}</dd>
+      <dt>Mode</dt><dd><code>${dash(i.mode)}</code></dd>
+      <dt>Max turns / conversation</dt><dd><code>${dash(i.max_turns)}</code></dd>
+      <dt>Concurrency</dt><dd><code>${dash(i.concurrency)}</code></dd>
+      <dt>Stop conditions</dt><dd>${stopConds}</dd>
+      <dt>Simulator model</dt><dd><code>${dash(i.user_simulator_model)}</code></dd>
     `;
 
     // Conversations grid
@@ -163,6 +167,8 @@
     document.getElementById("conv-count").textContent = run.progress.conversations_total;
     const grid = document.getElementById("conv-grid");
     grid.innerHTML = "";
+    // Cap the tile wall to a scroll viewport once a run gets large.
+    grid.classList.toggle("scroll", (run.progress.conversations_total || 0) > 24);
     for (let idx = 0; idx < run.progress.conversations_total; idx++) {
       const t = traces[idx];
       const tile = document.createElement(t ? "a" : "div");
@@ -170,7 +176,9 @@
       const cls = t ? `conv-tile ${t.stop_reason}` : `conv-tile ${idx < run.progress.conversations_done ? "running" : "queued"}`;
       tile.className = cls;
       const personaName = t ? (SIM.PERSONAS[t.persona?.id]?.name || t.persona?.id) : "—";
-      const turns = t ? t.turns.length : 0;
+      // Trace meta carries a turn *count* (live API) while seed traces carry a
+      // turns *array*; accept either so the tile renders in both modes.
+      const turns = t ? (Array.isArray(t.turns) ? t.turns.length : (t.turn_count ?? t.turns ?? 0)) : 0;
       tile.innerHTML = `
         <div class="qid">${t ? t.question_id : `q · ${String(idx + 1).padStart(3, "0")}`}</div>
         <div class="meta">

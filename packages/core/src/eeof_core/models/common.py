@@ -58,6 +58,10 @@ class Job(BaseModel):
     inputs: dict[str, Any] = Field(default_factory=dict)
     result: dict[str, Any] | None = None  # e.g. {"run_id": "sim_..."} once ready
     error: dict[str, Any] | None = None
+    # Lifecycle audit trail: one {ts, state, by} per transition (queued →
+    # running → ready/failed). Appended by the edge on submit and the worker on
+    # each state change so every stage's job page can render a real timeline.
+    events: list[dict[str, Any]] = Field(default_factory=list)
     submitted_by: str = "alex@acme"
     submitted_at: str = Field(default_factory=iso)
     updated_at: str = Field(default_factory=iso)

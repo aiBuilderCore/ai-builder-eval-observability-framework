@@ -176,6 +176,7 @@ async def create_run(
         "run_id": run_id,
         "seed_set_id": req.seed_set_id,
         "adapter_snapshot": snapshot,
+        "mode": req.mode,
         "max_turns": req.max_turns,
         "concurrency": req.concurrency,
         "user_simulator_model": req.user_simulator_model,

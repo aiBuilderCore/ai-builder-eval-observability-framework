@@ -345,6 +345,8 @@
 
   function buildChips() {
     if (!isStage) return '';  // Dashboard / Settings carry their own context
+    // Static fallback; hydrateSpend() replaces this with the real derived figure
+    // from /observability/spend once the API client is present.
     var spend = SCOPE_SPEND[activeSub] || '$0.00';
     return [
       '<div class="aibc-chrome-chips" role="group" aria-label="Scope">',
@@ -360,7 +362,7 @@
       '  </span>',
       '  <span class="aibc-chrome-chip aibc-chrome-chip--spend" title="LLM + judge spend for this stage (last 24h)">',
       '    <span class="aibc-chrome-chip__label">spend 24h</span>',
-      '    <span class="aibc-chrome-chip__value">' + escapeHtml(spend) + '</span>',
+      '    <span class="aibc-chrome-chip__value" id="aibc-chrome-spend">' + escapeHtml(spend) + '</span>',
       '  </span>',
       '</div>'
     ].join('\n');
@@ -586,6 +588,23 @@
 
     wireThemeToggle();
     wireWorkspaceSwitcher();
+    hydrateSpend();
+  }
+
+  // Replace the static per-stage spend chip with the real derived figure from
+  // /observability/spend (the same rollup the dashboard uses), so the header
+  // never shows a fabricated cost. Silent no-op when the API client is absent.
+  function hydrateSpend() {
+    if (!isStage || !window.EEOF || typeof EEOF.get !== 'function') return;
+    var el = document.getElementById('aibc-chrome-spend');
+    if (!el) return;
+    EEOF.get('/observability/spend').then(function (data) {
+      var stages = (data && data.stages) || [];
+      var stage = stages.filter(function (s) { return s.slug === activeSub; })[0];
+      if (stage && typeof stage.amount === 'number') {
+        el.textContent = '$' + stage.amount.toFixed(2);
+      }
+    }).catch(function () {});
   }
 
   if (document.readyState === 'loading') {

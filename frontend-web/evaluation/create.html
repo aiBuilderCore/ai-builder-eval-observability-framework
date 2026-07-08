@@ -617,6 +617,12 @@
   renderMitigations();
   refreshSummary();
   refreshNav();
+
+  // The initial paint uses seed EV.RUNS / EV.JUDGES; once the LIVE wiring hydrates
+  // them from the edge (real sim runs + the judge registry), repaint the pickers.
+  if (window.EV && EV.ready && typeof EV.ready.then === "function") {
+    EV.ready.then(() => { renderRuns(); renderJudges(); refreshSummary(); refreshNav(); });
+  }
 </script>
 
 </body>

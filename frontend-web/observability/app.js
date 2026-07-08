@@ -871,7 +871,33 @@
   if (!window.EEOF || !window.AIBC_OBS) return;
   const State = window.AIBC_OBS.State;
 
-  let monitorsCache = [], packsCache = [], calibrationCache = [];
+  let monitorsCache = [], packsCache = [], calibrationCache = [], batchesCache = [];
+
+  // Map a live ingest batch (+ its run and verdict set) into the batch-table row
+  // shape. Deep OpenInference span trees have no backend source, so `runs`/spans
+  // stay empty — the list, counts, pass-rate and lineage are all real.
+  const mapBatch = (b, runsById, vsByRun) => {
+    const run = runsById[b.run_id] || {};
+    const snap = run.adapter_snapshot || {};
+    const agent = snap.name || snap.id || "agent-under-test";
+    const vs = vsByRun[b.run_id];
+    const runCount = b.traces || run.completed || 0;
+    return {
+      batch_id: b.run_id, experiment_id: agent, name: `${agent} · run`, sut: agent,
+      lineage: {
+        persona_set_version: "core-personas",
+        question_strategy_version: "rainbow",
+        target_version: `${agent}@v${snap.version || 1}`,
+        rubric_version: vs && vs.judge_refs ? vs.judge_refs.join(" + ") : "—",
+      },
+      started_at: b.first_seen || run.created_at, finished_at: b.last_seen,
+      run_count: runCount,
+      pass_count: vs ? vs.pass_count : 0,
+      pass_rate: vs ? vs.pass_rate : 0,
+      judge_pass_rates: vs ? vs.aggregate_scores || {} : {},
+      kind_histogram: {}, pass_sparkline: [], runs: [],
+    };
+  };
 
   const mapMonitor = (m) => ({
     id: m.id, name: m.name, kind: "quality",
@@ -894,14 +920,36 @@
 
   async function hydrate() {
     try {
-      const [mons, packs, cal] = await Promise.all([
+      const [mons, packs, cal, batches, runs, vsets] = await Promise.all([
         EEOF.get("/observability/monitors").catch(() => null),
         EEOF.get("/observability/evidence").catch(() => null),
         EEOF.get("/observability/calibration").catch(() => null),
+        EEOF.get("/observability/batches").catch(() => null),
+        EEOF.get("/simulation/runs").catch(() => null),
+        EEOF.get("/verdict-sets").catch(() => null),
       ]);
       if (cal) calibrationCache = cal;
       if (mons) monitorsCache = mons.map(mapMonitor);
       if (packs) packsCache = packs.map(mapPack);
+      if (Array.isArray(batches)) {
+        const runsById = {};
+        (runs || []).forEach((r) => { runsById[r.id] = r; });
+        const vsByRun = {};
+        (vsets || []).forEach((v) => { (v.run_ids || []).forEach((rid) => { vsByRun[rid] = v; }); });
+        batchesCache = batches
+          .map((b) => mapBatch(b, runsById, vsByRun))
+          .sort((a, b2) => (b2.started_at || "").localeCompare(a.started_at || ""));
+        // Override the batch data seam so the index list shows the real run.
+        if (window.AIBC_BATCHES && batchesCache.length) {
+          const seedLoad = window.AIBC_BATCHES.loadBatches;
+          const seedGet = window.AIBC_BATCHES.getBatch;
+          window.AIBC_BATCHES.loadBatches = () => batchesCache;
+          window.AIBC_BATCHES.getBatch = (id) =>
+            batchesCache.find((x) => x.batch_id === id) || seedGet(id);
+          if (typeof window.AIBC_OBS_renderBatches === "function") window.AIBC_OBS_renderBatches();
+          void seedLoad;
+        }
+      }
       if (typeof window.render === "function") window.render();
     } catch {}
   }

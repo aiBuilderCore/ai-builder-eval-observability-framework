@@ -81,6 +81,7 @@ class Verdict(BaseModel):
     mode: str = "judge"  # judge | jury
     judges: list[dict[str, Any]] = Field(default_factory=list)  # per-juror scores
     consensus_rate: float | None = None
+    scored_turns: int = 0  # agent turns the judge scored (whole-conversation grading)
     mitigations_applied: list[str] = Field(default_factory=list)
     rubric: dict[str, Any] = Field(default_factory=dict)
     human_overridden: bool = False

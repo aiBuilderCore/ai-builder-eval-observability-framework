@@ -645,6 +645,7 @@ window.QG = {
       seed_set_id: r.seed_set_id || null,
       created_by: j.submitted_by, created_at: j.submitted_at,
       completed_at: shipped ? j.updated_at : null,
+      completed_by: shipped ? "worker" : null,
       config_hash: j.config_hash, inputs: j.inputs || {},
       state: uiState,
       progress: {
@@ -690,8 +691,30 @@ window.QG = {
   QG.ready = new Promise((r) => (_resolveReady = r));
   let _firstHydrate = true;
 
+  // Replace the static seed persona list with the live core-library personas so
+  // the create wizard conditions on real personas (and submitLive can resolve
+  // their refs). Mutated *in place* because the module-local `PERSONAS` const —
+  // closed over by personaById/shapesForPersonas/scenariosForPersonas — is the
+  // same array object as QG.PERSONAS; reassigning would desync the helpers.
+  async function syncPersonas() {
+    try {
+      const live = await EEOF.get("/personas");
+      if (!Array.isArray(live) || !live.length) return;
+      const mapped = live.map((p) => ({
+        id: p.id, name: p.name, role: p.role || "",
+        hue: p.hue || "ochre", version: p.version,
+        primary_rubric: p.primary_rubric || "helpfulness",
+        default_shapes: (p.default_shapes && p.default_shapes.length) ? p.default_shapes : ["ambiguate"],
+        default_scenarios: (p.default_scenarios && p.default_scenarios.length) ? p.default_scenarios : ["short.chat.easy"],
+      }));
+      QG.PERSONAS.length = 0;
+      QG.PERSONAS.push(...mapped);
+    } catch {}
+  }
+
   async function hydrate() {
     try {
+      await syncPersonas();
       const jobs = (await EEOF.get("/jobs")).filter(j => j.stage === "qgen");
       jobsCache = jobs.map(mapJob).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
       // Pull questions for shipped seed sets (for the seed-set view).

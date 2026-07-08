@@ -27,6 +27,14 @@ def _item(job: Job) -> dict:
     }
 
 
+def record_event(job: Job, state: str, by: str = "worker") -> None:
+    """Append a lifecycle event to the job's audit trail, de-duplicated per state
+    so a redelivered message never double-logs the same transition."""
+    if job.events and job.events[-1].get("state") == state:
+        return
+    job.events.append({"ts": iso(), "state": state, "by": by})
+
+
 async def save_job(job: Job) -> None:
     job.updated_at = iso()
     await get_table().put(_item(job))
@@ -62,4 +70,5 @@ async def push_status(job: Job) -> None:
 async def fail_job(job: Job, code: str, message: str) -> None:
     job.state = JobState.failed
     job.error = {"code": code, "message": message}
+    record_event(job, "failed")
     await push_status(job)

@@ -195,7 +195,21 @@
 
     const rows = document.getElementById("rows");
     rows.innerHTML = "";
-    document.getElementById("empty").style.display = filtered.length === 0 ? "" : "none";
+    const emptyEl = document.getElementById("empty");
+    emptyEl.style.display = filtered.length === 0 ? "" : "none";
+    // Distinguish a first-run empty list from a filter/search that excludes rows.
+    const pristine = all.length === 0 && !state.search && !state.filterState;
+    if (pristine) {
+      emptyEl.innerHTML =
+        '<p style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;">No jobs yet</p>' +
+        '<h3>No question-generation jobs yet.</h3>' +
+        '<p><a href="./create.html" style="color:var(--accent);text-decoration:underline;">Create your first job</a> to turn personas into an eval question set.</p>';
+    } else {
+      emptyEl.innerHTML =
+        '<p style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;">No matches</p>' +
+        '<h3>No jobs match that filter.</h3>' +
+        '<p>Clear the search, pick another state, or <a href="./create.html" style="color:var(--accent);text-decoration:underline;">submit a new job</a>.</p>';
+    }
 
     // newest first by created_at
     filtered.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));

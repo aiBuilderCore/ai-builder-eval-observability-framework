@@ -12,7 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from .dataplane import get_bus
-from .jobs import fail_job, get_job, push_status
+from .jobs import fail_job, get_job, push_status, record_event
 from .models.common import Job, JobProgress, JobState
 
 
@@ -38,11 +38,14 @@ class BaseWorker(ABC):
         try:
             job.state = JobState.running
             job.progress = JobProgress(phase="running")
+            record_event(job, "queued", by=job.submitted_by)  # ensure the trail opens
+            record_event(job, "running")
             await push_status(job)
             result = await self.handle(job)
             job.result = result
             job.state = JobState.ready
             job.progress.phase = "ready"
+            record_event(job, "ready")
             await push_status(job)
         except Exception as e:  # noqa: BLE001 — surface any failure as a failed job
             await fail_job(job, "worker_error", str(e))

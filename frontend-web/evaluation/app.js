@@ -905,11 +905,23 @@ window.EV = {
   const mapJob = (j) => {
     const r = j.result || {};
     const d = (j.progress && j.progress.detail) || {};
+    // The edge freezes inputs as { run_ids, judge_refs, judge_rubrics, aggregation }
+    // but the job UI reads inputs.judge_ids (the "judge.<name>@vN" catalog id form)
+    // and inputs.mode. Normalise so job.html / verdict-set.html render live jobs.
+    const rawInputs = j.inputs || {};
+    const judgeIds = (rawInputs.judge_ids
+      || (rawInputs.judge_refs || []).map((ref) => (String(ref).startsWith("judge.") ? ref : `judge.${ref}`)));
+    const inputs = {
+      ...rawInputs,
+      run_ids: rawInputs.run_ids || [],
+      judge_ids: judgeIds,
+      mode: rawInputs.mode || (rawInputs.panel_id ? "jury" : "judge"),
+    };
     return {
       job_id: j.job_id, verdict_set_id: r.verdict_set_id || null,
       created_by: j.submitted_by, created_at: j.submitted_at,
       completed_at: (j.state === "ready" || j.state === "shipped") ? j.updated_at : null,
-      config_hash: j.config_hash, inputs: j.inputs || {},
+      config_hash: j.config_hash, inputs,
       state: JSTATE[j.state] || j.state,
       progress: {
         phase: (j.progress && j.progress.phase) || j.state,
@@ -919,9 +931,24 @@ window.EV = {
         judge_call_count: d.judge_call_count || r.judge_call_count || 0,
         consensus_rate: r.consensus_rate || 0,
       },
+      // Prefer the real backend audit trail (Job.events); fall back to a
+      // synthesised timeline for older records that predate event logging.
+      events: (j.events && j.events.length) ? j.events : (() => {
+        const evs = [{ ts: j.submitted_at, state: "queued", by: j.submitted_by }];
+        if (["ready", "shipped"].includes(j.state)) {
+          evs.push({ ts: j.updated_at || j.submitted_at, state: "shipped", by: "worker" });
+        } else if (j.state === "failed") {
+          evs.push({ ts: j.updated_at || j.submitted_at, state: "failed", by: "worker" });
+        }
+        return evs;
+      })(),
       output: r.verdict_set_id ? {
         verdict_set_id: r.verdict_set_id, verdict_count: r.verdict_count || 0,
         aggregate_scores: r.aggregate_scores || {}, pass_count: r.pass_count || 0,
+        // Judge mode has no abstentions; fail = total − pass. Kept explicit so the
+        // job KPIs don't render "undefined".
+        fail_count: Math.max(0, (r.verdict_count || 0) - (r.pass_count || 0)),
+        abstain_count: r.abstain_count || 0,
         pass_rate: r.pass_rate || 0,
       } : null,
     };
@@ -949,6 +976,7 @@ window.EV = {
     question_prompt: v.question_prompt, persona_name: v.persona_name, run_id: v.run_id,
     dimension: v.dimension, score: v.score, verdict: v.verdict, reasoning: v.rationale,
     mode: v.mode, judges: v.judges || [], consensus_rate: v.consensus_rate,
+    scored_turns: v.scored_turns || 0,
     mitigations_applied: v.mitigations_applied || [], rubric: v.rubric || { id: v.dimension, version: 1 },
     human_overridden: v.human_overridden || false, override_history: [],
   });
@@ -987,9 +1015,15 @@ window.EV = {
       // Feed live sim runs into the create-wizard run picker (EV.RUNS is seed data).
       if (runs && Array.isArray(EV.RUNS)) {
         EV.RUNS.length = 0;
+        // Field names must match what create.html's renderRuns() reads
+        // (question_count / traces_count / seed_set / completed_at).
         runs.forEach((r) => EV.RUNS.push({
-          run_id: r.id, adapter: (r.adapter_snapshot || {}).id || "adapter",
-          seed_set_id: r.seed_set_id, trace_count: (r.output || {}).trace_count || r.completed,
+          run_id: r.id,
+          adapter: (r.adapter_snapshot || {}).name || (r.adapter_snapshot || {}).id || "adapter",
+          seed_set: r.seed_set_id,
+          question_count: r.total_questions ?? r.seed_set_question_count ?? r.completed,
+          traces_count: (r.output || {}).trace_count ?? r.completed,
+          completed_at: r.completed_at || r.created_at,
           created_at: r.created_at, state: r.state,
         }));
       }

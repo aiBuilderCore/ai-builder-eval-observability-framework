@@ -47,12 +47,17 @@ async def main() -> None:
     ]
     # Seed one realistic end-to-end lineage per demo agent so the dashboard's
     # derived rollups (quality / spend / incidents) have real rows to aggregate.
-    from eeof_core.seed_demo import ensure_demo_data
+    # Skippable via SEED_DEMO=0 to boot a clean slate (only the core persona +
+    # judge libraries load lazily on first access; everything else starts empty).
+    if settings.seed_demo:
+        from eeof_core.seed_demo import ensure_demo_data
 
-    seeded = await ensure_demo_data(settings.dev_tenant, settings.dev_workspace)
-    if seeded.get("seeded"):
-        print(f"  seeded demo lineage: {seeded['runs']} runs · {seeded['verdicts']} verdicts "
-              f"across {seeded['verdict_sets']} agents")
+        seeded = await ensure_demo_data(settings.dev_tenant, settings.dev_workspace)
+        if seeded.get("seeded"):
+            print(f"  seeded demo lineage: {seeded['runs']} runs · {seeded['verdicts']} verdicts "
+                  f"across {seeded['verdict_sets']} agents")
+    else:
+        print("  SEED_DEMO=0 — skipping demo seed (clean slate: personas + judges only)")
 
     print(f"eeof platform up ({settings.app_env} mode, model={settings.model_provider}):")
     print(f"  edge (REST+WS): http://127.0.0.1:{settings.api_orchestration_port}/api/v1")

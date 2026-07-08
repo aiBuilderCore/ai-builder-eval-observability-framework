@@ -1982,7 +1982,7 @@ table.token-table td .dot {
 }
 .verdict-row {
   display: grid;
-  grid-template-columns: 64px 1fr 130px 90px;
+  grid-template-columns: 96px 1fr 130px 90px;
   gap: 14px;
   padding: 16px 0;
   border-top: 1px solid var(--border);
@@ -1995,6 +1995,12 @@ table.token-table td .dot {
   color: var(--text-faint);
   letter-spacing: 0.04em;
   padding-top: 2px;
+  /* The id can be longer than its column — clip it so it never spills over the
+     prompt text in the next column. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .verdict-row .vbody { min-width: 0; }
 .verdict-row .vprompt {

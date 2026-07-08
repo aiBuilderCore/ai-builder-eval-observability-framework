@@ -23,6 +23,15 @@ class FallbackProvider(ModelProvider):
         self._chain = chain
         self.name = "fallback(" + " → ".join(p.name for p in chain) + ")"
 
+    @property
+    def model_label(self) -> str:
+        # Attribute verdicts to the effective primary — the first link that isn't
+        # the offline echo safety net (falls back to it if that's all there is).
+        for provider in self._chain:
+            if provider.name != "echo":
+                return provider.model_label
+        return self._chain[0].model_label
+
     async def chat(
         self,
         *,

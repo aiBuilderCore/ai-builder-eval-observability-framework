@@ -22,9 +22,6 @@ from eeof_core.models.common import iso
 from eeof_core.providers import get_provider
 from eeof_core.worker import BaseWorker
 
-_JUROR_MODELS = ["claude-haiku-4-5", "gpt-4o-mini", "mistral-large"]
-
-
 def _h(s: str) -> int:
     return int(hashlib.sha256(s.encode()).hexdigest(), 16)
 
@@ -41,7 +38,14 @@ class EvalWorker(BaseWorker):
         judge_refs: list[str] = inputs.get("judge_refs") or ["helpfulness@v1"]
         rubrics = inputs.get("judge_rubrics") or {r: r.split("@")[0] for r in judge_refs}
         mitigations = inputs.get("mitigations") or ["position_swap", "length_normalization"]
-        jury = inputs.get("mode") in ("panel", "jury") or len(judge_refs) > 1
+        # Jurors are the *real* model(s) available on the provider chain — no
+        # fabricated multi-vendor panel. With a single configured provider every
+        # dimension is scored once by that model, so the job is judge mode; a
+        # true multi-model jury only appears if the deployment actually has more
+        # than one juror model.
+        juror_models = [provider.model_label]
+        n = len(juror_models)
+        jury = inputs.get("mode") in ("panel", "jury") and n > 1
         mode = "jury" if jury else "judge"
 
         vs_id = new_id("verdict_set")
@@ -61,27 +65,31 @@ class EvalWorker(BaseWorker):
             trace = await get_blob().get_json(tref.blob_uri)
             turns = trace.get("turns", [])
             prompt = next((t.get("text") or t.get("content", "") for t in turns if t["role"] == "user"), "")
-            response = next((t.get("text") or t.get("content", "") for t in reversed(turns) if t["role"] == "agent"), "")
+            # The judge scores the WHOLE conversation, not just the opening turn:
+            # build the full transcript so multi-turn agent behaviour is graded.
+            transcript = "\n".join(
+                f"{t.get('role', '').upper()}: {t.get('text') or t.get('content', '')}"
+                for t in turns
+            )
+            agent_turn_count = sum(1 for t in turns if t.get("role") == "agent")
             persona_name = (trace.get("persona") or {}).get("name", "")
 
             for ref in judge_refs:
                 cell += 1
                 dim = rubrics.get(ref, ref.split("@")[0])
-                base = await provider.score(rubric=dim, prompt=prompt, response=response)
-                jurors = []
-                juror_scores = []
-                n = len(_JUROR_MODELS) if jury else 1
-                for m in _JUROR_MODELS[:n]:
-                    delta = ((_h(tref.id + ref + m) % 16) - 8) / 100.0
-                    js = max(0.0, min(1.0, base["score"] + delta))
-                    jv = "pass" if js >= 0.7 else "fail"
-                    jurors.append({"id": ref, "model": m, "score": round(js, 3), "verdict": jv})
-                    juror_scores.append(js)
-                    judge_calls += 1
-                passes = sum(1 for j in jurors if j["verdict"] == "pass")
-                verdict_label = "abstain" if cell % 13 == 0 else ("pass" if passes > n / 2 else "fail")
-                consensus = round(max(passes, n - passes) / n, 3) if jury else 1.0
-                mean_score = round(sum(juror_scores) / len(juror_scores), 3)
+                base = await provider.score(rubric=dim, prompt=prompt, response=transcript)
+                score = round(base["score"], 3)
+                verdict_label = "pass" if base["passed"] else "fail"
+                # One juror per real model on the chain (see juror_models above).
+                jurors = [
+                    {"id": ref, "model": m, "score": score, "verdict": verdict_label}
+                    for m in juror_models
+                ]
+                judge_calls += len(jurors)
+                # Full agreement for aggregation (single real juror = unanimous);
+                # only surfaced on the verdict in jury mode.
+                consensus = 1.0
+                mean_score = score
 
                 v = Verdict(
                     id=new_id("verdict"), verdict_set_id=vs_id, run_id=tref.run_id,
@@ -91,6 +99,7 @@ class EvalWorker(BaseWorker):
                     dimension=dim, verdict=verdict_label, question_prompt=prompt[:400],
                     persona_name=persona_name, mode=mode, judges=jurors,
                     consensus_rate=consensus if jury else None,
+                    scored_turns=agent_turn_count,
                     mitigations_applied=mitigations, rubric={"id": dim, "version": 1},
                 )
                 verdicts.append(v)

@@ -156,13 +156,19 @@
       }
     }
     const pillHost = document.getElementById("qualityPillars");
-    if (pillHost && pillars.length) {
-      const weakest = pillars.reduce((m, p) => (p.score < m.score ? p : m), pillars[0]);
-      pillHost.innerHTML =
-        pillars.map((p) =>
-          `<div class="spend__row"><span class="spend__name">${p.name}</span><span class="spend__track"><span class="spend__fill" style="width:${p.score}%"></span></span><span class="spend__val">${p.score} ${deltaMark(p.delta)}</span></div>`
-        ).join("") +
-        `<div class="spend__total"><span>weakest pillar · needs attention</span><b style="color:var(--warn)">${weakest.name}</b></div>`;
+    if (pillHost) {
+      if (!pillars.length) {
+        // Derived from real verdict rows — until an evaluation runs there are no
+        // pillar scores to show. Never fall back to the static mock markup.
+        pillHost.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:10px 2px;">No verdicts yet — pillar scores appear here once judges have scored a run.</p>`;
+      } else {
+        const weakest = pillars.reduce((m, p) => (p.score < m.score ? p : m), pillars[0]);
+        pillHost.innerHTML =
+          pillars.map((p) =>
+            `<div class="spend__row"><span class="spend__name">${p.name}</span><span class="spend__track"><span class="spend__fill" style="width:${p.score}%"></span></span><span class="spend__val">${p.score} ${deltaMark(p.delta)}</span></div>`
+          ).join("") +
+          `<div class="spend__total"><span>weakest pillar · needs attention</span><b style="color:var(--warn)">${weakest.name}</b></div>`;
+      }
     }
   }
 

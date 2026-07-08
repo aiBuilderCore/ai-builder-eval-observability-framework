@@ -18,6 +18,15 @@ class Settings(BaseSettings):
 
     app_env: Literal["local", "infra"] = "local"
 
+    # Demo seeding switch. When true (default) a fresh boot seeds the demo
+    # lineage (runs/verdicts/batches), the built-in agent-under-test adapter, and
+    # the self-heal incident backlog so the dashboards have rows to aggregate.
+    # Set SEED_DEMO=0 to boot a clean slate: only the core persona + judge
+    # libraries load lazily on first access; adapters, runs, verdicts, and
+    # self-heal incidents all start empty so an operator can drive the whole
+    # pipeline by hand and watch real data appear only after each stage runs.
+    seed_demo: bool = True
+
     # Data plane (infra mode)
     scylla_endpoint: str = "http://localhost:8000"
     scylla_region: str = "us-east-1"

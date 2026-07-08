@@ -570,6 +570,13 @@
   renderSessionCluster();
   paintStepper();
   paintSummary();
+
+  // The initial paint runs before the LIVE wiring has hydrated its caches from
+  // the edge; repaint the seed-set and adapter grids once the first hydrate
+  // resolves so freshly shipped seed sets and onboarded adapters show up.
+  if (window.SIM && SIM.ready && typeof SIM.ready.then === "function") {
+    SIM.ready.then(() => { renderSeedGrid(); renderAdapterGrid(); paintSummary(); });
+  }
 </script>
 
 </body>

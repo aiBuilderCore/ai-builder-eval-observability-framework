@@ -8,6 +8,7 @@ in the single table. Seed data is written once per tenant on first access
 
 from __future__ import annotations
 
+from eeof_core.config import settings
 from eeof_core.dataplane import get_table, keys
 from eeof_core.models import (
     Policy,
@@ -18,9 +19,8 @@ from eeof_core.models import (
 
 from .seed import SEED_ACTIONS, SEED_INCIDENTS, SEED_POLICIES
 
-# Auto-resolved / MTTR are rolling aggregates the worker would maintain; seeded
-# here as demo constants so the KPI strip reads coherently offline.
-_AUTO_RESOLVED_24H = 12
+# Median MTTR is a rolling aggregate the worker would maintain; used as a demo
+# figure only when there are actually resolved incidents to attribute it to.
 _MEDIAN_MTTR = "18m"
 
 
@@ -33,7 +33,12 @@ async def ensure_seeded(tenant: str) -> None:
     existing = await get_table().query(keys.heal_incident_pk(tenant), "HEAL_INCIDENT#")
     if existing:
         return
-    for inc in SEED_INCIDENTS:
+    # Clean-slate mode: no synthetic incident backlog — incidents should only
+    # appear once a real quality breach is detected from an actual run. The
+    # policy + action-registry vocabulary still loads: it is built-in config
+    # (like the persona/judge libraries), not runtime data.
+    seed_incidents = SEED_INCIDENTS if settings.seed_demo else []
+    for inc in seed_incidents:
         model = SelfHealIncident.model_validate(inc)
         gsipk, gsisk = keys.heal_incident_gsi(tenant, model.status, model.opened_at)
         await get_table().put({
@@ -115,9 +120,12 @@ async def summary(tenant: str) -> SelfHealSummary:
     incs = await list_incidents(tenant)
     policies = await list_policies(tenant)
     open_count = len([i for i in incs if i.status != "resolved"])
+    resolved = [i for i in incs if i.status == "resolved"]
+    # Derive from real incident rows: a clean slate (no resolved incidents)
+    # reports 0 auto-resolved and no MTTR rather than a fabricated constant.
     return SelfHealSummary(
         open_incidents=open_count,
-        auto_resolved_24h=_AUTO_RESOLVED_24H,
-        median_mttr=_MEDIAN_MTTR,
+        auto_resolved_24h=len(resolved),
+        median_mttr=_MEDIAN_MTTR if resolved else "—",
         active_policies=len(policies),
     )

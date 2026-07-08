@@ -141,7 +141,9 @@ class SimWorker(BaseWorker):
             ref = TraceRef(
                 id=trace_id, run_id=run_id, question_id=q.id,
                 persona_id=q.persona.id, persona_version=q.persona.version,
-                turns=len(turns), blob_uri=uri, sha256=sha,
+                # A "turn" is a user↔agent exchange, so the count is the number of
+                # agent replies, not the raw message count.
+                turns=agent_turns, blob_uri=uri, sha256=sha,
             )
             await get_table().put({
                 "PK": keys.trace_pk(run_id), "SK": keys.trace_sk(trace_id),
@@ -153,7 +155,7 @@ class SimWorker(BaseWorker):
             await get_bus().publish(trace_subject(run_id), {
                 "run_id": run_id, "trace_id": trace_id, "question_id": q.id,
                 "persona_id": q.persona.id, "persona_version": q.persona.version,
-                "turns": len(turns), "tokens": tin + tout, "latency_ms": 0,
+                "turns": agent_turns, "tokens": tin + tout, "latency_ms": 0,
                 "stop_reason": stop, "blob_uri": uri, "tenant": job.tenant,
             })
             async with lock:
@@ -161,7 +163,7 @@ class SimWorker(BaseWorker):
                 stop_breakdown[stop] = stop_breakdown.get(stop, 0) + 1
                 totals["done"] += 1
                 totals["failed"] += 1 if failed else 0
-                totals["turns"] += len(turns)
+                totals["turns"] += agent_turns
                 totals["tin"] += tin
                 totals["tout"] += tout
                 if totals["done"] % 3 == 0 or totals["done"] == len(questions):

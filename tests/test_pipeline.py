@@ -205,7 +205,9 @@ async def test_multiturn_followup_is_grounded_in_history():
                            tone="casual", tech_savviness="novice"),
         rubric="numeric_accuracy",
     )
-    turns = await simulate_conversation(q, {}, RecordingProvider(), max_turns=6)
+    # A "turn" is one user↔agent exchange, so max_turns=3 yields three exchanges
+    # (six messages), alternating user then agent.
+    turns = await simulate_conversation(q, {}, RecordingProvider(), max_turns=3)
 
     # user, agent, user, agent, user, agent
     assert [t.role for t in turns] == ["user", "agent", "user", "agent", "user", "agent"]

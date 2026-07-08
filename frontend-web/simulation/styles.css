@@ -1068,6 +1068,13 @@ header.top .row {
   gap: 8px;
   margin-top: 14px;
 }
+/* Large runs (e.g. 100+ conversations) cap the grid to a scroll viewport so the
+   tile wall never pushes the rest of the run report off-screen. */
+.conv-grid.scroll {
+  max-height: 460px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 .conv-tile {
   display: flex; flex-direction: column; gap: 4px;
   padding: 10px 12px;

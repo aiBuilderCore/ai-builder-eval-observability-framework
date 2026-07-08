@@ -40,6 +40,15 @@ _JSON = re.compile(r"\{.*\}", re.DOTALL)
 class ModelProvider(ABC):
     name: str = "base"
 
+    @property
+    def model_label(self) -> str:
+        """Human-readable identity of the concrete model backing this provider,
+        e.g. ``groq:llama-3.3-70b-versatile``. Used so verdicts attribute scores
+        to the real LLM instead of a placeholder. Providers that carry a
+        ``_model``/``_deployment`` expose it; others fall back to the name."""
+        model = getattr(self, "_model", None) or getattr(self, "_deployment", None)
+        return f"{self.name}:{model}" if model else self.name
+
     @abstractmethod
     async def chat(
         self,
