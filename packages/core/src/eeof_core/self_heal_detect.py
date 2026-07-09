@@ -51,6 +51,26 @@ _DIM_GLYPH = {
     "pii_leakage": "parser",
 }
 
+# Breached dimension → the candidate remediation action(s) the RCA agent would
+# most plausibly draw from the fixed registry vocabulary (see
+# `models/selfheal.py::RemediationAction`). This is NOT a fabricated fix — it is
+# a deterministic proposal grounded in the failure class, surfaced in the UI as a
+# *proposed* action pending RCA. Names mirror the seeded registry labels so the
+# modal chips read identically to the "Remediation registry" card.
+_PROPOSED_ACTION = {
+    "numeric_accuracy": "Guardrail tweak · KB update",
+    "regulatory_disclosure": "Prompt rewrite · Guardrail tweak",
+    "no_financial_advice": "Guardrail tweak · Prompt rewrite",
+    "hallucination": "KB update · Re-rank tune",
+    "faithfulness": "Re-rank tune · KB update",
+    "tool_call_correctness": "Fall-back · Circuit break",
+    "pii_leakage": "Guardrail tweak · Circuit break",
+}
+
+
+def _proposed_action(dim: str) -> str:
+    return _PROPOSED_ACTION.get(dim.split("@")[0], "Guardrail tweak")
+
 
 def _threshold(dim: str) -> float:
     return _JUDGE_THRESHOLD.get(dim.split("@")[0], 0.7)
@@ -139,7 +159,7 @@ async def detect_incidents(
             policy=policy,
             band=band,
             confidence=None,
-            action="",
+            action=_proposed_action(dim),
             incident_from=vset.id,
             timeline=[
                 TimelineStep(

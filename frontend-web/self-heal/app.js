@@ -263,10 +263,19 @@
       '  <p class="sh-eyebrow">Closed-loop progress</p>' +
       '  <ul class="tl">' + inc.timeline.map(tlItem).join("") + "</ul>" +
       fixPanel(inc) +
-      '  <p class="sh-eyebrow" style="margin-top:1.4rem;">Remediation action · registry</p>' +
+      '  <p class="sh-eyebrow" style="margin-top:1.4rem;">' +
+      (inc.status === "resolved" ? "Remediation action · applied"
+        : inc.stage === "remediate" ? "Remediation action · shipping"
+        : "Remediation action · proposed") + "</p>" +
       '  <div class="sh-registry">' +
-      inc.action.split(" · ").map(function (a) { return '<span class="tag">' + esc(a) + "</span>"; }).join("") +
+      (inc.action
+        ? inc.action.split(" · ").map(function (a) { return '<span class="tag">' + esc(a) + "</span>"; }).join("")
+        : '<span class="sh-empty__sub">No action selected yet — the RCA agent picks one from the registry once it attributes the root cause.</span>') +
       "  </div>" +
+      (inc.action && inc.status !== "resolved" && inc.stage !== "remediate"
+        ? '<p class="conf__note">Candidate drawn from the registry for a <b>' + esc(inc.failure) +
+          "</b> — confirmed and applied only after RCA and a policy-band clearance.</p>"
+        : "") +
       '  <p class="sh-eyebrow" style="margin-top:1.4rem;">Related traces · ' + inc.traces.length + " flagged</p>" +
       inc.traces.map(function (t) {
         return (

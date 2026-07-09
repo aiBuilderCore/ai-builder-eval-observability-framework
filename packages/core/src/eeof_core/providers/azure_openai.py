@@ -47,4 +47,23 @@ class AzureOpenAIProvider(ModelProvider):
             resp = await client.post(self._url, headers=self._headers, json=payload)
             resp.raise_for_status()
             data = resp.json()
-        return data["choices"][0]["message"]["content"]
+
+        # Azure content filtering can return HTTP 200 with a *null* (or empty)
+        # completion and finish_reason="content_filter" — notably when authoring
+        # adversarial red-team prompts. Unlike a network error this raises nothing,
+        # so the fallback chain (→ Groq → echo) would never engage and the caller
+        # would get a blank/broken message. Detect it and raise so the chain moves
+        # on, exactly as it does for a transport failure.
+        choices = data.get("choices") or []
+        if not choices:
+            raise RuntimeError(
+                f"azure_openai returned no choices (prompt_filter={data.get('prompt_filter_results')})"
+            )
+        finish = choices[0].get("finish_reason")
+        content = (choices[0].get("message") or {}).get("content")
+        if not content or not content.strip():
+            raise RuntimeError(
+                f"azure_openai returned empty content (finish_reason={finish!r}) — "
+                "likely a content filter or refusal; falling through the provider chain."
+            )
+        return content
