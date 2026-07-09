@@ -116,11 +116,12 @@ if ($Mode -eq 'infra') {
     401k agent  : http://127.0.0.1:8097/chat        (REST agent-under-test)
     model       : Azure GPT-4 primary -> Groq fallback -> echo (set keys in .env)
 
-  Initial data is seeded automatically: the dashboard + observability rollups
-  (SEED_DEMO) and — once the edge is live — a real question-generation /
-  simulation / evaluation / self-heal lineage driven through the API
-  (scripts/seed_pipeline.py). Judge catalogue + persona lab come from the core
-  library. To drive another lineage yourself:
+  Clean slate by default (SEED_DEMO=0): no synthetic agent fleet. Once the edge
+  is live, a real question-generation / simulation / evaluation / self-heal
+  lineage is driven through the API (scripts/seed_pipeline.py) so the dashboard +
+  observability rollups fill in only from real runs. Judge catalogue + persona
+  lab come from the core library. Set SEED_DEMO=1 to restore the demo fleet.
+  To drive another lineage yourself:
     uv run python scripts/demo.py
 
 "@ | Write-Host
@@ -135,11 +136,14 @@ if ($NoRun) {
 # Start the whole stack in the background so we can seed the interactive surfaces
 # through the real edge once it is live, then hand the console back to the stack.
 # SEED_HEAL_INCIDENTS=0 keeps Self-Heal populated only by the real breach detector
-# (no hand-written INC-99x incidents); SEED_DEMO (default on) still seeds the
-# dashboard/observability rollups + onboards the agent adapter.
+# (no hand-written INC-99x incidents); SEED_DEMO defaults to 0 (clean slate —
+# personas + judges only, no synthetic agent fleet), so the dashboard/observability
+# rollups fill in only from real runs driven through the edge. Set SEED_DEMO=1 to
+# restore the synthetic demo fleet.
 Log "starting all services in the background ..."
 $env:APP_ENV = $Mode
 $env:SEED_HEAL_INCIDENTS = '0'
+if (-not $env:SEED_DEMO) { $env:SEED_DEMO = '0' }
 $proc = Start-Process -FilePath 'uv' -ArgumentList @('run', 'python', 'scripts/run_all.py') `
   -NoNewWindow -PassThru
 
