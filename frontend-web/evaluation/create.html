@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Evaluation — New Job · AIBuilderCore</title>
+<title>Evaluation — New Job · Verity</title>
 <script>
   (function () {
     try {
@@ -62,7 +62,7 @@
 <header class="mock-back">
   <a href="../../" class="mock-back__link">
     <span class="mock-back__arrow" aria-hidden="true">←</span>
-    Back to Applications · AIBuilderCore
+    Back to Applications · Verity
   </a>
 </header>
 
@@ -70,9 +70,9 @@
   <div class="frame row">
     <div class="brand">
       <span class="brand-mark"></span>
-      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+      <span class="brand-text">Verity <em>· Evaluation</em></span>
     </div>
-    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation</b></span>
+    <span class="product-name"><a href="../index.html">Verity</a> · <b>04 · Evaluation</b></span>
   </div>
 </header>
 
@@ -594,7 +594,7 @@
     const job = {
       job_id: EV.newJobId(),
       verdict_set_id: null,
-      created_by: "you@aibuildercore.com",
+      created_by: "you@verity.com",
       created_at: EV.nowISO(),
       completed_by: null,
       completed_at: null,
@@ -603,7 +603,7 @@
       state: "queued",
       progress: { phase: "queued", cells_total: cells, cells_done: 0, verdicts_emitted: 0, judge_call_count: 0, consensus_rate: null },
       output: null,
-      events: [{ ts: EV.nowISO(), state: "queued", by: "you@aibuildercore.com" }],
+      events: [{ ts: EV.nowISO(), state: "queued", by: "you@verity.com" }],
     };
     EV.upsertJob(job);
     EV.toast(`Submitted ${job.job_id}`, "Evaluation");

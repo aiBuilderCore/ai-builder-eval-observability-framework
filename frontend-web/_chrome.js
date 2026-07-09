@@ -1,9 +1,9 @@
-/* AIBuilderCore app chrome for the Enterprise Eval Observability mock UIs.
+/* Verity app chrome for the Verity mock UIs.
 
    The framework opens as a *fullscreen application* (launched from the
    Applications catalog), not as a docs page. It carries its own shell:
 
-     ┌ Top bar:  AIBuilderCore / Applications ······· scope chips · theme
+     ┌ Top bar:  Verity / Applications ······· scope chips · theme
      ├ Left rail (in-app): app title (→ Dashboard) + the five stages,
      │            and pinned to the bottom the logged-in user + Settings.
      └ Main:     full remaining width (each stage centers its own column).
@@ -33,12 +33,12 @@
   // entry, so highlight it (and not Evaluation) when it's the current page.
   var isCatalog = /\/evaluation\/catalog\.html$/.test(herePath);
 
-  var APP_NAME = 'Enterprise Eval Observability';
+  var APP_NAME = 'Verity';
 
   // Logged-in operator — synthetic demo identity, not a persona and not real
-  // customer data. Shown in the sidebar user block. Alex is the workspace admin:
+  // customer data. Shown in the sidebar user block. Nitin is the workspace admin:
   // the only role allowed to register teams and onboard members (see settings).
-  var USER = { name: 'Alex Rivera', role: 'Workspace Admin', tenant: 'acme-corp', initials: 'AR', admin: true };
+  var USER = { name: 'Nitin K', role: 'Workspace Admin', tenant: 'acme-corp', initials: 'NK', admin: true };
 
   // Compact inline icons (16×16 stroke). One per stage + settings.
   var ICON = {
@@ -81,7 +81,7 @@
     { slug: 'simulation',          label: 'Simulation' },
     { slug: 'evaluation',          label: 'Evaluation' },
     { slug: 'observability',       label: 'Observability' },
-    { slug: 'self-heal',           label: 'Self-Heal' }
+    { slug: 'self-heal',           label: 'Self Heal' }
   ];
   var isStage = SUB_APPS.some(function (s) { return s.slug === activeSub; });
 
@@ -101,13 +101,12 @@
 
   var SECTION_LANDING  = new URL('index.html', sectionUrl).href;
   var SETTINGS_LANDING = new URL('settings.html', sectionUrl).href;
-  var APPS_LANDING     = new URL('index.html', appsUrl).href;
   var HOME             = new URL('index.html', repoUrl).href;
 
   var CSS = [
     'html.aibc-chrome .mock-back { display: none !important; }',
     'html.aibc-chrome #aibc-theme-toggle[data-aibc-theme-injected] { display: none !important; }',
-    // The per-page sub-brand strip (header.top) restates the AIBuilderCore brand,
+    // The per-page sub-brand strip (header.top) restates the Verity brand,
     // the framework name, and the sub-app name — all already carried by the
     // injected top bar + left rail. Hide it so pages open clean.
     'html.aibc-chrome header.top { display: none !important; }',
@@ -134,10 +133,19 @@
     '  font-size: 15px; font-weight: 600;',
     '  color: var(--text); text-decoration: none; letter-spacing: -0.01em;',
     '}',
-    '.aibc-brand:hover { color: var(--accent); }',
+    '.aibc-brand:hover .aibc-brand__name { filter: brightness(1.08); }',
     '.aibc-brand__dot {',
     '  width: 8px; height: 8px; border-radius: 999px;',
     '  background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);',
+    '}',
+    '.aibc-brand__name {',
+    "  font-family: 'Space Grotesk', 'Geist', 'Inter', sans-serif;",
+    '  font-size: 18px; font-weight: 700; line-height: 1;',
+    '  text-transform: uppercase; letter-spacing: 0.16em;',
+    '  background: linear-gradient(96deg, var(--accent) 6%, var(--text) 82%);',
+    '  -webkit-background-clip: text; background-clip: text;',
+    '  -webkit-text-fill-color: transparent; color: var(--accent);',
+    '  transition: filter 150ms ease;',
     '}',
     '.aibc-crumb-sep { color: var(--text-faint); font-size: 13px; flex-shrink: 0; }',
     '.aibc-crumb {',
@@ -372,12 +380,10 @@
     return [
       '<div class="aibc-site-header__inner">',
       '  <nav class="aibc-crumbs" aria-label="Breadcrumb">',
-      '    <a class="aibc-brand" href="' + HOME + '">',
+      '    <a class="aibc-brand" href="' + HOME + '" aria-label="Verity — home">',
       '      <span class="aibc-brand__dot" aria-hidden="true"></span>',
-      '      <span>AIBuilderCore</span>',
+      '      <span class="aibc-brand__name">Verity</span>',
       '    </a>',
-      '    <span class="aibc-crumb-sep" aria-hidden="true">/</span>',
-      '    <a class="aibc-crumb" href="' + APPS_LANDING + '">Applications</a>',
       '  </nav>',
       '  <div class="aibc-header-right">',
       '    ' + buildChips(),

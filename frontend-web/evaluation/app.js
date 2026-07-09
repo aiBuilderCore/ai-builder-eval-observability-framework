@@ -23,7 +23,7 @@ const CUSTOM_JUDGES_KEY = "aibcore.eval.customjudges.v1";
 // dimensions), and verdicts they produce carry provenance: "custom"
 // so cross-team rollups can filter them out by default.
 const BYOJ_QUOTA       = 2;
-const CURRENT_USER     = "you@aibuildercore.com";
+const CURRENT_USER     = "you@verity.com";
 const APPROVED_MODELS  = [
   "claude-haiku-4-5",
   "claude-sonnet-4-6",

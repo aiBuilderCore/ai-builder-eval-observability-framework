@@ -1,5 +1,5 @@
 /* ============================================================================
-   styles.css — Enterprise Eval Observability · Control Center (dashboard home)
+   styles.css — Verity · Control Center (dashboard home)
 
    The framework landing is a hand-authored mock (not rendered from markdown).
    It loads _chrome.js like every sub-app, so it inherits the unified site
@@ -239,8 +239,10 @@ a { color: inherit; }
    its sub-app; the connector conveys "output of one is the input of the next". */
 .pipeline {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  /* Responsive: wraps cleanly to 4 / 3 / 2 columns as width shrinks so the full
+     set of stage cards (incl. Judge Catalogue + Self Heal) always reads well. */
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  gap: 12px;
   align-items: stretch;
 }
 .stage {
@@ -262,16 +264,8 @@ a { color: inherit; }
   box-shadow: 0 10px 26px var(--shadow-strong);
 }
 .stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* connector chevron between stages */
-.stage:not(:last-child)::after {
-  content: "";
-  position: absolute; right: -11px; top: 50%;
-  width: 12px; height: 12px; z-index: 2;
-  transform: translateY(-50%) rotate(45deg);
-  border-top: 1.5px solid var(--border-strong);
-  border-right: 1.5px solid var(--border-strong);
-  background: var(--bg);
-}
+/* Connector chevrons are omitted now that the grid wraps to multiple rows —
+   the section hint (test users → questions → …) carries the flow instead. */
 .stage__top {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 0.65rem;

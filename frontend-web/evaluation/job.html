@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Evaluation — Job · AIBuilderCore</title>
+<title>Evaluation — Job · Verity</title>
 <script>
   (function () {
     try {
@@ -62,7 +62,7 @@
 <header class="mock-back">
   <a href="../../" class="mock-back__link">
     <span class="mock-back__arrow" aria-hidden="true">←</span>
-    Back to Applications · AIBuilderCore
+    Back to Applications · Verity
   </a>
 </header>
 
@@ -70,9 +70,9 @@
   <div class="frame row">
     <div class="brand">
       <span class="brand-mark"></span>
-      <span class="brand-text">AIBuilderCore <em>· Evaluation</em></span>
+      <span class="brand-text">Verity <em>· Evaluation</em></span>
     </div>
-    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>04 · Evaluation</b></span>
+    <span class="product-name"><a href="../index.html">Verity</a> · <b>04 · Evaluation</b></span>
   </div>
 </header>
 
@@ -385,7 +385,7 @@
           body: `Verdict set <b>${job.verdict_set_id}</b> will become immutable. Observability and audit reports will reference it by ID.`,
           confirmLabel: "Ship",
         });
-        if (ok && EV.shipJob(job.job_id, "you@aibuildercore.com")) {
+        if (ok && EV.shipJob(job.job_id, "you@verity.com")) {
           EV.toast("Shipped", "Evaluation");
           load();
         }
@@ -413,7 +413,7 @@
       document.getElementById("subtitle").textContent = "Check the URL or return to the jobs list.";
       return;
     }
-    document.title = `Evaluation — ${job.job_id} · AIBuilderCore`;
+    document.title = `Evaluation — ${job.job_id} · Verity`;
 
     document.getElementById("title").innerHTML = `Job <code style="font-size:0.6em;background:var(--surface-alt);padding:0.1em 0.35em;border-radius:4px;border:1px solid var(--border);">${job.job_id}</code> <span class="qualifier" id="title-meta">— ${EV.phaseLabel(job.state)}</span>`;
 

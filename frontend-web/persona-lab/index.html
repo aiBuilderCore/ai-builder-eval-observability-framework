@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Persona Lab — Gallery · AIBuilderCore</title>
+<title>Persona Lab — Gallery · Verity</title>
 <script>
   // aibc-theme: apply persisted theme before paint (avoid FOUC).
   (function () {
@@ -66,7 +66,7 @@
 <header class="mock-back">
   <a href="../../" class="mock-back__link">
     <span class="mock-back__arrow" aria-hidden="true">←</span>
-    Back to Applications · AIBuilderCore
+    Back to Applications · Verity
   </a>
 </header>
 
@@ -74,9 +74,9 @@
   <div class="frame row">
     <div class="brand">
       <span class="brand-mark"></span>
-      <span class="brand-text">AIBuilderCore <em>· Persona Lab</em></span>
+      <span class="brand-text">Verity <em>· Persona Lab</em></span>
     </div>
-    <span class="product-name"><a href="../index.html">Enterprise Eval Observability</a> · <b>01 · Persona Lab</b></span>
+    <span class="product-name"><a href="../index.html">Verity</a> · <b>01 · Persona Lab</b></span>
   </div>
 </header>
 
@@ -84,7 +84,7 @@
 
   <section class="page-head">
     <p class="eyebrow"><span class="dot"></span> Stage 01 · Personas</p>
-    <h1>Persona Lab <span class="qualifier">— the synthetic users you test</span></h1>
+    <h1>Persona Lab</h1>
     <p class="subtitle">
       The reusable cast of synthetic users every downstream stage evaluates against.
     </p>
@@ -150,6 +150,11 @@
       ].join(" ").toLowerCase();
       return blob.includes(q);
     });
+    // Core (generic) personas on top, finance-domain personas at the bottom —
+    // both come from the core library; sort is stable within each group.
+    const isFinance = (p) => (p.tags || []).some((t) => t === "finance" || t === "retirement");
+    filtered.sort((a, b) => (isFinance(a) ? 1 : 0) - (isFinance(b) ? 1 : 0));
+
     document.getElementById("filter-count").textContent = filtered.length;
 
     const shelf = document.getElementById("shelf");
@@ -217,6 +222,10 @@
     state.search = e.target.value;
     render();
   });
+  // Expose the gallery repaint so app.js hydrate() can re-render once the live
+  // /personas fetch resolves (otherwise the gallery keeps the stale first paint
+  // and newly created personas never show up hydrated).
+  window.render = render;
   render();
 </script>
 

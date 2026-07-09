@@ -1,5 +1,5 @@
 /* ============================================================================
-   _app.css — shared design-system layer for the Enterprise Eval Observability
+   _app.css — shared design-system layer for the Verity
    mock UIs.  Injected by _chrome.js AFTER each sub-app's own styles.css, so the
    rules here win ties and enforce ONE consistent, executive look across all five
    stages (Persona Lab · Question Generation · Simulation · Evaluation ·
@@ -16,29 +16,11 @@
    ============================================================================ */
 
 /* ── 1 · Colour discipline ────────────────────────────────────────────────
-   Full unification: retire the decorative per-persona "hue" palette. Violet is
-   the one accent; semantic green/amber/red stay reserved for state. Every
-   persona card now keys its ribbon, monogram, quote-rule, and emphasis off the
-   accent instead of a rainbow, so the gallery reads as part of one product. */
-html.aibc-chrome .persona[data-hue],
-html.aibc-chrome .persona[data-hue="ochre"],
-html.aibc-chrome .persona[data-hue="sage"],
-html.aibc-chrome .persona[data-hue="rose"],
-html.aibc-chrome .persona[data-hue="olive"],
-html.aibc-chrome .persona[data-hue="plum"],
-html.aibc-chrome .persona[data-hue="rust"],
-html.aibc-chrome .persona[data-hue="terracotta"] {
-  --p-hue: var(--accent);
-  --p-bg: var(--accent-soft);
-}
-
-/* Monogram: a calm violet-tinted tile rather than a saturated colour block. */
-html.aibc-chrome .monogram {
-  background: var(--accent-soft);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-html.aibc-chrome .monogram::after { display: none; }
+   Persona cards keep their per-hue palette: each card keys its ribbon,
+   monogram, quote-rule, and emphasis off its own `data-hue` (defined in the
+   per-app styles.css). Semantic green/amber/red stay reserved for state. This
+   shared layer no longer flattens those hues to the accent — the gallery reads
+   as a warm, varied cast while the surrounding chrome stays violet. */
 
 /* Topic tags: one neutral chip everywhere — quiet metadata, not decoration.
    (State/verdict chips are styled by each app and left untouched.) */
@@ -92,7 +74,9 @@ html.aibc-chrome .page-head .subtitle {
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-muted);
-  max-width: 62ch;
+  /* Let the intro flow across the page instead of stopping mid-width; cap only
+     on ultra-wide screens so lines never get uncomfortably long. */
+  max-width: min(100%, 104ch);
   margin: 0 0 1.15rem 0;
 }
 
@@ -133,18 +117,24 @@ html.aibc-chrome .meta-pills .pill.pill--accent b { color: var(--accent); }
    dashboard read, replacing the old count-pills. One accent stat carries the
    headline number; a hairline divider separates each. */
 html.aibc-chrome .aibc-kpis {
-  display: flex;
-  flex-wrap: wrap;
+  /* Equal-width columns (1fr each) so every tile is exactly the same size — a
+     longer label never makes a tile wider. Grid guarantees this even for the
+     flush-left first tile, which flex could not. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: 0;
   margin: 0.25rem 0 0;
 }
 html.aibc-chrome .aibc-stat {
+  box-sizing: border-box;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  padding: 2px 22px;
+  padding: 2px 20px;
   border-left: 1px solid var(--border);
 }
 html.aibc-chrome .aibc-stat:first-child { padding-left: 0; border-left: 0; }
@@ -168,6 +158,12 @@ html.aibc-chrome .aibc-stat__label {
   white-space: nowrap;
 }
 @media (max-width: 640px) {
+  /* Too many tiles for one row on phones — wrap into equal 3-up rows. */
+  html.aibc-chrome .aibc-kpis {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 14px;
+  }
   html.aibc-chrome .aibc-stat { padding: 2px 16px; }
   html.aibc-chrome .aibc-stat__num { font-size: 22px; }
 }

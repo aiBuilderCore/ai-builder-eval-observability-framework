@@ -8,11 +8,20 @@
     if (nums[index]) nums[index].textContent = value;
   }
 
+  // Custom (BYOJ) judges live client-side in the Evaluation app's localStorage;
+  // count them so the judge tally reflects built-in + custom, not built-in only.
+  function customJudgeCount() {
+    try {
+      const arr = JSON.parse(localStorage.getItem("aibcore.eval.customjudges.v1") || "[]");
+      return Array.isArray(arr) ? arr.length : 0;
+    } catch { return 0; }
+  }
+
   const GATE_THRESHOLD = 0.85;
 
   async function refresh() {
     try {
-      const [personas, sets, runs, vsets, jobs, incidents, batches, calibration] =
+      const [personas, sets, runs, vsets, jobs, incidents, batches, calibration, judges] =
         await Promise.all([
           EEOF.get("/personas").catch(() => []),
           EEOF.get("/question-sets").catch(() => []),
@@ -22,6 +31,7 @@
           EEOF.get("/observability/incidents?state=open").catch(() => []),
           EEOF.get("/observability/batches").catch(() => []),
           EEOF.get("/observability/calibration").catch(() => []),
+          EEOF.get("/judges").catch(() => []),
         ]);
       const verdicts = vsets.reduce((n, v) => n + (v.verdict_count || 0), 0);
       const passRates = vsets.filter((v) => v.pass_rate != null).map((v) => v.pass_rate);
@@ -32,15 +42,21 @@
         jobs.filter((j) => j.stage === stage && ["queued", "running"].includes(j.state)).length;
       const openFlags = incidents.length;
 
-      // KPI strip — six .aibc-stat tiles.
+      const customJudges = customJudgeCount();
+      const totalJudges = judges.length + customJudges;
+
+      // KPI strip — eight .aibc-stat tiles.
       setKpi(0, passRate);
       setKpi(1, personas.length);
       setKpi(2, sets.length);
       setKpi(3, runs.length);
       setKpi(4, verdicts.toLocaleString());
-      setKpi(5, openFlags);
+      setKpi(5, totalJudges);
+      setKpi(6, batches.length);
+      setKpi(7, openFlags);
 
-      // Pipeline stage cards — big metric + status chip.
+      // Pipeline stage cards — big metric + status chip. Order matches the DOM:
+      // Persona · QGen · Sim · Judge Catalogue · Eval · Observability · Self Heal.
       const bigs = document.querySelectorAll(".stage__num-big");
       const chips = [...document.querySelectorAll(".stage .chip")];
       const setCard = (i, big, chipText, chipCls) => {
@@ -50,8 +66,10 @@
       setCard(0, personas.length, personas.length ? "healthy" : "empty", personas.length ? "ok" : "warn");
       setCard(1, sets.length, running("qgen") ? `${running("qgen")} running` : "idle", running("qgen") ? "run" : "ok");
       setCard(2, runs.length, running("sim") ? `${running("sim")} in flight` : "idle", running("sim") ? "run" : "ok");
-      setCard(3, verdicts.toLocaleString(), `${passRate} pass`, passRates.length && passRate !== "—" && parseInt(passRate) < 85 ? "warn" : "ok");
-      setCard(4, `${batches.length} <em>batches</em>`, `${openFlags} flags`, openFlags ? "warn" : "ok");
+      setCard(3, totalJudges, customJudges ? `${judges.length} + ${customJudges}` : `${judges.length} built-in`, "ok");
+      setCard(4, verdicts.toLocaleString(), `${passRate} pass`, passRates.length && passRate !== "—" && parseInt(passRate) < 85 ? "warn" : "ok");
+      setCard(5, `${batches.length} <em>batches</em>`, `${openFlags} flags`, openFlags ? "warn" : "ok");
+      setCard(6, incidents.length, incidents.length ? `${incidents.length} open` : "auto", incidents.length ? "warn" : "ok");
 
       renderJobs(jobs);
       renderRail(jobs, vsets, calibration, incidents);

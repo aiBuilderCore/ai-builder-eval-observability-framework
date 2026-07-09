@@ -1,4 +1,4 @@
-/* Self-Heal — closed-loop remediation.
+/* Self Heal — closed-loop remediation.
 
    No bundled data. Every incident, policy, and KPI is hydrated live from the
    `/self-heal/*` edge by the LIVE-wiring adapter at the bottom of this file;
@@ -354,7 +354,7 @@
 })();
 
 // ── LIVE wiring ──────────────────────────────────────────────────────────────
-// When the API Orchestration edge is reachable, hydrate the Self-Heal seam from
+// When the API Orchestration edge is reachable, hydrate the Self Heal seam from
 // /self-heal/* and route the human-in-the-loop verdicts to the real endpoints.
 // Follows the repo recipe: guard on window.EEOF, map API → the app's UI shapes
 // (the only rename is dispo_class → dispoClass), override the SH.* seam, repaint.

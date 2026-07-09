@@ -1,4 +1,4 @@
-/* Self-Heal — closed-loop remediation.
+/* Self Heal — closed-loop remediation.
    Inherit every design token + shared component (card, chip, stage, pipeline,
    alert, aibc-stat) from the root dashboard stylesheet, then add only the
    surfaces unique to this stage: the incident queue, the closed-loop timeline,

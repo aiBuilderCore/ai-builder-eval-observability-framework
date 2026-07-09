@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Enterprise Eval Observability — Control Center · AIBuilderCore</title>
+<title>Control Center · Verity</title>
 <script>
   // aibc-theme: apply persisted theme before paint (avoid FOUC).
   (function () {
@@ -28,10 +28,13 @@
 
   <section class="page-head">
     <p class="eyebrow"><span class="dot"></span> Control Center · pre-release · acme-corp</p>
-    <h1>Enterprise Eval Observability <span class="qualifier">— one pipeline from persona to production evidence</span></h1>
+    <h1>Verity</h1>
     <p class="subtitle">
-      Design synthetic users, generate adversarial questions, simulate them against your agents, let judges score every
-      run, and keep the trace — audit-ready — all the way to the deploy gate. Five stages, one lineage.
+      Verity checks that your AI agents are safe and reliable before they go live. It creates realistic test
+      users, asks them tricky questions, sends those questions to your agent, and lets independent judges score
+      every answer. It keeps watching quality after launch, stores a complete audit ready record for reviewers,
+      and automatically turns any flagged problem into a fix before it reaches your customers. One connected
+      trail, from the first test all the way to go live.
     </p>
     <p class="scope-note" title="Change scope from the Workspace switcher in the sidebar">
       <span class="scope-note__label">Workspace</span>
@@ -45,14 +48,16 @@
       <div class="aibc-stat"><span class="aibc-stat__num">14</span><span class="aibc-stat__label">question sets</span></div>
       <div class="aibc-stat"><span class="aibc-stat__num">38</span><span class="aibc-stat__label">sim runs</span></div>
       <div class="aibc-stat"><span class="aibc-stat__num">1,240</span><span class="aibc-stat__label">verdicts</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">15</span><span class="aibc-stat__label">judges</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num">9</span><span class="aibc-stat__label">batches watched</span></div>
       <div class="aibc-stat"><span class="aibc-stat__num">4</span><span class="aibc-stat__label">open flags</span></div>
     </div>
   </section>
 
   <!-- ── Pipeline flow — the four-tuple lineage, left → right ────────────── -->
   <div class="sec-head">
-    <h2 class="sec-head__title">The pipeline</h2>
-    <span class="sec-head__hint">persona → question → run → verdict → evidence</span>
+    <h2 class="sec-head__title">How it works</h2>
+    <span class="sec-head__hint">test users → questions → agent runs → scores → audit evidence</span>
   </div>
 
   <div class="pipeline">
@@ -63,7 +68,7 @@
         <span class="chip chip--ok">healthy</span>
       </div>
       <p class="stage__name">Persona Lab</p>
-      <p class="stage__desc">Curated synthetic users that seed every eval — the "who" behind each question.</p>
+      <p class="stage__desc">Realistic pretend users that stand in for your real customers — the "who" behind every test question.</p>
       <div class="stage__metric">
         <span class="stage__num-big">6</span>
         <span class="stage__metric-label">active personas</span>
@@ -79,7 +84,7 @@
         <span class="chip chip--run">1 running</span>
       </div>
       <p class="stage__name">Question Generation</p>
-      <p class="stage__desc">Turns personas + intents into adversarial question sets via rainbow-teaming strategies.</p>
+      <p class="stage__desc">Turns those users into tough, tricky questions designed to find your agent's weak spots.</p>
       <div class="stage__metric">
         <span class="stage__num-big">14</span>
         <span class="stage__metric-label">question sets</span>
@@ -95,7 +100,7 @@
         <span class="chip chip--run">2 in flight</span>
       </div>
       <p class="stage__name">Simulation</p>
-      <p class="stage__desc">Replays question sets against your agents over REST / MCP / A2A and captures every trace.</p>
+      <p class="stage__desc">Sends the questions to your agent and records exactly how it responds, step by step.</p>
       <div class="stage__metric">
         <span class="stage__num-big">38</span>
         <span class="stage__metric-label">runs recorded</span>
@@ -105,13 +110,29 @@
       </div>
     </a>
 
-    <a class="stage" href="evaluation/index.html">
+    <a class="stage" href="evaluation/catalog.html">
       <div class="stage__top">
         <span class="stage__num">04</span>
+        <span class="chip chip--ok">15 judges</span>
+      </div>
+      <p class="stage__name">Judge Catalogue</p>
+      <p class="stage__desc">The library of scorers behind Evaluation — built-in judges for safety, accuracy and more, plus your own.</p>
+      <div class="stage__metric">
+        <span class="stage__num-big">15</span>
+        <span class="stage__metric-label">judges available</span>
+      </div>
+      <div class="stage__foot">
+        <span class="stage__open">Open →</span>
+      </div>
+    </a>
+
+    <a class="stage" href="evaluation/index.html">
+      <div class="stage__top">
+        <span class="stage__num">05</span>
         <span class="chip chip--ok">87% pass</span>
       </div>
       <p class="stage__name">Evaluation</p>
-      <p class="stage__desc">Opaque judges and jury panels score every run; bring your own judge, export the exec report.</p>
+      <p class="stage__desc">Independent judges score every answer for quality and safety — add your own, or export a summary report.</p>
       <div class="stage__metric">
         <span class="stage__num-big">1,240</span>
         <span class="stage__metric-label">verdicts issued</span>
@@ -123,14 +144,30 @@
 
     <a class="stage" href="observability/index.html">
       <div class="stage__top">
-        <span class="stage__num">05</span>
+        <span class="stage__num">06</span>
         <span class="chip chip--warn">4 flags</span>
       </div>
       <p class="stage__name">Observability</p>
-      <p class="stage__desc">Batch traces, OpenInference span trees, judge κ calibration, drift and regulator-ready evidence packs.</p>
+      <p class="stage__desc">Track results over time, catch problems early, and package audit-ready evidence for reviewers and regulators.</p>
       <div class="stage__metric">
         <span class="stage__num-big">9 <em>batches</em></span>
         <span class="stage__metric-label">under watch</span>
+      </div>
+      <div class="stage__foot">
+        <span class="stage__open">Open →</span>
+      </div>
+    </a>
+
+    <a class="stage" href="self-heal/index.html">
+      <div class="stage__top">
+        <span class="stage__num">07</span>
+        <span class="chip chip--ok">auto</span>
+      </div>
+      <p class="stage__name">Self Heal</p>
+      <p class="stage__desc">Turns any flagged problem into a fix automatically, before it reaches your customers.</p>
+      <div class="stage__metric">
+        <span class="stage__num-big">0</span>
+        <span class="stage__metric-label">open incidents</span>
       </div>
       <div class="stage__foot">
         <span class="stage__open">Open →</span>
