@@ -1,0 +1,103 @@
+name: version-bump
+
+# Auto-tag a new version every time a PR is merged into main.
+#
+#   branch contains 'feature/'  -> minor bump   (also the default when neither
+#                                                 'feature/' nor 'fix/' appears)
+#   branch contains 'fix/'      -> patch bump
+#
+# Roll-over: a component climbs until it reaches ROLLOVER (50), then it resets to
+# 0 and carries into the next-higher component:
+#   minor reaches 50 -> major += 1, minor = 0
+#   patch reaches 50 -> minor += 1, patch = 0  (which may itself carry to major)
+# A minor bump resets patch to 0 (standard semver). Tune ROLLOVER below.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Compute next version and tag
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          # Value a component reaches before rolling over into the next one.
+          ROLLOVER=50
+
+          git fetch --tags --force origin
+
+          # Highest semver tag (vMAJOR.MINOR.PATCH); start from v0.0.0 if none.
+          latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)" || true
+          latest="${latest:-v0.0.0}"
+          echo "latest tag: $latest"
+
+          core="${latest#v}"
+          major="${core%%.*}"
+          rest="${core#*.}"
+          minor="${rest%%.*}"
+          patch="${rest#*.}"
+
+          # Decide the bump from the merged branch name (substring match).
+          case "$HEAD_REF" in
+            *feature/*) bump=minor ;;
+            *fix/*)     bump=patch ;;
+            *)          bump=minor ;;
+          esac
+          echo "branch '$HEAD_REF' -> $bump bump"
+
+          if [ "$bump" = "patch" ]; then
+            patch=$((patch + 1))
+            if [ "$patch" -ge "$ROLLOVER" ]; then
+              patch=0
+              minor=$((minor + 1))
+            fi
+          else
+            minor=$((minor + 1))
+            patch=0
+          fi
+
+          # Minor overflow cascades into a major bump.
+          if [ "$minor" -ge "$ROLLOVER" ]; then
+            minor=0
+            major=$((major + 1))
+          fi
+
+          next="v${major}.${minor}.${patch}"
+          echo "next tag: $next"
+
+          if git rev-parse -q --verify "refs/tags/${next}" >/dev/null; then
+            echo "tag ${next} already exists — nothing to do"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${next}" -m "${next} — auto-bump on merge of #${PR_NUMBER} (${bump})
+
+${PR_TITLE}
+source branch: ${HEAD_REF}"
+          git push origin "${next}"
+
+          echo "### Tagged \`${next}\` (${bump} bump from \`${latest}\`)" >> "$GITHUB_STEP_SUMMARY"
