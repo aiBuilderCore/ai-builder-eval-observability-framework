@@ -564,18 +564,22 @@
   }
 
   // ---------- Init ----------
-  renderSeedGrid();
-  renderAdapterGrid();
+  // Static reference clusters (mode/session) paint immediately.
   renderModeCluster();
   renderSessionCluster();
   paintStepper();
   paintSummary();
 
-  // The initial paint runs before the LIVE wiring has hydrated its caches from
-  // the edge; repaint the seed-set and adapter grids once the first hydrate
-  // resolves so freshly shipped seed sets and onboarded adapters show up.
+  // Seed sets + adapters mirror live backend entities. In live mode, wait for the
+  // first hydrate before painting them so seed data never flashes as stale;
+  // offline mode paints the seed fallback immediately (so the UI never blanks).
   if (window.SIM && SIM.ready && typeof SIM.ready.then === "function") {
+    const sg = document.getElementById("seed-grid"), ag = document.getElementById("adapter-grid");
+    if (sg) sg.innerHTML = `<p class="sub" style="padding:20px;color:var(--text-muted);">Loading seed sets…</p>`;
+    if (ag) ag.innerHTML = `<p class="sub" style="padding:20px;color:var(--text-muted);">Loading adapters…</p>`;
     SIM.ready.then(() => { renderSeedGrid(); renderAdapterGrid(); paintSummary(); });
+  } else {
+    renderSeedGrid(); renderAdapterGrid(); paintSummary();
   }
 </script>
 

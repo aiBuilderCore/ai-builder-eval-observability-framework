@@ -308,8 +308,11 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
-  render();
-  QG.startTicking(render);
+  // Live mode: defer the first paint until the adapter's first hydrate so a
+  // freshly-submitted job (navigated to straight after submit) doesn't flash
+  // "job not found" before jobsCache fills. Offline mode renders immediately.
+  if (window.QG && QG.ready) QG.ready.then(() => QG.startTicking(render));
+  else { render(); QG.startTicking(render); }
 </script>
 
 </body>

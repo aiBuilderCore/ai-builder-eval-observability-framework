@@ -801,14 +801,24 @@ window.SIM = {
     try {
       // Independent fetches — one failing endpoint must not blank the others
       // (a blank runsCache makes run.html's not-found guard redirect to index).
-      const [runs, adapters, sets] = await Promise.all([
+      const [runs, adapters, sets, personas] = await Promise.all([
         EEOF.get("/simulation/runs").catch(() => null),
         EEOF.get("/adapters").catch(() => null),
         EEOF.get("/question-sets").catch(() => null),
+        EEOF.get("/personas").catch(() => null),
       ]);
       if (runs) runsCache = runs.map(mapRun).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
       if (adapters) adaptersCache = adapters.map(mapAdapter);
       if (sets) seedSetsCache = sets.map(mapSeedSet).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+      // Hydrate the persona name map (in place) so seed-set cards resolve live
+      // persona ids to real names instead of raw ids or stale mock names. Mock
+      // entries stay only as the offline synth fallback.
+      if (Array.isArray(personas)) {
+        for (const p of personas) {
+          PERSONAS[p.id] = { name: p.name, hue: p.hue || "ochre",
+            primary_rubric: p.primary_rubric || "rub_helpfulness", description: p.role || "" };
+        }
+      }
       await Promise.all(runsCache.map(async (r) => {
         try { tracesMetaByRun[r.run_id] = (await EEOF.get(`/simulation/runs/${r.run_id}/traces`)).map(mapTraceMeta); }
         catch { tracesMetaByRun[r.run_id] = []; }

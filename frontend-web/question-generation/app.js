@@ -58,14 +58,13 @@ const STATE_ORDER = PHASES.map(p => p.state).concat(["shipped"]);
 //                       "length.style.difficulty" strings for compact dedup.
 //                       Step 03 of the wizard derives scenarios from the union
 //                       of these across the selected personas; user can override.
-const PERSONAS = [
-  { id: "persona_olivia",  name: "Onboarding Olivia",  role: "First-time user, mid-market ops lead",     hue: "ochre", version: 4, primary_rubric: "rub_helpfulness",   default_shapes: ["ambiguate"],                       default_scenarios: ["short.chat.easy", "short.chat.medium", "short.ticket.easy", "medium.chat.easy"] },
-  { id: "persona_aaron",   name: "Adversarial Aaron",  role: "Red-team analyst, security research",      hue: "rust",  version: 7, primary_rubric: "rub_safety",        default_shapes: ["adversify", "hallucinate_bait"],   default_scenarios: ["short.chat.hard", "medium.chat.hard", "long.chat.hard", "short.ticket.hard"] },
-  { id: "persona_hari",    name: "Hurried Hari",       role: "Field sales lead",                         hue: "rose",  version: 3, primary_rubric: "rub_tone",          default_shapes: ["ambiguate"],                       default_scenarios: ["short.ticket.easy", "short.chat.easy", "short.voice.medium", "medium.email.easy"] },
-  { id: "persona_mei",     name: "Methodical Mei",     role: "Research scientist, scientific computing", hue: "olive", version: 5, primary_rubric: "rub_faithfulness",  default_shapes: ["hallucinate_bait"],                default_scenarios: ["long.email.hard", "medium.email.hard", "medium.email.medium", "long.email.medium"] },
-  { id: "persona_carlos",  name: "Confused Carlos",    role: "SMB owner, food-services",                 hue: "plum",  version: 2, primary_rubric: "rub_faithfulness",  default_shapes: ["ambiguate", "hallucinate_bait"],   default_scenarios: ["short.ticket.medium", "short.ticket.easy", "medium.ticket.medium", "short.email.easy"] },
-  { id: "persona_priya",   name: "Polyglot Priya",     role: "Bilingual product engineer",               hue: "sage",  version: 4, primary_rubric: "rub_helpfulness",   default_shapes: ["code_switch"],                     default_scenarios: ["medium.chat.medium", "short.chat.medium", "medium.ticket.medium", "medium.chat.easy"] },
-];
+// No bundled/mock personas. The list is hydrated live from the backend
+// (`/personas`) by the LIVE wiring adapter's syncPersonas(); the create wizard
+// waits for that first hydrate before painting the picker (QG.ready), so users
+// never see stale seed identities that don't exist in the backend. Kept as a
+// mutable array because personaById/shapesForPersonas/scenariosForPersonas close
+// over this exact reference — syncPersonas fills it in place, never reassigns.
+const PERSONAS = [];
 
 // Pure helper: most common primary_rubric across a list of persona ids.
 // Ties broken by first-seen. Empty input returns null.
@@ -144,6 +143,55 @@ function encodeScenario(obj) {
 const SCENARIO_LENGTHS    = ["short", "medium", "long"];
 const SCENARIO_STYLES     = ["chat", "ticket", "voice", "email"];
 const SCENARIO_DIFFICULTY = ["easy", "medium", "hard"];
+
+// Curated scenario presets — high-signal starting sets so users never have to
+// hand-build the full 3×4×3 = 36-cell matrix. Eval best-practice is coverage
+// over volume (25–50 well-chosen cases beat an exhaustive, redundant grid), so
+// each preset spans the axes without duplicating register. Keys are the same
+// "length.style.difficulty" strings the edge/qgen worker consume.
+const SCENARIO_PRESETS = {
+  smoke:       ["short.chat.easy", "short.ticket.medium", "medium.chat.hard"],
+  balanced:    ["short.chat.easy", "short.ticket.medium", "short.email.hard",
+                "medium.chat.medium", "medium.ticket.hard", "medium.voice.easy",
+                "long.email.hard", "long.chat.medium", "long.ticket.easy"],
+  adversarial: ["short.chat.hard", "medium.chat.hard", "long.chat.hard",
+                "short.ticket.hard", "medium.email.hard"],
+};
+
+// Decompose scenario keys into the axis values present across them (a lossy
+// "union" view that drives the axis-chip checked state). Order follows the
+// canonical axis orders so painting is stable.
+function axesFromScenarios(keys) {
+  const has = { length: new Set(), style: new Set(), difficulty: new Set() };
+  for (const k of keys || []) {
+    const d = decodeScenario(k);
+    if (d.length) has.length.add(d.length);
+    if (d.style) has.style.add(d.style);
+    if (d.difficulty) has.difficulty.add(d.difficulty);
+  }
+  return {
+    lengths: SCENARIO_LENGTHS.filter(v => has.length.has(v)),
+    styles: SCENARIO_STYLES.filter(v => has.style.has(v)),
+    diffs: SCENARIO_DIFFICULTY.filter(v => has.difficulty.has(v)),
+  };
+}
+
+// Cross-product of selected axis values → scenario keys (canonical order → the
+// output is stable and dedup-free). Any empty axis yields an empty product.
+function scenariosFromAxes(axes) {
+  const out = [];
+  for (const l of SCENARIO_LENGTHS) {
+    if (!axes.lengths.includes(l)) continue;
+    for (const s of SCENARIO_STYLES) {
+      if (!axes.styles.includes(s)) continue;
+      for (const d of SCENARIO_DIFFICULTY) {
+        if (!axes.diffs.includes(d)) continue;
+        out.push(`${l}.${s}.${d}`);
+      }
+    }
+  }
+  return out;
+}
 
 // Adversify-only archive cells — risk × style
 const RISK_CATEGORIES = ["bio-weapons", "CSAM", "malware", "fraud", "self-harm"];
@@ -432,7 +480,7 @@ function confirmModal({ title, body, confirmLabel = "Confirm", danger = false })
 window.QG = {
   // reference data
   RUBRICS, STRATEGIES, PHASES, STATE_ORDER, PERSONAS,
-  SCENARIO_LENGTHS, SCENARIO_STYLES, SCENARIO_DIFFICULTY,
+  SCENARIO_LENGTHS, SCENARIO_STYLES, SCENARIO_DIFFICULTY, SCENARIO_PRESETS,
   RISK_CATEGORIES, ATTACK_STYLES,
   // storage
   loadJobs, saveJobs, getJob, upsertJob,
@@ -440,7 +488,7 @@ window.QG = {
   resetSeed,
   // ids + helpers
   newJobId, newSeedSetId, configHashOf, nowISO, fmtTs, fmtTsShort,
-  strategiesByIds, rubricById, personaById, phaseLabel, monogramOf, inferRubric, rubricsForPersonas, shapesForPersonas, scenariosForPersonas, decodeScenario, encodeScenario,
+  strategiesByIds, rubricById, personaById, phaseLabel, monogramOf, inferRubric, rubricsForPersonas, shapesForPersonas, scenariosForPersonas, decodeScenario, encodeScenario, axesFromScenarios, scenariosFromAxes,
   // worker
   tick, startTicking, stopTicking, shipJob, TICK_MS,
   // ui helpers
@@ -507,13 +555,22 @@ window.QG = {
     const seed = personaByName(bq.persona && bq.persona.name);
     const rubric = bq.rubric || "helpfulness";
     const shape = bq.shape || "ambiguate";
-    const adversarial = shape === "adversify" || rubric === "safety" || rubric === "refusal";
+    // Backend ships domain rubrics (refusal_correctness, no_financial_advice,
+    // numeric_accuracy, coherence_multiturn, …) that aren't in the generic
+    // RUBRIC_TO_UI map. Treat refusal/safety/advice families as adversarial and
+    // derive a sensible expected behavior instead of defaulting everything to
+    // "helpfulness / answer".
+    const refusalFamily = /refus|safety|financial|advice/i.test(rubric);
+    const adversarial = shape === "adversify" || refusalFamily;
     return {
       question_id: bq.question_id || bq.id,
       seed_set_id: bq.seed_set_id,
       prompt: bq.prompt,
-      expected_behavior: BEHAVIOR[rubric] || "answer",
-      rubric_dimension: RUBRIC_TO_UI[rubric] || "rub_helpfulness",
+      expected_behavior: BEHAVIOR[rubric] || (refusalFamily ? "refuse_with_explanation" : "answer"),
+      // Map known rubrics to the UI ids; pass real backend rubrics through
+      // verbatim so the seed-set view/filter show the true dimension (it renders
+      // rubric_dimension as raw text) rather than collapsing them to helpfulness.
+      rubric_dimension: RUBRIC_TO_UI[rubric] || rubric,
       persona: { id: seed ? seed.id : (bq.persona && bq.persona.id),
                  version: seed ? seed.version : 1 },
       prompt_shape: { id: SHAPE_TO_UI[shape] || shape, version: 1 },
@@ -547,7 +604,12 @@ window.QG = {
       }));
       QG.PERSONAS.length = 0;
       QG.PERSONAS.push(...mapped);
-    } catch {}
+    } catch {
+      // Fetch failed — surface it rather than silently leaving a stale list.
+      // With no bundled seed personas the picker shows an honest empty state,
+      // and submitLive refuses to POST a personaless job (see below).
+      QG.toast && QG.toast("Couldn't load personas from the backend — refresh to retry.", "Question Generation");
+    }
   }
 
   async function hydrate() {
@@ -586,9 +648,15 @@ window.QG = {
     const personas = await EEOF.get("/personas");
     const refs = draft.personas.map((pid) => {
       const seed = QG.PERSONAS.find(p => p.id === pid);
-      const live = personas.find(p => p.name === (seed ? seed.name : "")) || personas.find(p => p.id === pid);
+      const live = personas.find(p => p.id === pid) || personas.find(p => p.name === (seed ? seed.name : ""));
       return live ? { id: live.id, version: live.version } : null;
     }).filter(Boolean);
+    // Never submit a personaless job: if selected personas don't resolve against
+    // the live backend (e.g. a stale picker), fail loudly instead of generating
+    // a meaningless set.
+    if (draft.personas.length && !refs.length) {
+      throw new Error("Selected personas aren't in the backend — refresh and reselect.");
+    }
     const shapes = (draft.shapes || []).map(s => UI_TO_SHAPE[s] || s);
     const intents = (draft.rubrics || ["helpfulness"]).map(r => String(r).replace("rub_", ""));
     const body = {
@@ -597,8 +665,13 @@ window.QG = {
       strategy: "rainbow",
       scenarios: draft.scenarios && draft.scenarios.length ? draft.scenarios : ["short.chat.easy"],
       shapes: shapes.length ? shapes : ["ambiguate", "adversify"],
-      count_per_persona: draft.count_per_persona || 4,
+      // One question per (persona × shape × scenario) cell. The worker iterates
+      // the full grid, so every selected scenario is exercised.
+      count_per_cell: draft.count_per_cell || 2,
     };
+    // Exact total override — the worker distributes it evenly so the produced
+    // count matches precisely (no client-side ceil overshoot).
+    if (draft.target_total) body.target_total = draft.target_total;
     const accepted = await EEOF.post("/question-sets", body);
     return accepted.job_id;
   };

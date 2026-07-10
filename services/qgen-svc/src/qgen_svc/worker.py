@@ -3,7 +3,16 @@
 Job inputs (frozen by the orchestrator):
   { "persona_snapshots": [<full persona dict>, ...],
     "intents": [...], "strategy": "rainbow",
-    "scenarios": [...], "shapes": [...], "count_per_persona": 8 }
+    "scenarios": [...], "shapes": [...], "count_per_cell": 2 }
+
+Generation walks the full (persona × shape × scenario) grid, authoring
+`count_per_cell` questions per cell, so every selected scenario is exercised —
+total = personas × shapes × scenarios × count_per_cell. (`count_per_persona` is
+accepted as a back-compat alias for `count_per_cell`.)
+
+When `target_total` is supplied it overrides `count_per_cell`: exactly that many
+questions are generated, distributed evenly across the grid (first cells take one
+extra), so the produced count matches the request precisely — no ceil overshoot.
 """
 
 from __future__ import annotations
@@ -32,12 +41,47 @@ class QGenWorker(BaseWorker):
         intents = inputs.get("intents") or ["helpfulness"]
         scenarios = inputs.get("scenarios") or ["short.chat.easy"]
         shapes = inputs.get("shapes") or ["ambiguate", "adversify"]
-        count = int(inputs.get("count_per_persona", 8))
+        # count_per_cell is the current name; count_per_persona is the legacy alias.
+        count = int(inputs.get("count_per_cell", inputs.get("count_per_persona", 8)))
+        # Optional exact target: generate precisely this many questions, spread as
+        # evenly as possible across the grid (overrides count_per_cell).
+        target_total = inputs.get("target_total")
+        target_total = int(target_total) if target_total else None
         strategy = inputs.get("strategy", "rainbow")
 
         seed_set_id = new_id("seed_set")
         questions: list[Question] = []
-        total = max(1, len(snapshots) * count)
+
+        # Build the (persona × shape × scenario) grid as a flat cell list so every
+        # selected scenario is exercised and an exact target can be distributed.
+        cells: list[tuple] = []
+        for persona in snapshots:
+            ref = PersonaRef(
+                id=persona["id"],
+                version=persona["version"],
+                name=persona.get("name", ""),
+                tone=persona.get("tone", ""),
+                tech_savviness=persona.get("tech_savviness", ""),
+            )
+            goals = persona.get("goals") or ["accomplish the task"]
+            edges = persona.get("edge_cases") or ["asks vague questions"]
+            for si, shape in enumerate(shapes):
+                for sj, scenario in enumerate(scenarios):
+                    intent = intents[(si * len(scenarios) + sj) % len(intents)]
+                    cells.append((persona, ref, goals, edges, shape, scenario, intent))
+
+        # Per-cell question counts. With an explicit target, distribute it evenly
+        # (the first `rem` cells take one extra) so the total is exact — no ceil
+        # overshoot. Otherwise author `count` per cell. A target smaller than the
+        # grid spreads one-per-cell across as many distinct cells as possible.
+        n_cells = len(cells)
+        if target_total is not None and n_cells:
+            base, rem = divmod(target_total, n_cells)
+            per_cell = [base + (1 if i < rem else 0) for i in range(n_cells)]
+        else:
+            per_cell = [count] * n_cells
+
+        total = max(1, sum(per_cell))
         done = 0
 
         async def phase(name: str, **detail) -> None:
@@ -50,22 +94,10 @@ class QGenWorker(BaseWorker):
         generated = 0
         await phase("running", questions_generated=0)
 
-        for persona in snapshots:
-            ref = PersonaRef(
-                id=persona["id"],
-                version=persona["version"],
-                name=persona.get("name", ""),
-                tone=persona.get("tone", ""),
-                tech_savviness=persona.get("tech_savviness", ""),
-            )
-            goals = persona.get("goals") or ["accomplish the task"]
-            edges = persona.get("edge_cases") or ["asks vague questions"]
-            for i in range(count):
-                shape = shapes[i % len(shapes)]
-                scenario = scenarios[i % len(scenarios)]
-                intent = intents[i % len(intents)]
-                goal = goals[i % len(goals)]
-                edge = edges[i % len(edges)]
+        for idx, (persona, ref, goals, edges, shape, scenario, intent) in enumerate(cells):
+            for n in range(per_cell[idx]):
+                goal = goals[n % len(goals)]
+                edge = edges[n % len(edges)]
                 text = await author_question(
                     provider, persona, shape=shape, scenario=scenario, goal=goal, edge=edge
                 )

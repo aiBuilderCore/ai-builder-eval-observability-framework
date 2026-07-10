@@ -97,7 +97,18 @@ class QuestionSetRequest(BaseModel):
     strategy: str = "rainbow"
     scenarios: list[str] = Field(default_factory=lambda: ["short.chat.easy"])
     shapes: list[str] = Field(default_factory=lambda: ["ambiguate", "adversify"])
+    # Questions per (persona × shape × scenario) cell — the worker iterates the
+    # full grid, so every selected scenario is exercised. `count_per_persona` is
+    # kept as a back-compat alias for older callers/scripts.
+    count_per_cell: int | None = None
     count_per_persona: int = 8
+    # Optional exact total — overrides count_per_cell; the worker distributes it
+    # evenly across the grid so the generated count matches precisely.
+    target_total: int | None = None
+
+    @property
+    def per_cell(self) -> int:
+        return self.count_per_cell if self.count_per_cell is not None else self.count_per_persona
 
 
 @api.post("/question-sets", status_code=202)
@@ -120,7 +131,8 @@ async def create_question_set(
         "strategy": req.strategy,
         "scenarios": req.scenarios,
         "shapes": req.shapes,
-        "count_per_persona": req.count_per_persona,
+        "count_per_cell": req.per_cell,
+        "target_total": req.target_total,
     }
     return await submit_job(
         p, kind="qgen.generate", stage="qgen", inputs=inputs, idempotency_key=idempotency_key

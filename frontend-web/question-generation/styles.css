@@ -1398,6 +1398,62 @@ table.token-table td .dot {
 .scenario-grid label input { display: none; }
 .scenario-grid label .sep { color: var(--text-faint); }
 
+/* ---------- Scenario presets + axes (wizard step 3) ----------
+   Presets are the primary path; axes build the matrix as a cross-product so
+   users pick ~10 chips instead of hand-toggling all 36 cells. */
+.scenario-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.scenario-presets .preset {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+.scenario-presets .preset:hover { border-color: var(--border-strong); color: var(--text); }
+.scenario-presets .preset.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.scenario-axes {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.axis-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: start;
+  gap: 12px;
+}
+.axis-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding-top: 8px;
+}
+.axis-row .scenario-grid { margin-top: 0; }
+.scenario-readout {
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.scenario-readout .warn { color: var(--accent); }
+
 /* ---------- Key/value grid (job detail inputs panel, output panel) ---------- */
 .kv-grid {
   display: grid;

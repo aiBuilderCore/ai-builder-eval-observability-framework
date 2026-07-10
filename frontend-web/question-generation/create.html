@@ -132,7 +132,27 @@
             <h3 style="font-family:var(--font-display);font-size:17px;font-weight:600;letter-spacing:-0.01em;margin:0 0 6px;">Scenarios</h3>
             <p class="sub">A <b>scenario</b> is the prompt's surface form: <code>(length × style × difficulty)</code>. It controls the prompt's register independently of who is asking (persona) and what content trick is applied (prompt shape) — the same persona × same shape reads very differently as a 1-line chat (<i>"where's my order?"</i>) vs. a long structured email. <b>Defaults are derived from each persona's <code>default_scenarios</code></b> — toggle below to override.</p>
             <p id="scenarios-hint" class="sub" style="margin-top:-6px;color:var(--accent);font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;display:none;"></p>
-            <div id="scenario-pick" class="scenario-grid"></div>
+
+            <!-- One-click presets — the primary path. "Persona default" keeps the
+                 derived set (no override); the curated sets span the axes without
+                 forcing users to hand-enumerate the 36-cell matrix. -->
+            <div class="scenario-presets" id="scenario-presets" role="group" aria-label="Scenario presets">
+              <button type="button" class="preset" data-preset="default">Persona default</button>
+              <button type="button" class="preset" data-preset="smoke">Smoke · 3</button>
+              <button type="button" class="preset" data-preset="balanced">Balanced · 9</button>
+              <button type="button" class="preset" data-preset="adversarial">Adversarial · 5</button>
+              <button type="button" class="preset" data-preset="clear">Clear</button>
+            </div>
+
+            <!-- Axes — pick a few per axis; the matrix is the cross-product.
+                 10 chips instead of 36, and no combination is enumerated by hand. -->
+            <div class="scenario-axes">
+              <div class="axis-row"><span class="axis-label">Length</span><div class="scenario-grid" id="axis-length"></div></div>
+              <div class="axis-row"><span class="axis-label">Style</span><div class="scenario-grid" id="axis-style"></div></div>
+              <div class="axis-row"><span class="axis-label">Difficulty</span><div class="scenario-grid" id="axis-diff"></div></div>
+            </div>
+
+            <p id="scenario-readout" class="scenario-readout"></p>
           </div>
 
           <details style="margin-top:28px;border-top:1px solid var(--border);padding-top:18px;">
@@ -180,7 +200,7 @@
               <div class="field">
                 <label>Target total <small style="color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;">— manual override</small></label>
                 <input class="input mono" id="k-target" type="number" min="1" step="1" placeholder="auto" />
-                <span class="hint">Leave blank to use <code>cells × count_per_cell</code>. Set a number to pin the total — generator backsolves <code>count_per_cell</code> per cell to hit it.</span>
+                <span class="hint">Leave blank to use <code>cells × count_per_cell</code>. Set a number to pin the <b>exact</b> total — the generator distributes it evenly across cells.</span>
               </div>
               <div class="field" style="align-self:end;">
                 <span class="hint" id="auto-calc-readout" style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);"></span>
@@ -242,6 +262,10 @@
     shapesOverridden: false,
     scenarios: [],               // "length.style.difficulty" keys; derived until scenariosOverridden flips
     scenariosOverridden: false,
+    // Persistent axis selection so a matrix can be built one axis at a time even
+    // while the cross-product is momentarily empty (e.g. length picked, style not
+    // yet). Kept in sync whenever draft.scenarios is set from a preset/default.
+    scenarioAxes: { lengths: [], styles: [], diffs: [] },
     knobs: { count_per_cell: 2, evolution_passes: 1, jailbreak_budget: 0, novelty_floor: 0.5, language: "en", dedup_threshold: 0.92, target_total: null },
   };
 
@@ -273,25 +297,104 @@
     paintShapes();
   }
 
-  // Reflect draft.scenarios into the chip toggles + inferred-hint.
-  // Same derive-with-override pattern as paintShapes.
+  // Reflect draft.scenarios into presets + axis chips + readout. Same
+  // derive-with-override pattern as paintShapes: while the user hasn't
+  // overridden, the persona-derived default stays selected and the "default"
+  // preset reads as active.
   function paintScenarios() {
-    const host = document.getElementById("scenario-pick");
-    if (!host) return;
-    [...host.children].forEach(c => {
-      const checked = draft.scenarios.includes(c.dataset.id);
-      c.classList.toggle("checked", checked);
-      const input = c.querySelector("input");
-      if (input) input.checked = checked;
-    });
+    // Axis chips reflect the persistent axis state (so partial builds show).
+    const axes = draft.scenarioAxes;
+    const paintAxis = (id, active) => {
+      const h = document.getElementById(id);
+      if (!h) return;
+      [...h.children].forEach(c => c.classList.toggle("checked", active.includes(c.dataset.val)));
+    };
+    paintAxis("axis-length", axes.lengths);
+    paintAxis("axis-style", axes.styles);
+    paintAxis("axis-diff", axes.diffs);
+
+    // Preset active state — which named set matches the current selection.
+    const presetHost = document.getElementById("scenario-presets");
+    if (presetHost) {
+      const cur = [...draft.scenarios].sort().join(",");
+      const eq = (arr) => [...arr].sort().join(",") === cur;
+      let active = "";
+      if (!draft.scenariosOverridden) active = "default";
+      else if (draft.scenarios.length === 0) active = "clear";
+      else for (const [name, set] of Object.entries(QG.SCENARIO_PRESETS)) { if (eq(set)) { active = name; break; } }
+      [...presetHost.children].forEach(b => b.classList.toggle("active", b.dataset.preset === active));
+    }
+
+    // Live coverage readout: scenarios → cells → estimated prompts. Soft-nudge
+    // toward coverage-over-volume when the matrix balloons.
+    const readout = document.getElementById("scenario-readout");
+    if (readout) {
+      const nS = draft.scenarios.length;
+      const nP = draft.personas.length, nSh = draft.shapes.length;
+      const cells = nP * nSh * nS;
+      const perCell = draft.knobs.count_per_cell || 1;
+      const prompts = cells * perCell;
+      if (nS === 0) {
+        readout.innerHTML = `<span class="warn">0 scenarios — pick a preset or an axis value in each row.</span>`;
+      } else {
+        const heavy = nS > 12 || prompts > 150;
+        readout.innerHTML =
+          `<b>${nS}</b> scenario${nS === 1 ? "" : "s"} · ${nP}×${nSh} persona-shape → <b>${cells}</b> cell${cells === 1 ? "" : "s"} × ${perCell} = <b>${prompts}</b> prompt${prompts === 1 ? "" : "s"}` +
+          (heavy ? ` <span class="warn">— large matrix; coverage beats volume, consider trimming.</span>` : "");
+      }
+    }
+
     const hint = document.getElementById("scenarios-hint");
     if (!hint) return;
     if (draft.personas.length > 0 && !draft.scenariosOverridden) {
-      hint.textContent = `↳ inferred from ${draft.personas.length} persona${draft.personas.length === 1 ? "" : "s"} → ${draft.scenarios.length} scenario${draft.scenarios.length === 1 ? "" : "s"}. toggle any to override.`;
+      hint.textContent = `↳ inferred from ${draft.personas.length} persona${draft.personas.length === 1 ? "" : "s"} → ${draft.scenarios.length} scenario${draft.scenarios.length === 1 ? "" : "s"}. pick a preset or axes to override.`;
       hint.style.display = "";
     } else {
       hint.style.display = "none";
     }
+  }
+
+  // Apply a named preset. "default" clears the override so the persona-derived
+  // set takes over again; everything else pins an explicit set (override).
+  function applyPreset(name) {
+    if (name === "default") {
+      draft.scenariosOverridden = false;
+      draft.scenarios = QG.scenariosForPersonas(draft.personas);
+    } else if (name === "clear") {
+      draft.scenariosOverridden = true;
+      draft.scenarios = [];
+    } else {
+      draft.scenariosOverridden = true;
+      draft.scenarios = (QG.SCENARIO_PRESETS[name] || []).slice();
+    }
+    syncAxesFromScenarios();
+    paintScenarios();
+    renderSummary();
+  }
+
+  // Toggle one axis value in the *persistent* axis state, then recompute
+  // draft.scenarios as the cross-product. Because the axis state is persistent,
+  // you can pick length → style → difficulty even though the product is empty
+  // until all three axes have at least one value. Flips override on first touch.
+  function toggleAxis(axisKey, val) {
+    draft.scenariosOverridden = true;
+    const arr = draft.scenarioAxes[axisKey];
+    const idx = arr.indexOf(val);
+    if (idx >= 0) arr.splice(idx, 1); else arr.push(val);
+    draft.scenarios = QG.scenariosFromAxes({
+      lengths: draft.scenarioAxes.lengths,
+      styles: draft.scenarioAxes.styles,
+      diffs: draft.scenarioAxes.diffs,
+    });
+    paintScenarios();
+    renderSummary();
+  }
+
+  // Mirror a scenario-key list back into the persistent axis state (the union of
+  // components present) so the axis chips reflect presets/defaults too.
+  function syncAxesFromScenarios() {
+    const a = QG.axesFromScenarios(draft.scenarios);
+    draft.scenarioAxes = { lengths: a.lengths, styles: a.styles, diffs: a.diffs };
   }
 
   // When personas change AND the user has not overridden, recompute
@@ -299,6 +402,7 @@
   function reapplyScenarios() {
     if (draft.scenariosOverridden) return;
     draft.scenarios = QG.scenariosForPersonas(draft.personas);
+    syncAxesFromScenarios();
     paintScenarios();
   }
 
@@ -343,7 +447,19 @@
 
   // ---------- Step 1 — persona pick ----------
   const personaHost = document.getElementById("persona-pick");
+  function personaNotice(msg) {
+    personaHost.innerHTML =
+      `<div class="empty" style="padding:28px 20px;text-align:left;">
+         <p style="margin:0;color:var(--text-muted);">${msg}</p>
+       </div>`;
+  }
   function buildPersonaPicker() {
+    // Never paint stale/mock personas: if the live list hasn't arrived (or the
+    // fetch failed), show an honest notice instead of the seed identities.
+    if (!QG.PERSONAS.length) {
+      personaNotice("No personas available from the backend. Refresh, or create one in Persona Lab.");
+      return;
+    }
     personaHost.innerHTML = "";
     QG.PERSONAS.forEach(p => {
       const lab = document.createElement("label");
@@ -369,42 +485,42 @@
       personaHost.appendChild(lab);
     });
   }
-  buildPersonaPicker();
-  // The initial paint uses the static seed list; once the LIVE wiring hydrates
-  // QG.PERSONAS from the real core-library personas, rebuild so the picker (and
-  // every ref it produces) matches what the backend actually has.
+  // Live mode: don't paint anything until the first hydrate resolves, so the
+  // picker only ever shows real backend personas — no seed/mock flash, and no
+  // stale identities lingering if the fetch is slow. Offline mode (no LIVE
+  // wiring) builds immediately from whatever QG.PERSONAS holds.
   if (QG.ready && typeof QG.ready.then === "function") {
+    personaNotice("Loading personas…");
     QG.ready.then(() => { draft.personas = []; buildPersonaPicker(); renderSummary(); });
+  } else {
+    buildPersonaPicker();
   }
 
-  // ---------- Step 3 — scenario chips ----------
-  // Build a chip for every (length × style × difficulty) tuple in the
-  // catalog. The chip's data-id is the "length.style.difficulty" key.
-  // Chip click → flip override flag, toggle membership, repaint, resummarize.
-  const scenarioHost = document.getElementById("scenario-pick");
-  for (const len of QG.SCENARIO_LENGTHS) {
-    for (const style of QG.SCENARIO_STYLES) {
-      for (const diff of QG.SCENARIO_DIFFICULTY) {
-        const key = `${len}.${style}.${diff}`;
-        const lab = document.createElement("label");
-        lab.dataset.id = key;
-        lab.innerHTML = `
-          <input type="checkbox" />
-          <span>${len}</span><span class="sep">·</span>
-          <span>${style}</span><span class="sep">·</span>
-          <span>${diff}</span>`;
-        lab.onclick = (e) => {
-          e.preventDefault();
-          draft.scenariosOverridden = true;
-          const idx = draft.scenarios.indexOf(key);
-          if (idx >= 0) draft.scenarios.splice(idx, 1); else draft.scenarios.push(key);
-          paintScenarios();
-          renderSummary();
-        };
-        scenarioHost.appendChild(lab);
-      }
-    }
+  // ---------- Step 3 — scenario presets + axes + custom grid ----------
+  // Presets are the primary path; clicking one applies a curated set.
+  const presetHost = document.getElementById("scenario-presets");
+  if (presetHost) {
+    [...presetHost.children].forEach(btn => {
+      btn.onclick = () => applyPreset(btn.dataset.preset);
+    });
   }
+
+  // Axis rows — one small chip per axis value. Clicking recomputes scenarios as
+  // the cross-product of selected axis values. 10 chips replace the 36-cell wall.
+  const buildAxis = (hostId, axisKey, values) => {
+    const host = document.getElementById(hostId);
+    if (!host) return;
+    for (const val of values) {
+      const lab = document.createElement("label");
+      lab.dataset.val = val;
+      lab.innerHTML = `<input type="checkbox" /><span>${val}</span>`;
+      lab.onclick = (e) => { e.preventDefault(); toggleAxis(axisKey, val); };
+      host.appendChild(lab);
+    }
+  };
+  buildAxis("axis-length", "lengths", QG.SCENARIO_LENGTHS);
+  buildAxis("axis-style", "styles", QG.SCENARIO_STYLES);
+  buildAxis("axis-diff", "diffs", QG.SCENARIO_DIFFICULTY);
 
   // ---------- Step 3 — prompt-shape pick + knobs ----------
   const stratHost = document.getElementById("strategy-pick");
@@ -531,7 +647,7 @@
         <dt>prompt_shapes</dt><dd>${draft.shapes.map(id => `<code>${id}</code>`).join(" ") || "—"}${draft.shapesOverridden ? ' <small style="color:var(--accent);">override</small>' : (draft.shapes.length ? ' <small style="color:var(--text-faint);">inferred</small>' : '')}</dd>
         <dt>scenarios</dt><dd>${draft.scenarios.map(k => `<code>${k}</code>`).join(" ") || "—"}${draft.scenariosOverridden ? ' <small style="color:var(--accent);">override</small>' : (draft.scenarios.length ? ' <small style="color:var(--text-faint);">inferred</small>' : '')}</dd>
         <dt>count_per_cell</dt><dd><code>${draft.knobs.count_per_cell}</code></dd>
-        <dt>target_total</dt><dd>${draft.knobs.target_total ? `<code>${draft.knobs.target_total}</code> <small style="color:var(--accent);">override · backsolves count_per_cell</small>` : `<code>auto</code> <small style="color:var(--text-faint);">= cells × count_per_cell</small>`}</dd>
+        <dt>target_total</dt><dd>${draft.knobs.target_total ? `<code>${draft.knobs.target_total}</code> <small style="color:var(--accent);">override · exact total, distributed evenly</small>` : `<code>auto</code> <small style="color:var(--text-faint);">= cells × count_per_cell</small>`}</dd>
         <dt>evolution_passes</dt><dd><code>${draft.knobs.evolution_passes}</code></dd>
         <dt>jailbreak_budget</dt><dd><code>${draft.knobs.jailbreak_budget}</code></dd>
         <dt>novelty_floor</dt><dd><code>${draft.knobs.novelty_floor}</code></dd>
@@ -580,24 +696,27 @@
 
     const inputs = inputsBlob();
     const cells = draft.personas.length * draft.shapes.length * draft.scenarios.length;
-    // If target_total override is set, backsolve count_per_cell so the
-    // fake worker hits the requested total. Floor at 1 per cell.
-    if (inputs.target_total && cells > 0) {
-      inputs.count_per_cell = Math.max(1, Math.ceil(inputs.target_total / cells));
-    }
-    // Live path: submit a real job to the edge and watch it stream.
+    // Live path: submit a real job to the edge and watch it stream. Pass
+    // target_total straight through — the worker distributes it evenly so the
+    // produced count is exact (no client-side ceil overshoot).
     if (window.EEOF && QG.submitLive) {
       QG.submitLive({
         personas: draft.personas,
         shapes: draft.shapes,
         scenarios: draft.scenarios,
         rubrics: QG.rubricsForPersonas(draft.personas),
-        count_per_persona: inputs.count_per_cell || 4,
+        count_per_cell: draft.knobs.count_per_cell || 2,
+        target_total: inputs.target_total || null,
       }).then((jobId) => {
         QG.toast(`Submitted ${jobId}`, "Question Generation");
         setTimeout(() => location.href = `./job.html?id=${encodeURIComponent(jobId)}`, 250);
       }).catch((err) => QG.toast(err.message, "Submit failed"));
       return;
+    }
+    // Fake (offline) worker can't distribute a target, so backsolve count_per_cell
+    // to approximate the requested total. Floor at 1 per cell.
+    if (inputs.target_total && cells > 0) {
+      inputs.count_per_cell = Math.max(1, Math.ceil(inputs.target_total / cells));
     }
     const job = {
       job_id: QG.newJobId(),

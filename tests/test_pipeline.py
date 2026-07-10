@@ -38,10 +38,11 @@ async def test_full_pipeline():
         "primary_rubric": "helpfulness",
     }
 
-    # 1. Question generation
+    # 1. Question generation — grid is persona × shape × scenario × count_per_cell.
+    # 1 × 1 × 1 × 3 = 3 questions flow through the rest of the chain.
     qgen_job = _job("qgen.generate", "qgen", {
-        "persona_snapshots": [persona], "count_per_persona": 3,
-        "shapes": ["ambiguate", "adversify"], "scenarios": ["short.chat.easy"],
+        "persona_snapshots": [persona], "count_per_cell": 3,
+        "shapes": ["ambiguate"], "scenarios": ["short.chat.easy"],
     })
     result = await QGenWorker().handle(qgen_job)
     seed_set_id = result["seed_set_id"]
@@ -80,6 +81,59 @@ async def test_full_pipeline():
     pack = await EvidenceWorker().handle(obs_job)
     assert pack["pack_id"].startswith("ev_")
     assert pack["decision"] in ("pass", "fail")
+
+
+@pytest.mark.asyncio
+async def test_qgen_covers_full_scenario_grid():
+    """Every selected scenario is exercised: the worker walks the full
+    persona × shape × scenario grid rather than cycling a fixed count."""
+    persona = {
+        "id": "persona_olivia", "version": "1.0.0", "name": "Onboarding Olivia",
+        "role": "ops lead", "tone": "casual", "tech_savviness": "novice",
+        "goals": ["ship fast"], "edge_cases": ["asks vague questions"],
+        "primary_rubric": "helpfulness",
+    }
+    scenarios = ["short.chat.easy", "medium.ticket.medium", "long.email.hard"]
+    shapes = ["ambiguate", "adversify"]
+    job = _job("qgen.generate", "qgen", {
+        "persona_snapshots": [persona], "count_per_cell": 1,
+        "shapes": shapes, "scenarios": scenarios,
+    })
+    result = await QGenWorker().handle(job)
+    # 1 persona × 2 shapes × 3 scenarios × 1 = 6 questions.
+    assert result["question_count"] == 6
+    rows = await get_table().query(keys.question_pk(result["seed_set_id"]), "QUESTION#")
+    generated = {r["data"]["scenario"] for r in rows}
+    assert generated == set(scenarios)  # no scenario dropped
+
+
+@pytest.mark.asyncio
+async def test_qgen_target_total_is_exact():
+    """An explicit target_total is honored precisely (no ceil overshoot), spread
+    evenly across the grid rather than uniform-per-cell rounding."""
+    persona = {
+        "id": "persona_olivia", "version": "1.0.0", "name": "Onboarding Olivia",
+        "role": "ops lead", "tone": "casual", "tech_savviness": "novice",
+        "goals": ["ship fast"], "edge_cases": ["asks vague questions"],
+        "primary_rubric": "helpfulness",
+    }
+    # 2 shapes × 3 scenarios = 6 cells; target 10 is NOT a multiple of 6.
+    # Old ceil path -> 6 × ceil(10/6)=12. Even distribution -> exactly 10.
+    job = _job("qgen.generate", "qgen", {
+        "persona_snapshots": [persona], "count_per_cell": 99, "target_total": 10,
+        "shapes": ["ambiguate", "adversify"],
+        "scenarios": ["short.chat.easy", "medium.ticket.medium", "long.email.hard"],
+    })
+    result = await QGenWorker().handle(job)
+    assert result["question_count"] == 10
+    rows = await get_table().query(keys.question_pk(result["seed_set_id"]), "QUESTION#")
+    assert len(rows) == 10
+    # Even spread: 10 across 6 cells -> counts differ by at most 1 (two 2s? -> 4
+    # cells of 2 and 2 cells of 1 = 10). No cell is empty.
+    from collections import Counter
+    per_cell = Counter((r["data"]["shape"], r["data"]["scenario"]) for r in rows)
+    assert len(per_cell) == 6  # every cell used
+    assert max(per_cell.values()) - min(per_cell.values()) <= 1
 
 
 @pytest.mark.asyncio
