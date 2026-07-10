@@ -224,7 +224,7 @@
     '  display: flex; align-items: center; gap: 0.6rem;',
     '  padding: 0.5rem 0.7rem; margin: 1px 0;',
     '  color: var(--text-muted); text-decoration: none;',
-    '  border-radius: 8px; font-size: 13.5px; font-weight: 500;',
+    '  border-radius: 8px; font-size: 13.5px; font-weight: 500; line-height: 1.25;',
     '  transition: color 150ms ease, background-color 150ms ease;',
     '}',
     '.aibc-nav-link:hover { color: var(--text); background: var(--surface-alt); }',

@@ -298,7 +298,12 @@
     // ----- Audit timeline -----
     document.getElementById("timeline").innerHTML = job.events.map((e, i) => {
       const isLast = i === job.events.length - 1;
-      return `<li class="${isLast ? "" : "done"}"><b>${QG.phaseLabel(e.state) || e.state}</b> · ${QG.fmtTs(e.ts)} <span class="who">· by ${e.by}</span></li>`;
+      // phaseLabel returns the raw state for terminal states (ready/shipped)
+      // that aren't in PHASES; capitalize so the trail reads consistently
+      // (Queued · Running · Ready) instead of a lowercase straggler.
+      const mapped = QG.phaseLabel(e.state);
+      const label = mapped !== e.state ? mapped : e.state.charAt(0).toUpperCase() + e.state.slice(1);
+      return `<li class="${isLast ? "" : "done"}"><b>${label}</b> · ${QG.fmtTs(e.ts)} <span class="who">· by ${e.by}</span></li>`;
     }).join("");
   }
 

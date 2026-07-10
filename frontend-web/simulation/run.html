@@ -197,7 +197,7 @@
     (run.events || []).forEach((ev, i) => {
       const li = document.createElement("li");
       if (i < run.events.length - 1 || run.state === "ready" || run.state === "failed") li.classList.add("done");
-      li.innerHTML = `<b>${SIM.escapeHtml(ev.state)}</b> · <span class="who">${SIM.escapeHtml(ev.by)}</span>${ev.note ? ` · <span class="who">${SIM.escapeHtml(ev.note)}</span>` : ""} <span style="color:var(--text-faint);float:right;">${SIM.fmtTsShort(ev.ts)}</span>`;
+      li.innerHTML = `<b>${SIM.escapeHtml(SIM.phaseLabel(ev.state))}</b> · <span class="who">${SIM.escapeHtml(ev.by)}</span>${ev.note ? ` · <span class="who">${SIM.escapeHtml(ev.note)}</span>` : ""} <span style="color:var(--text-faint);float:right;">${SIM.fmtTsShort(ev.ts)}</span>`;
       list.appendChild(li);
     });
 
