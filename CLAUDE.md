@@ -72,7 +72,7 @@ lockstep.
 
 ## Frontend wiring (frontend-web/)
 
-The SPA is served by the edge (`NoCacheStatic` mount). Each app is wired live by
+The SPA is served by the edge (`SpaStatic` mount). Each app is wired live by
 a `LIVE wiring` adapter appended to its `app.js`, following one recipe:
 
 1. **Shared client** `_api.js` exposes `window.EEOF` (REST + one WebSocket +

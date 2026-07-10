@@ -33,6 +33,32 @@ SERVICES = {
 }
 
 
+# One shared client for the process lifetime. Creating a client per call opened
+# (and immediately tore down) a fresh loopback TCP connection for every proxied
+# request — cheap on macOS but a real per-request penalty on Windows, where a
+# single page's 6-13 API calls each paid the connect/teardown cost. A shared
+# client keeps connections warm and pooled, so repeat calls reuse a live socket.
+# Bound + closed by the edge app lifespan (see app.py).
+_client: httpx.AsyncClient | None = None
+
+
+def get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(
+            timeout=60,
+            limits=httpx.Limits(max_keepalive_connections=64, keepalive_expiry=30.0),
+        )
+    return _client
+
+
+async def close_client() -> None:
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
+
+
 async def proxy(
     service: str,
     method: str,
@@ -43,17 +69,17 @@ async def proxy(
     params: dict | None = None,
 ) -> Any:
     base = SERVICES[service]
-    async with httpx.AsyncClient(timeout=60) as client:
-        try:
-            resp = await client.request(
-                method,
-                f"{base}{path}",
-                json=json,
-                params=params,
-                headers=forward_headers(principal),
-            )
-        except httpx.HTTPError as e:
-            raise HTTPException(502, f"{service} unreachable: {e}") from e
+    client = get_client()
+    try:
+        resp = await client.request(
+            method,
+            f"{base}{path}",
+            json=json,
+            params=params,
+            headers=forward_headers(principal),
+        )
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"{service} unreachable: {e}") from e
     if resp.status_code >= 400:
         detail = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text
         raise HTTPException(resp.status_code, detail)

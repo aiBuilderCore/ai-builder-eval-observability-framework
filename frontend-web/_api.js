@@ -8,9 +8,14 @@
 // always renders (synthetic-only, demo-safe).
 // ============================================================================
 (function () {
+  // Normalize `localhost` -> `127.0.0.1`. The edge (uvicorn) binds IPv4 only,
+  // but on Windows `localhost` resolves to IPv6 `::1` first, so every fetch +
+  // the WebSocket paid a connect-refused-then-retry penalty before falling back
+  // to IPv4. Pinning the host removes that per-request delay. macOS was fast
+  // either way, which is why this only bit on Windows.
   const ORIGIN =
     location.origin && location.origin.startsWith("http")
-      ? location.origin
+      ? location.origin.replace("://localhost", "://127.0.0.1")
       : "http://127.0.0.1:8080";
   const BASE = ORIGIN + "/api/v1";
   const HEADERS = { "Content-Type": "application/json", Authorization: "Bearer dev" };

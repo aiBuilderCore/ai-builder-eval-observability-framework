@@ -31,14 +31,17 @@ from eeof_core.models import (
     SeedSet,
 )
 
-from .clients import proxy
+from .clients import close_client, proxy
 from .submit import submit_job
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await get_bus().connect()
-    yield
+    try:
+        yield
+    finally:
+        await close_client()
 
 
 app = FastAPI(title="api-orchestration", version="0.1.0", lifespan=lifespan)
@@ -484,23 +487,35 @@ async def ws(sock: WebSocket) -> None:
 
 
 # Serve the SPA at "/" (single origin with the API) when present.
-# Mounted last so /api/v1/* and /health keep precedence. No-cache headers keep
-# the browser from serving a stale bundle during active development.
+# Mounted last so /api/v1/* and /health keep precedence.
+#
+# This is a multi-page frontend: every section is its own .html, so switching
+# pages is a full navigation that re-requests the shared shell (_chrome.js/CSS/
+# app.js). The old mount sent `no-store` on everything, forcing a full
+# re-download of all of that on every click — barely noticeable on macOS
+# loopback but seconds of dead time on Windows. Instead:
+#   - .html documents: `no-cache` (always revalidate → cheap 304 when unchanged,
+#     so edits during dev are picked up immediately, no stale entry pages).
+#   - everything else (JS/CSS/assets): a short max-age so repeat navigations in a
+#     session serve the shell straight from the browser cache with no request at
+#     all. Tune/disable via FRONTEND_ASSET_MAXAGE (seconds; 0 = revalidate only).
 import os  # noqa: E402
 
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
+_ASSET_MAXAGE = int(os.environ.get("FRONTEND_ASSET_MAXAGE", "60"))
 
-class NoCacheStatic(StaticFiles):
-    def is_not_modified(self, response_headers, request_headers) -> bool:  # noqa: ARG002
-        return False
 
+class SpaStatic(StaticFiles):
     async def get_response(self, path, scope):
         resp = await super().get_response(path, scope)
-        resp.headers["Cache-Control"] = "no-store, must-revalidate"
+        if path.endswith(".html") or _ASSET_MAXAGE <= 0:
+            resp.headers["Cache-Control"] = "no-cache"
+        else:
+            resp.headers["Cache-Control"] = f"private, max-age={_ASSET_MAXAGE}"
         return resp
 
 
 _frontend = os.environ.get("FRONTEND_DIR") or os.path.join(os.getcwd(), "frontend-web")
 if os.path.isdir(_frontend):
-    app.mount("/", NoCacheStatic(directory=_frontend, html=True), name="frontend")
+    app.mount("/", SpaStatic(directory=_frontend, html=True), name="frontend")
