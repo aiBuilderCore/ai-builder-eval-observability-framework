@@ -526,13 +526,32 @@ window.QG = {
     const phase = j.progress && j.progress.phase;
     const uiState = STATE_MAP[phase] || STATE_MAP[j.state] || j.state;
     const shipped = j.state === "ready" || j.state === "shipped";
+    // The API stores inputs as persona_refs[{id,version}] / intents[] / shapes[],
+    // but every UI view (job detail, list) reads persona_ids[] / rubric_ids[] /
+    // prompt_shapes[] resolved through personaById / rubricById / strategiesByIds.
+    // Translate here (the single mapping seam) so those lookups resolve. Prefer
+    // any already-UI-shaped field so legacy/seed jobs pass through unchanged.
+    const ai = j.inputs || {};
+    const uiInputs = {
+      ...ai,
+      persona_ids: (ai.persona_ids && ai.persona_ids.length)
+        ? ai.persona_ids
+        : (ai.persona_snapshots || ai.persona_refs || []).map(
+            (p) => (typeof p === "string" ? p : p.id)),
+      rubric_ids: (ai.rubric_ids && ai.rubric_ids.length)
+        ? ai.rubric_ids
+        : (ai.intents || []).map((i) => RUBRIC_TO_UI[i] || i),
+      prompt_shapes: (ai.prompt_shapes && ai.prompt_shapes.length)
+        ? ai.prompt_shapes
+        : (ai.shapes || []).map((s) => SHAPE_TO_UI[s] || s),
+    };
     return {
       job_id: j.job_id,
       seed_set_id: r.seed_set_id || null,
       created_by: j.submitted_by, created_at: j.submitted_at,
       completed_at: shipped ? j.updated_at : null,
       completed_by: shipped ? "worker" : null,
-      config_hash: j.config_hash, inputs: j.inputs || {},
+      config_hash: j.config_hash, inputs: uiInputs,
       state: uiState,
       progress: {
         phase: phase || j.state,
@@ -639,6 +658,20 @@ window.QG = {
   QG.startTicking = (cb) => {
     hydrate().then(() => cb && cb());
     return setInterval(() => hydrate().then(() => cb && cb()), 1500);
+  };
+
+  // Socket-driven detail-page updates: re-hydrate + repaint on every status push
+  // instead of polling on a fixed clock. Falls back to interval polling when the
+  // edge is offline, no job id is known, or the socket drops.
+  QG.watchLive = (jobId, render) => {
+    const paint = () => hydrate().then(() => render && render());
+    paint();
+    if (!window.EEOF || !jobId) return QG.startTicking(render);
+    let pollHandle = null;
+    EEOF.watchJob(jobId, paint)
+      .then(paint)
+      .catch(() => { pollHandle = QG.startTicking(render); });
+    return () => pollHandle && clearInterval(pollHandle);
   };
   // job.html calls tick(cb) too in some flows; make it a hydrate.
   QG.tick = () => {};

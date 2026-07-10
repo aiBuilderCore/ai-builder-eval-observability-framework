@@ -36,7 +36,7 @@ HEALTHY_JUDGES = ["helpfulness@v1", "answer_relevance@v1"]
 FINANCE_JUDGES = ["no_financial_advice@v1", "regulatory_disclosure@v1", "numeric_accuracy@v1"]
 
 
-def poll(c: httpx.Client, job_id: str, timeout: float = 120) -> dict:
+def poll(c: httpx.Client, job_id: str, timeout: float = 300) -> dict:
     deadline = time.time() + timeout
     while time.time() < deadline:
         job = c.get(f"{BASE}/jobs/{job_id}", headers=HEADERS).json()
@@ -64,16 +64,19 @@ def ensure_adapter(c: httpx.Client, adapters: list[dict], name: str, config: dic
 def lineage(c: httpx.Client, persona: dict, adapter: dict, judges: list[str],
             *, evidence: bool, label: str) -> None:
     """Run one persona × adapter lineage end-to-end through the public API."""
+    # Small counts on purpose: this is a demo seed, not a load test. Fewer
+    # questions × shorter conversations = far fewer LLM calls, so the lineage
+    # finishes quickly even when the free-tier provider is rate-limiting.
     qs = c.post(
         f"{BASE}/question-sets", headers=HEADERS,
         json={"persona_refs": [{"id": persona["id"], "version": persona["version"]}],
-              "count_per_persona": 4},
+              "count_per_persona": 2},
     ).json()
     seed_set_id = poll(c, qs["job_id"])["result"]["seed_set_id"]
 
     run = c.post(
         f"{BASE}/simulation/runs", headers=HEADERS,
-        json={"seed_set_id": seed_set_id, "adapter_id": adapter["id"], "max_turns": 3},
+        json={"seed_set_id": seed_set_id, "adapter_id": adapter["id"], "max_turns": 2},
     ).json()
     run_id = run["run_id"]
     poll(c, run["job_id"])

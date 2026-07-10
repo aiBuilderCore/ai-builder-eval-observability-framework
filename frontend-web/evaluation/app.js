@@ -930,6 +930,20 @@ window.EV = {
   EV.tick = () => {};
   EV.startTicking = (cb) => { hydrate().then(() => cb && cb()); return setInterval(() => hydrate().then(() => cb && cb()), 1500); };
 
+  // Socket-driven detail-page updates: re-hydrate + repaint on every status push
+  // instead of polling on a fixed clock. Falls back to interval polling when the
+  // edge is offline, no job id is known, or the socket drops.
+  EV.watchLive = (jobId, render) => {
+    const paint = () => hydrate().then(() => render && render());
+    paint();
+    if (!window.EEOF || !jobId) return EV.startTicking(render);
+    let pollHandle = null;
+    EEOF.watchJob(jobId, paint)
+      .then(paint)
+      .catch(() => { pollHandle = EV.startTicking(render); });
+    return () => pollHandle && clearInterval(pollHandle);
+  };
+
   EV.submitLive = async function (draft) {
     const dims = (draft.judge_ids || []).map((id) => id.split("@")[0].replace("judge.", ""));
     const refs = dims.map((d) => `${d}@v1`);

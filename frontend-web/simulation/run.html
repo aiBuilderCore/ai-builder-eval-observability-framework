@@ -99,6 +99,7 @@
 <script>
   const params = new URLSearchParams(location.search);
   const runId = params.get("id");
+  const jobId = params.get("job"); // status socket is keyed by job_id, not run_id
   if (!runId) { location.href = "./index.html"; }
 
   function render() {
@@ -280,7 +281,7 @@
 
   // Live mode: wait for the adapter's first hydrate before the first render so
   // getRun() resolves (otherwise the not-found guard redirects to the index).
-  if (window.SIM && SIM.ready) SIM.ready.then(() => { render(); SIM.startTicking(render); });
+  if (window.SIM && SIM.watchLive) SIM.ready.then(() => SIM.watchLive(jobId, render));
   else { render(); SIM.startTicking(render); }
 </script>
 

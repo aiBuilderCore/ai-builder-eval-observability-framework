@@ -449,8 +449,10 @@
     if (job) renderVerdicts(job);
   });
 
-  load();
-  EV.startTicking(load);
+  // Live mode streams this job over the shared socket (event-accurate); offline
+  // mode keeps the interval poll. id here is the job_id the socket is keyed by.
+  if (window.EV && EV.watchLive) EV.watchLive(getQuery("id"), load);
+  else { load(); EV.startTicking(load); }
 </script>
 
 </body>

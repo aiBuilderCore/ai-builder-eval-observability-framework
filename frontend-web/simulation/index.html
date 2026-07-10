@@ -192,6 +192,10 @@
       const traceCount = r.output?.trace_count ?? r.progress.conversations_done ?? 0;
       const adapter = r.adapter_snapshot || {};
       const transport = adapter.transport || "—";
+      // Prefer the human product name (config.display_name) over the raw registry
+      // id/name, so baseline + regression variants of one agent read as the same
+      // product in the run list.
+      const adapterLabel = adapter.display_name || adapter.config?.display_name || adapter.name || adapter.id || "—";
 
       tr.innerHTML = `
         <td><span class="id">${r.run_id}</span></td>
@@ -199,7 +203,7 @@
         <td><span class="ts">${SIM.fmtTsShort(r.created_at)}</span></td>
         <td>
           <span class="transport-pill ${transport}">${transport}</span>
-          <span class="ts" style="display:block;margin-top:3px;">${SIM.escapeHtml(adapter.id || "—")}</span>
+          <span class="ts" style="display:block;margin-top:3px;">${SIM.escapeHtml(adapterLabel)}</span>
         </td>
         <td><span class="ts" style="text-transform:uppercase;letter-spacing:0.06em;">${r.inputs?.mode || "—"}</span></td>
         <td><span class="state-pill ${r.state}">${SIM.phaseLabel(r.state)}</span></td>

@@ -7,7 +7,7 @@
 # integrated stack (backend + frontend, served single-origin by the edge).
 #
 # Usage:
-#   ./bootstrap.sh                 # mode from .env APP_ENV, else 'infra'
+#   ./bootstrap.sh                 # mode from .env APP_ENV, else 'local' (default)
 #   ./bootstrap.sh infra           # real ScyllaDB + NATS + MinIO via docker
 #   ./bootstrap.sh local           # zero-infra, in-memory data plane
 #   ./bootstrap.sh infra --no-run  # set everything up but don't start services
@@ -45,10 +45,10 @@ else
   log ".env already present — keeping it"
 fi
 
-# Resolve mode: explicit arg > existing .env value > default 'infra'
+# Resolve mode: explicit arg > existing .env value > default 'local'
 if [ -z "$MODE" ]; then
   MODE="$(grep -E '^APP_ENV=' .env | head -1 | cut -d= -f2 | tr -d '[:space:]' || true)"
-  MODE="${MODE:-infra}"
+  MODE="${MODE:-local}"
 fi
 
 # Write APP_ENV back into .env (portable in-place edit)

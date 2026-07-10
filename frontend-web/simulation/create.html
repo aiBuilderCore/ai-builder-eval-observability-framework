@@ -518,9 +518,10 @@
         seed_set_id: draft.seed_set_id, adapter_id: draft.adapter_id,
         mode: inp.mode, max_turns: inp.max_turns, concurrency: inp.concurrency,
         user_simulator_model: inp.user_simulator_model,
-      }).then((runId) => {
-        SIM.toast(`Queued <b>${runId}</b>`, "Simulation");
-        setTimeout(() => location.href = `./run.html?id=${encodeURIComponent(runId)}`, 400);
+      }).then(({ run_id, job_id }) => {
+        SIM.toast(`Queued <b>${run_id}</b>`, "Simulation");
+        const q = `id=${encodeURIComponent(run_id)}` + (job_id ? `&job=${encodeURIComponent(job_id)}` : "");
+        setTimeout(() => location.href = `./run.html?${q}`, 400);
       }).catch((err) => SIM.toast(err.message, "Submit failed"));
       return;
     }
@@ -564,22 +565,19 @@
   }
 
   // ---------- Init ----------
-  // Static reference clusters (mode/session) paint immediately.
+  // Seed sets + adapters paint immediately from the bundled seed so the wizard
+  // always shows content on launch (also the offline fallback). The LIVE wiring
+  // then repaints them from the edge once its first hydrate resolves, so freshly
+  // shipped seed sets and onboarded adapters replace the seed in place.
+  renderSeedGrid();
+  renderAdapterGrid();
   renderModeCluster();
   renderSessionCluster();
   paintStepper();
   paintSummary();
 
-  // Seed sets + adapters mirror live backend entities. In live mode, wait for the
-  // first hydrate before painting them so seed data never flashes as stale;
-  // offline mode paints the seed fallback immediately (so the UI never blanks).
   if (window.SIM && SIM.ready && typeof SIM.ready.then === "function") {
-    const sg = document.getElementById("seed-grid"), ag = document.getElementById("adapter-grid");
-    if (sg) sg.innerHTML = `<p class="sub" style="padding:20px;color:var(--text-muted);">Loading seed sets…</p>`;
-    if (ag) ag.innerHTML = `<p class="sub" style="padding:20px;color:var(--text-muted);">Loading adapters…</p>`;
     SIM.ready.then(() => { renderSeedGrid(); renderAdapterGrid(); paintSummary(); });
-  } else {
-    renderSeedGrid(); renderAdapterGrid(); paintSummary();
   }
 </script>
 

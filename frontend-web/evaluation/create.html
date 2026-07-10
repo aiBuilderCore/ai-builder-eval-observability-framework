@@ -611,23 +611,17 @@
   }
 
   // ---- Initial render -------------------------------------------------
-  // Static reference pickers (mode/panels/mitigations) paint immediately.
+  renderRuns();
+  renderJudges();
   renderMode(); renderPanels();
   renderMitigations();
   refreshSummary();
   refreshNav();
 
-  // Runs + judges mirror live backend entities. In live mode, wait for the first
-  // hydrate before painting them so seed data never flashes as stale; offline
-  // mode paints the seed fallback immediately (so the UI never blanks).
-  const loadingCard = (msg) => `<p class="sub" style="padding:20px;color:var(--text-muted);">${msg}</p>`;
+  // The initial paint uses seed EV.RUNS / EV.JUDGES; once the LIVE wiring hydrates
+  // them from the edge (real sim runs + the judge registry), repaint the pickers.
   if (window.EV && EV.ready && typeof EV.ready.then === "function") {
-    const rg = document.getElementById("run-grid"), jg = document.getElementById("judge-grid");
-    if (rg) rg.innerHTML = loadingCard("Loading runs…");
-    if (jg) jg.innerHTML = loadingCard("Loading judges…");
     EV.ready.then(() => { renderRuns(); renderJudges(); refreshSummary(); refreshNav(); });
-  } else {
-    renderRuns(); renderJudges(); refreshSummary(); refreshNav();
   }
 </script>
 

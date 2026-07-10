@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  bootstrap.ps1 — Windows PowerShell counterpart of bootstrap.sh.
+  bootstrap.ps1 - Windows PowerShell counterpart of bootstrap.sh.
 
   One command to stand up the Enterprise Eval Observability Framework from
   scratch: create .env, install every dependency (core, all services, frontend,
@@ -10,9 +10,9 @@
   self-heal). Judge catalogue + persona lab come from the core library.
 
 .EXAMPLE
-  .\bootstrap.ps1                 # mode from .env APP_ENV, else 'infra'
-  .\bootstrap.ps1 infra           # real ScyllaDB + NATS + MinIO via docker
+  .\bootstrap.ps1                 # mode from .env APP_ENV, else 'local' (default)
   .\bootstrap.ps1 local           # zero-infra, in-memory data plane
+  .\bootstrap.ps1 infra           # real ScyllaDB + NATS + MinIO via docker
   .\bootstrap.ps1 infra -NoRun    # set everything up but don't start services
 
   Idempotent: safe to re-run. Preserves an existing .env (only fills APP_ENV).
@@ -28,24 +28,34 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location -Path $PSScriptRoot
 
+# This script and the child processes it launches emit UTF-8 text. Windows
+# PowerShell 5.1 otherwise decodes console output with the legacy OEM codepage,
+# which mangles any non-ASCII byte. Pin the console + pipeline to UTF-8 so the
+# stack's log output renders cleanly; guarded so hosts without a real console
+# (ISE, some CI) don't error. The script body itself is pure ASCII.
+try {
+  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+  $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch { }
+
 function Log  ($m) { Write-Host "> $m" -ForegroundColor Cyan }
 function Warn ($m) { Write-Host "! $m" -ForegroundColor Yellow }
 
 # ---------------------------------------------------------------------------
-# 1. .env — create from example if missing, then pin APP_ENV
+# 1. .env - create from example if missing, then pin APP_ENV
 # ---------------------------------------------------------------------------
 if (-not (Test-Path .env)) {
   Copy-Item .env.example .env
   Log "created .env from .env.example"
 } else {
-  Log ".env already present — keeping it"
+  Log ".env already present - keeping it"
 }
 
-# Resolve mode: explicit arg > existing .env value > default 'infra'
+# Resolve mode: explicit arg > existing .env value > default 'local'
 if (-not $Mode) {
   $line = Select-String -Path .env -Pattern '^APP_ENV=' | Select-Object -First 1
   if ($line) { $Mode = ($line.Line -split '=', 2)[1].Trim() }
-  if (-not $Mode) { $Mode = 'infra' }
+  if (-not $Mode) { $Mode = 'local' }
 }
 
 # Write APP_ENV back into .env
@@ -58,10 +68,10 @@ if ($envText -match '(?m)^APP_ENV=') {
 Log "APP_ENV=$Mode"
 
 # ---------------------------------------------------------------------------
-# 2. Dependencies — uv installs core + all services (incl. agent-under-test)
+# 2. Dependencies - uv installs core + all services (incl. agent-under-test)
 # ---------------------------------------------------------------------------
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-  Warn "uv not found — installing (https://astral.sh/uv)"
+  Warn "uv not found - installing (https://astral.sh/uv)"
   Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
   $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 }
@@ -70,13 +80,13 @@ $SyncGroups = @('--group', 'dev')
 if ($Mode -eq 'infra') { $SyncGroups += @('--group', 'infra', '--group', 'llm') }
 Log "uv sync $($SyncGroups -join ' ')"
 uv sync @SyncGroups
-# The frontend is static (served by the edge) — no separate JS build/install.
+# The frontend is static (served by the edge) - no separate JS build/install.
 
 # ---------------------------------------------------------------------------
-# 3. Infrastructure (infra mode) — bring up backends, init schema, onboard agent
+# 3. Infrastructure (infra mode) - bring up backends, init schema, onboard agent
 # ---------------------------------------------------------------------------
 if ($Mode -eq 'infra' -and -not (Get-Command docker -ErrorAction SilentlyContinue)) {
-  Warn "docker not found but APP_ENV=infra — falling back to local mode."
+  Warn "docker not found but APP_ENV=infra - falling back to local mode."
   $Mode = 'local'
   ((Get-Content .env -Raw) -replace '(?m)^APP_ENV=.*', 'APP_ENV=local').TrimEnd() + "`n" |
     Set-Content .env -NoNewline
@@ -95,7 +105,7 @@ if ($Mode -eq 'infra') {
   if (-not $ready) { Warn "ScyllaDB did not become ready in time"; exit 1 }
 
   $env:APP_ENV = 'infra'
-  Log "init_infra — create table + GSI + bucket"
+  Log "init_infra - create table + GSI + bucket"
   uv run python scripts/init_infra.py
   Log "onboard 401(k) agent as a REST adapter directly into ScyllaDB"
   uv run python scripts/onboard_agent.py
@@ -136,7 +146,7 @@ if ($NoRun) {
 # Start the whole stack in the background so we can seed the interactive surfaces
 # through the real edge once it is live, then hand the console back to the stack.
 # SEED_HEAL_INCIDENTS=0 keeps Self-Heal populated only by the real breach detector
-# (no hand-written INC-99x incidents); SEED_DEMO defaults to 0 (clean slate —
+# (no hand-written INC-99x incidents); SEED_DEMO defaults to 0 (clean slate -
 # personas + judges only, no synthetic agent fleet), so the dashboard/observability
 # rollups fill in only from real runs driven through the edge. Set SEED_DEMO=1 to
 # restore the synthetic demo fleet.
@@ -151,7 +161,7 @@ try {
   Log "waiting for the edge on :8080 ..."
   $edgeUp = $false
   foreach ($i in 1..60) {
-    if ($proc.HasExited) { Warn "the stack exited during startup — see the logs above"; exit 1 }
+    if ($proc.HasExited) { Warn "the stack exited during startup - see the logs above"; exit 1 }
     try {
       Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://127.0.0.1:8080/health | Out-Null
       $edgeUp = $true; break
@@ -163,10 +173,10 @@ try {
     try { uv run python scripts/seed_pipeline.py }
     catch { Warn "pipeline seed skipped/failed (stack still up)" }
   } else {
-    Warn "edge did not become ready in time — skipping pipeline seed"
+    Warn "edge did not become ready in time - skipping pipeline seed"
   }
 
-  Log "platform ready — http://127.0.0.1:8080/  (Ctrl-C to stop)"
+  Log "platform ready - http://127.0.0.1:8080/  (Ctrl-C to stop)"
   Wait-Process -Id $proc.Id
 }
 finally {

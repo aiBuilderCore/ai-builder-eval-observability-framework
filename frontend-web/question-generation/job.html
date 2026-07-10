@@ -311,7 +311,7 @@
   // Live mode: defer the first paint until the adapter's first hydrate so a
   // freshly-submitted job (navigated to straight after submit) doesn't flash
   // "job not found" before jobsCache fills. Offline mode renders immediately.
-  if (window.QG && QG.ready) QG.ready.then(() => QG.startTicking(render));
+  if (window.QG && QG.watchLive) QG.ready.then(() => QG.watchLive(jobId, render));
   else { render(); QG.startTicking(render); }
 </script>
 

@@ -40,13 +40,20 @@ async def _all_verdicts(tenant: str) -> list[dict]:
 
 
 async def _run_agent_map(tenant: str) -> dict[str, str]:
-    """run_id → agent name, from the run's frozen adapter snapshot."""
+    """run_id → agent name, from the run's frozen adapter snapshot.
+
+    Groups by the adapter's human display name (config.display_name) rather than
+    the raw registry name, so distinct adapter records for the *same* product
+    (e.g. a baseline and a guardrail-regression variant of one agent) roll up
+    into a single Application-quality row. Falls back to the registry name.
+    """
     gsipk, _ = keys.run_gsi(tenant, "", "")
     rows = await get_table().query_gsi(gsipk)
     m: dict[str, str] = {}
     for r in rows:
-        run = r["data"]
-        m[run["id"]] = (run.get("adapter_snapshot") or {}).get("name", "Unknown agent")
+        snap = r["data"].get("adapter_snapshot") or {}
+        display = snap.get("display_name") or (snap.get("config") or {}).get("display_name")
+        m[r["data"]["id"]] = display or snap.get("name", "Unknown agent")
     return m
 
 

@@ -845,6 +845,20 @@ window.SIM = {
   SIM.tick = () => {};
   SIM.startTicking = (cb) => { hydrate().then(() => cb && cb()); return setInterval(() => hydrate().then(() => cb && cb()), 1500); };
 
+  // Socket-driven detail-page updates: re-hydrate + repaint on every status push
+  // (event-accurate) instead of polling on a fixed clock. Falls back to interval
+  // polling when the edge is offline, no job id is known, or the socket drops.
+  SIM.watchLive = (jobId, render) => {
+    const paint = () => hydrate().then(() => render && render());
+    paint();
+    if (!window.EEOF || !jobId) return SIM.startTicking(render);
+    let pollHandle = null;
+    EEOF.watchJob(jobId, paint)
+      .then(paint)
+      .catch(() => { pollHandle = SIM.startTicking(render); });
+    return () => pollHandle && clearInterval(pollHandle);
+  };
+
   // Adapter onboarding (onboard.html) commits via upsertAdapter — write through
   // to POST /adapters. The page's ~700ms nav delay covers the round trip.
   SIM.upsertAdapter = (a) => {
@@ -867,7 +881,8 @@ window.SIM = {
       user_simulator_model: draft.user_simulator_model || "claude-opus-4-8",
     };
     const acc = await EEOF.post("/simulation/runs", body);
-    return acc.run_id;
+    // run_id keys the detail page; job_id keys the status socket — return both.
+    return { run_id: acc.run_id, job_id: acc.job_id };
   };
 
   SIM.__hydrate = hydrate;
