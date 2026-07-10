@@ -94,10 +94,10 @@ jobs:
 
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "${next}" -m "${next} — auto-bump on merge of #${PR_NUMBER} (${bump})
-
-${PR_TITLE}
-source branch: ${HEAD_REF}"
+          git tag -a "${next}" \
+            -m "${next} — auto-bump on merge of #${PR_NUMBER} (${bump})" \
+            -m "${PR_TITLE}" \
+            -m "source branch: ${HEAD_REF}"
           git push origin "${next}"
 
           echo "### Tagged \`${next}\` (${bump} bump from \`${latest}\`)" >> "$GITHUB_STEP_SUMMARY"
