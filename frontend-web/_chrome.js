@@ -442,12 +442,12 @@
     var links = [navLink(SECTION_LANDING, 'dashboard', 'Dashboard', !activeSub)];
     SUB_APPS.forEach(function (s) {
       var url = new URL(s.slug + '/index.html', sectionUrl).href;
-      links.push(navLink(url, s.slug, s.label, s.slug === activeSub && !isCatalog));
-      // Judge Catalogue sits directly under Evaluation — the sync judge registry.
+      // Judge Catalogue sits directly above Evaluation — the sync judge registry.
       if (s.slug === 'evaluation') {
         var catUrl = new URL('evaluation/catalog.html', sectionUrl).href;
         links.push(navLink(catUrl, 'judges', 'Judge Catalogue', isCatalog));
       }
+      links.push(navLink(url, s.slug, s.label, s.slug === activeSub && !isCatalog));
     });
     var scroll = '<div class="aibc-sidebar__scroll">' + links.join('\n') + '</div>';
 

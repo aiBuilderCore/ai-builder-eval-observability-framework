@@ -91,8 +91,7 @@
       kinds of people it will actually meet in the real world.
     </p>
     <div class="aibc-kpis">
-      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num">6</span><span class="aibc-stat__label">personas</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">1</span><span class="aibc-stat__label">live</span></div>
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num" id="kpi-personas">0</span><span class="aibc-stat__label">personas</span></div>
     </div>
   </section>
 
@@ -124,6 +123,8 @@
     const all = PL.load();
     const libCount = document.getElementById("lib-count");
     if (libCount) libCount.textContent = all.length;
+    const kpiPersonas = document.getElementById("kpi-personas");
+    if (kpiPersonas) kpiPersonas.textContent = all.length;
 
     // tag pills (top-5 by frequency, plus an "All" pill to clear the filter)
     const tagCounts = {};

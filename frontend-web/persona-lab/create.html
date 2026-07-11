@@ -349,7 +349,7 @@
   updatePreview();
 
   // ---- Submit ----
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const name = (fd.get("name") || "").trim();
@@ -372,9 +372,12 @@
       created_at: PL.todayISO(),
       updated_at: PL.todayISO(),
     };
-    PL.upsert(persona);
+    // Await the write (POST + re-hydrate) before navigating — otherwise the
+    // redirect can cancel the in-flight POST and the persona (and its tags)
+    // never reach the backend, so the gallery hydrates without them.
+    await PL.upsert(persona);
     PL.toast(`Saved ${persona.name} (v${persona.version})`, "Persona Lab");
-    setTimeout(() => { window.location.href = "./index.html"; }, 600);
+    window.location.href = "./index.html";
   });
 </script>
 
