@@ -57,7 +57,7 @@ html.aibc-chrome .source-tab .tag {
    Same rhythm and hierarchy on every stage: airy top space, a muted eyebrow,
    one tight display H1, a readable one-line subtitle, then the meta row. */
 html.aibc-chrome .page-head {
-  padding-top: clamp(1.5rem, 3.5vw, 2.75rem);
+  padding-top: clamp(0.75rem, 1.8vw, 1.25rem);
   padding-bottom: 0.25rem;
   margin-bottom: clamp(1.25rem, 3vw, 2rem);
 }
