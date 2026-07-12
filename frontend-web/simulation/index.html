@@ -232,11 +232,16 @@
         card.className = "adapter-card";
         const url = a.transport_config?.base_url || a.transport_config?.server_url || a.transport_config?.agent_card_url || "—";
         const smoke = a.smoke_test?.passed ? `<span class="transport-pill" style="color:var(--stop-goal);background:var(--stop-goal-bg);border-color:transparent;">smoke ✓</span>` : `<span class="transport-pill" style="color:var(--stop-err);background:var(--stop-err-bg);border-color:transparent;">smoke ✗</span>`;
+        const singleTurn = a.capabilities?.interaction_mode === "single_turn";
+        const turnLabel = singleTurn ? "single-turn" : "multi-turn";
         card.innerHTML = `
           <div class="head">
             <div class="name">${SIM.escapeHtml(a.name)}</div>
-            <span class="transport-pill ${a.transport}">${a.transport}</span>
           </div>
+          <span class="pill-group">
+            <span class="turn-pill ${singleTurn ? "single" : "multi"}" title="Application type">${turnLabel}</span>
+            <span class="transport-pill ${a.transport}">${a.transport}</span>
+          </span>
           <div class="url">${SIM.escapeHtml(url)}</div>
           <div class="stats">
             <span>v<b>${a.version}</b></span>

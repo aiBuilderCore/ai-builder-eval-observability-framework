@@ -574,6 +574,23 @@ tr:hover .job-id-chip__copy,
 .transport-pill.mcp   { color: #2f7a5b; border-color: rgba(47, 122, 91, 0.3);  background: rgba(47, 122, 91, 0.06);  }
 .transport-pill.a2a   { color: var(--accent); border-color: rgba(124, 58, 237, 0.3); background: var(--accent-soft); }
 
+.pill-group { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Application type — how the adapter is driven at runtime. */
+.turn-pill {
+  display: inline-flex; align-items: center;
+  padding: 0.15rem 0.55rem; border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.turn-pill.multi  { color: #2f6fb8; border-color: rgba(47, 111, 184, 0.3); background: rgba(47, 111, 184, 0.06); }
+.turn-pill.single { color: #8a6d3b; border-color: rgba(138, 109, 59, 0.3);  background: rgba(138, 109, 59, 0.07); }
+
 /* ---------- Panels ---------- */
 .panel {
   background: var(--surface);
@@ -1160,8 +1177,9 @@ html.aibc-chrome .transport-tab .tag,
 /* ---------- Adapter cards (runs list / picker) ---------- */
 .adapter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 340px));
   gap: 14px;
+  justify-content: start;
 }
 .adapter-card {
   background: var(--surface);

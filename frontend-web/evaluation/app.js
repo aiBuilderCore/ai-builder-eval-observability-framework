@@ -810,10 +810,16 @@ window.EV = {
       judge_ids: judgeIds,
       mode: rawInputs.mode || (rawInputs.panel_id ? "jury" : "judge"),
     };
+    // The edge has no `completed_by` column — the finalizer is recorded as the
+    // `by` of the terminal event (worker/reviewer). Surface it so the audit trail
+    // reads "completed by worker" instead of a dead "—".
+    const terminalEvent = (j.events || []).slice().reverse()
+      .find((e) => ["ready", "shipped", "failed"].includes(e.state));
     return {
       job_id: j.job_id, verdict_set_id: r.verdict_set_id || null,
       created_by: j.submitted_by, created_at: j.submitted_at,
       completed_at: (j.state === "ready" || j.state === "shipped") ? j.updated_at : null,
+      completed_by: (j.state === "ready" || j.state === "shipped") ? (terminalEvent?.by || "worker") : null,
       config_hash: j.config_hash, inputs,
       state: JSTATE[j.state] || j.state,
       progress: {
@@ -843,6 +849,9 @@ window.EV = {
         fail_count: Math.max(0, (r.verdict_count || 0) - (r.pass_count || 0)),
         abstain_count: r.abstain_count || 0,
         pass_rate: r.pass_rate || 0,
+        // Object-store URI when the infra plane (MinIO) is active; absent on the
+        // in-memory local plane, where the verdict-set id is the storage handle.
+        storage_uri: r.storage_uri || null,
       } : null,
     };
   };

@@ -142,6 +142,22 @@
     gap: 24px;
     margin-top: 22px;
   }
+  /* Grid children default to min-width:auto, which lets a wide child (e.g. a
+     many-column heatmap) blow the track out past the viewport instead of
+     scrolling. min-width:0 lets the track shrink so inner overflow-x engages. */
+  .exec-grid-2 > * { min-width: 0; }
+  /* Equal-width variant — used where the two panels carry peer content
+     (score distribution vs. judge reliability) and should read as a matched pair. */
+  .exec-grid-2.even { grid-template-columns: 1fr 1fr; }
+  /* A .panel immediately after a grid row is not caught by the base
+     `.panel + .panel` rule, so it loses its 22px top gap (e.g. Top failures
+     right after the score-distribution row). Restore the consistent rhythm. */
+  .exec-grid-2 + .panel { margin-top: 22px; }
+  /* The two panels inside a grid row are adjacent siblings, so the base
+     `.panel + .panel { margin-top: 22px }` shoves the right card down 22px and
+     steals that height — breaking equal-height stretch. Reset it inside the row. */
+  .exec-grid-2 { align-items: stretch; }
+  .exec-grid-2 > .panel + .panel { margin-top: 0; }
 
   /* Narrative prose */
   .exec-prose p {
@@ -352,6 +368,82 @@
     :root:not([data-theme="light"]) .exec-heatmap td.h-mid  { color: #e2b777; }
     :root:not([data-theme="light"]) .exec-heatmap td.h-low  { color: #e88f8f; }
   }
+
+  /* Full-width heatmap scroller — the persona × dimension matrix can be wide;
+     let it scroll inside its panel rather than pushing the layout. */
+  .exec-heatmap-scroll { overflow-x: auto; max-width: 100%; }
+
+  /* Judge reliability / evidence-quality panel */
+  .exec-rel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+  .exec-rel .stat {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--r-3, 10px);
+    padding: 12px 14px;
+  }
+  .exec-rel .stat .lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .exec-rel .stat .val {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .exec-rel .stat.warn .val { color: #b8853a; }
+  .exec-rel .stat.crit .val { color: #b04444; }
+  .exec-rel .stat .sub {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .exec-provider-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--surface-alt);
+    margin: 14px 0 10px;
+  }
+  .exec-provider-bar .seg { height: 100%; }
+  .exec-provider-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .exec-provider-legend .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .exec-quality-note {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  .exec-quality-note.ok   { background: rgba(47,122,91,0.08);  color: var(--text-muted); border-left: 3px solid #2f7a5b; }
+  .exec-quality-note.warn { background: rgba(184,133,58,0.10); color: var(--text); border-left: 3px solid #b8853a; }
+  .exec-quality-note.crit { background: rgba(176,68,68,0.08);  color: var(--text); border-left: 3px solid #b04444; }
 
   /* Donut for jury consensus */
   .exec-donut { width: 160px; height: 160px; }
@@ -641,11 +733,7 @@
       const failed  = cells.filter(v => v.verdict === "fail").length;
       const abstain = cells.filter(v => v.verdict === "abstain").length;
       const status = avg >= threshold ? "green" : avg >= threshold * 0.85 ? "amber" : "red";
-      // synthetic prior-run baseline (deterministic from dim + job_id)
-      let h = 0; for (const c of (dim + job.job_id)) h = (h * 31 + c.charCodeAt(0)) | 0;
-      const prior = Math.max(0.4, Math.min(0.95, avg + ((h % 17) - 8) / 100));
-      const delta = avg - prior;
-      return { dim, judge, threshold, avg, passed, failed, abstain, total: cells.length, status, prior, delta };
+      return { dim, judge, threshold, avg, passed, failed, abstain, total: cells.length, status };
     });
 
     // Score histogram (10 buckets, [0, 0.1) … [0.9, 1.0])
@@ -680,11 +768,54 @@
     const judgeCalls = job.progress?.judge_call_count ?? 0;
     const cellsTotal = job.progress?.cells_total ?? total;
 
+    // Distribution shape — median score and score spread, plus how many
+    // dimensions actually cleared their own threshold (a dimension-level roll-up
+    // that complements the verdict-level pass/fail/abstain split).
+    const sortedScores = verdicts.map(v => v.score).sort((a, b) => a - b);
+    const medianScore = sortedScores.length
+      ? (sortedScores.length % 2
+          ? sortedScores[(sortedScores.length - 1) / 2]
+          : (sortedScores[sortedScores.length / 2 - 1] + sortedScores[sortedScores.length / 2]) / 2)
+      : 0;
+    const minScore = sortedScores[0] ?? 0;
+    const maxScore = sortedScores[sortedScores.length - 1] ?? 0;
+    const dimsCleared = perDim.filter(d => d.avg >= d.threshold).length;
+
+    // Judge model / provider mix (from per-juror model tags on each verdict).
+    // Collapse "provider:model" → provider so the legend stays readable.
+    const providerMix = {};
+    let jurorTotal = 0;
+    verdicts.forEach(v => (v.judges || []).forEach(j => {
+      const provider = String(j.model || "unknown").split(":")[0];
+      providerMix[provider] = (providerMix[provider] || 0) + 1;
+      jurorTotal += 1;
+    }));
+
+    // Evidence quality — how many verdicts were produced by a real judge call
+    // vs. a deterministic offline fallback (the "echo" provider). A high offline
+    // share means the scores are stubs, not real judgements — a ship-blocking
+    // caveat that is otherwise invisible in the aggregate numbers.
+    const isOffline = (v) =>
+      /\becho\b|deterministic offline/i.test(v.reasoning || "") ||
+      (v.judges || []).some(j => /(^|:)echo/i.test(String(j.model || "")));
+    const offlineCount = verdicts.filter(isOffline).length;
+    const liveCount = total - offlineCount;
+    const offlineRate = total ? offlineCount / total : 0;
+
+    // Applied mitigations — the frozen job envelope often omits the mitigation
+    // list, but every verdict records the mitigations it was scored under. Union
+    // those so the guardrails panel reflects what actually ran, not an empty set.
+    const appliedMitigations = new Set(job.inputs.mitigations || []);
+    verdicts.forEach(v => (v.mitigations_applied || []).forEach(m => appliedMitigations.add(m)));
+
     return {
       total, passCount, failCount, abstainCount, passRate, avgScore,
       dims, perDim, histogram, personas, heatmap,
       consensusAvg, consensusUnanimous, consensusContested,
       failures, judgeCalls, cellsTotal,
+      providerMix, jurorTotal, offlineCount, liveCount, offlineRate,
+      appliedMitigations,
+      medianScore, minScore, maxScore, dimsCleared,
     };
   }
 
@@ -757,6 +888,16 @@
         level: "crit",
         title: `Safety-refusal pass rate needs review`,
         body: `Adversify-tagged questions are the highest-stakes cells in the run. A refusal score under 0.85 suggests the agent missed jailbreak attempts or refused incorrectly when it should have answered. Pair this with a human safety review before ship.`,
+      });
+    }
+
+    // Evidence quality — offline (echo) fallback verdicts. Derived from the
+    // verdict set's own reasoning/model tags, so this fires on real degradation.
+    if (A.offlineCount > 0) {
+      recs.push({
+        level: A.offlineRate >= 0.25 ? "crit" : "warn",
+        title: `${A.offlineCount} verdict${A.offlineCount === 1 ? "" : "s"} scored by the offline fallback judge (${pct(A.offlineRate)})`,
+        body: `These cells were scored deterministically by the echo provider, not a live judge — the scores are stubs, not real judgements. This usually means the judge provider was unreachable (missing/expired credentials or a network fault). Restore a live provider and re-run before treating the affected dimensions as trustworthy.`,
       });
     }
 
@@ -841,7 +982,7 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
             <span class="exec-status ${status}">${statusLabel}</span>
             <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:0.06em;">
-              JOB <b style="color:var(--text);">${esc(job.job_id)}</b> · shipped ${esc(completedAt)}
+              JOB <b style="color:var(--text);">${esc(job.job_id)}</b> · completed ${esc(completedAt)}
             </span>
           </div>
           <h2 class="exec-hero__verdict"><em>${esc(adapter)}</em> · ${verdictLine}</h2>
@@ -895,8 +1036,12 @@
       const passPct = (d.passed / Math.max(1, d.total)) * 100;
       const failPct = (d.failed / Math.max(1, d.total)) * 100;
       const absPct  = (d.abstain / Math.max(1, d.total)) * 100;
-      const deltaArrow = d.delta >= 0.005 ? "▲" : d.delta <= -0.005 ? "▼" : "·";
-      const deltaCol = d.delta >= 0.005 ? "#2f7a5b" : d.delta <= -0.005 ? "#b04444" : "var(--text-faint)";
+      // Real, backend-derived margin: how far the average sits above/below this
+      // dimension's own pass threshold. (Replaces a synthetic "vs prior" delta —
+      // there is no prior-run baseline in the verdict set to compare against.)
+      const margin = d.avg - d.threshold;
+      const marginArrow = margin >= 0.005 ? "▲" : margin <= -0.005 ? "▼" : "·";
+      const marginCol = margin >= 0 ? "#2f7a5b" : "#b04444";
       const statusDot = `<span class="exec-status ${d.status}" style="padding:2px 10px;font-size:9.5px;">${d.status === 'green' ? 'OK' : d.status === 'amber' ? 'WATCH' : 'FAIL'}</span>`;
       return `
         <tr>
@@ -913,7 +1058,7 @@
           </td>
           <td class="num-cell">
             ${d.avg.toFixed(2)}
-            <span class="delta" style="color:${deltaCol};">${deltaArrow} ${Math.abs(d.delta).toFixed(2)} vs prior</span>
+            <span class="delta" style="color:${marginCol};" title="threshold ${d.threshold}">${marginArrow} ${(margin >= 0 ? "+" : "−") + Math.abs(margin).toFixed(2)} vs threshold</span>
           </td>
           <td>
             <div class="pf-bar" title="${d.passed} pass · ${d.failed} fail · ${d.abstain} abstain">
@@ -930,7 +1075,7 @@
     }).join("");
 
     return `
-      <div class="exec-grid-2">
+      <div class="exec-grid-2 even">
         <section class="panel">
           <div class="panel-header">
             <h2>What this means</h2>
@@ -939,21 +1084,24 @@
           <div class="exec-prose">
             ${para.map(p => `<p>${p}</p>`).join("")}
           </div>
+          ${renderWatchList(A)}
         </section>
 
-        <section class="panel">
+        <section class="panel" style="display:flex;flex-direction:column;">
           <div class="panel-header">
             <h2>Verdict distribution</h2>
             <span class="meta">All verdicts</span>
           </div>
-          ${renderVerdictDonut(A)}
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            ${renderVerdictDonut(A)}
+          </div>
         </section>
       </div>
 
       <section class="panel" style="margin-top:22px;">
         <div class="panel-header">
           <h2>Dimension scorecard</h2>
-          <span class="meta">${A.dims.length} dimension${A.dims.length === 1 ? "" : "s"} · vs prior shipped run</span>
+          <span class="meta">${A.dims.length} dimension${A.dims.length === 1 ? "" : "s"} · ${A.dimsCleared} cleared</span>
         </div>
         <table class="exec-dim-table">
           <thead>
@@ -961,7 +1109,7 @@
               <th style="width:240px;">Dimension</th>
               <th>Status</th>
               <th>Score vs threshold</th>
-              <th>Avg / Δ prior</th>
+              <th>Avg / margin</th>
               <th>Pass / Fail / Abstain</th>
             </tr>
           </thead>
@@ -971,6 +1119,38 @@
     `;
   }
 
+  // Executive "watch list" — the dimensions that missed their own threshold,
+  // ranked worst-first, straight from the per-dimension roll-up. Gives leadership
+  // the "what do I actually look at" answer without scanning the full scorecard.
+  function renderWatchList(A) {
+    const below = A.perDim.filter(d => d.avg < d.threshold).sort((a, b) => (a.avg - a.threshold) - (b.avg - b.threshold));
+    const head = `<div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;">`;
+    if (below.length === 0) {
+      return `
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+          ${head}Threshold check</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);">
+            <span class="exec-status green" style="padding:2px 10px;font-size:9.5px;">CLEAR</span>
+            All ${A.dims.length} dimension${A.dims.length === 1 ? "" : "s"} met their pass threshold.
+          </div>
+        </div>`;
+    }
+    const chips = below.map(d => `
+      <span title="avg ${d.avg.toFixed(2)} vs threshold ${d.threshold}"
+        style="display:inline-flex;align-items:baseline;gap:6px;padding:5px 10px;border-radius:999px;
+               border:1px solid color-mix(in srgb, #b04444 35%, var(--border));
+               background:rgba(176,68,68,0.06);font-family:var(--font-mono);font-size:11px;">
+        <span style="color:var(--text);font-weight:600;">${esc(d.dim)}</span>
+        <span style="color:#b04444;font-weight:600;">${d.avg.toFixed(2)}</span>
+        <span style="color:var(--text-faint);">/ ${d.threshold}</span>
+      </span>`).join("");
+    return `
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+        ${head}Below threshold · ${below.length} of ${A.dims.length} — review before sign-off</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">${chips}</div>
+      </div>`;
+  }
+
   function renderVerdictDonut(A) {
     const total = Math.max(1, A.total);
     const r = 60;
@@ -978,31 +1158,71 @@
     const passLen = c * (A.passCount / total);
     const failLen = c * (A.failCount / total);
     const absLen  = c * (A.abstainCount / total);
+    const legendRow = (color, count, label) => `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="swatch" style="background:${color};display:inline-block;width:11px;height:11px;border-radius:2px;flex:0 0 auto;"></span>
+        <b style="min-width:24px;text-align:left;font-variant-numeric:tabular-nums;">${count}</b>
+        <span style="color:var(--text-muted);">${label}</span>
+        <span style="color:var(--text-faint);margin-left:auto;font-variant-numeric:tabular-nums;">${pct(count / total)}</span>
+      </div>`;
     return `
-      <div style="display:flex;align-items:center;gap:18px;">
-        <svg class="exec-donut" viewBox="0 0 160 160">
-          <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--surface-alt)" stroke-width="20"/>
-          <circle cx="80" cy="80" r="${r}" fill="none" stroke="#2f7a5b" stroke-width="20"
-            stroke-dasharray="${passLen} ${c - passLen}" transform="rotate(-90 80 80)"/>
-          <circle cx="80" cy="80" r="${r}" fill="none" stroke="#b04444" stroke-width="20"
-            stroke-dasharray="${failLen} ${c - failLen}"
-            stroke-dashoffset="${-passLen}" transform="rotate(-90 80 80)"/>
-          <circle cx="80" cy="80" r="${r}" fill="none" stroke="#b8853a" stroke-width="20"
-            stroke-dasharray="${absLen} ${c - absLen}"
-            stroke-dashoffset="${-(passLen + failLen)}" transform="rotate(-90 80 80)"/>
-          <text class="num" x="80" y="80" text-anchor="middle" dominant-baseline="middle">${A.total}</text>
-          <text class="lbl" x="80" y="100" text-anchor="middle">verdicts</text>
-        </svg>
-        <div style="flex:1;display:flex;flex-direction:column;gap:8px;font-family:var(--font-mono);font-size:12px;">
-          <div><span class="swatch" style="background:#2f7a5b;display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:8px;vertical-align:middle;"></span><b>${A.passCount}</b> pass <span style="color:var(--text-faint);">· ${pct(A.passCount/total)}</span></div>
-          <div><span class="swatch" style="background:#b04444;display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:8px;vertical-align:middle;"></span><b>${A.failCount}</b> fail <span style="color:var(--text-faint);">· ${pct(A.failCount/total)}</span></div>
-          <div><span class="swatch" style="background:#b8853a;display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:8px;vertical-align:middle;"></span><b>${A.abstainCount}</b> abstain <span style="color:var(--text-faint);">· ${pct(A.abstainCount/total)}</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:18px;">
+        <div style="display:flex;align-items:center;gap:26px;flex-wrap:wrap;justify-content:center;">
+          <svg class="exec-donut" viewBox="0 0 160 160">
+            <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--surface-alt)" stroke-width="20"/>
+            <circle cx="80" cy="80" r="${r}" fill="none" stroke="#2f7a5b" stroke-width="20"
+              stroke-dasharray="${passLen} ${c - passLen}" transform="rotate(-90 80 80)"/>
+            <circle cx="80" cy="80" r="${r}" fill="none" stroke="#b04444" stroke-width="20"
+              stroke-dasharray="${failLen} ${c - failLen}"
+              stroke-dashoffset="${-passLen}" transform="rotate(-90 80 80)"/>
+            <circle cx="80" cy="80" r="${r}" fill="none" stroke="#b8853a" stroke-width="20"
+              stroke-dasharray="${absLen} ${c - absLen}"
+              stroke-dashoffset="${-(passLen + failLen)}" transform="rotate(-90 80 80)"/>
+            <text class="num" x="80" y="76" text-anchor="middle" dominant-baseline="middle">${pct(A.passRate)}</text>
+            <text class="lbl" x="80" y="98" text-anchor="middle">pass rate</text>
+          </svg>
+          <div style="display:flex;flex-direction:column;gap:9px;font-family:var(--font-mono);font-size:12.5px;min-width:180px;">
+            ${legendRow("#2f7a5b", A.passCount, "pass")}
+            ${legendRow("#b04444", A.failCount, "fail")}
+            ${legendRow("#b8853a", A.abstainCount, "abstain")}
+          </div>
         </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;border-top:1px solid var(--border);padding-top:16px;">
+          ${distStat(`${A.dimsCleared}<span style="font-size:13px;color:var(--text-faint);">/${A.dims.length}</span>`, "dimensions cleared", "met threshold", `${A.dimsCleared} of ${A.dims.length} dimensions have an average score at or above their own pass threshold.`)}
+          ${distStat(A.medianScore.toFixed(2), "median score", `range ${A.minScore.toFixed(2)}–${A.maxScore.toFixed(2)}`, "The middle score across all verdicts — half scored higher, half lower. Less skewed by outliers than the average.")}
+          ${distStat(A.total.toLocaleString(), "verdicts", "judge × answer", "One verdict = one judge scoring one answer on one dimension (pass / fail / abstain).")}
+        </div>
+        <ul style="width:100%;margin:18px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:11px;">
+          ${distNote("Dimensions cleared", "dimensions whose average met their pass threshold")}
+          ${distNote("Median Score", "the midpoint of all verdict scores, steadier than the mean when a few cells score low")}
+          ${distNote("Verdict", "one judge scoring one answer on a single dimension (pass · fail · abstain)")}
+        </ul>
       </div>
     `;
   }
 
-  function renderHistogramAndHeatmap(job, A) {
+  function distNote(term, desc) {
+    return `
+      <li style="display:flex;gap:10px;align-items:baseline;font-size:12px;line-height:1.5;color:var(--text-faint);">
+        <span style="flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0.7;transform:translateY(-2px);"></span>
+        <span><b style="color:var(--text);font-weight:600;">${term}</b> ${desc}</span>
+      </li>`;
+  }
+
+  function distStat(val, lbl, sub, tip) {
+    return `
+      <div style="text-align:center;"${tip ? ` title="${esc(tip)}"` : ""}>
+        <div style="font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--text);font-variant-numeric:tabular-nums;">${val}</div>
+        <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.10em;text-transform:uppercase;color:var(--text-faint);margin-top:3px;">${lbl}</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin-top:2px;">${sub}</div>
+      </div>`;
+  }
+
+  // Score distribution histogram (left) + judge reliability / evidence quality
+  // (right). The persona × dimension heatmap moved to its own full-width section
+  // (renderPersonaHeatmap) so it can breathe when many dimensions run — cramming
+  // 15 columns into a 1fr track was what pushed the layout off-screen.
+  function renderDistributionAndReliability(job, A) {
     const max = Math.max(1, ...A.histogram);
     const bars = A.histogram.map((cnt, i) => {
       const h = (cnt / max) * 110;
@@ -1019,23 +1239,8 @@
       `;
     }).join("");
 
-    // Heatmap
-    const dims = A.dims;
-    const heatRows = A.heatmap
-      .filter(r => r.support > 0)
-      .sort((a, b) => b.support - a.support)
-      .map(row => {
-        const cells = dims.map(d => {
-          const v = row.cells[d];
-          if (v == null) return `<td class="empty">—</td>`;
-          const cls = classOfScore(v);
-          return `<td class="h-${cls}" title="${esc(row.persona)} × ${esc(d)} → ${v.toFixed(2)}">${v.toFixed(2)}</td>`;
-        }).join("");
-        return `<tr><th class="row-label">${esc(row.persona)} <span style="color:var(--text-faint);font-weight:400;">· ${row.support}</span></th>${cells}</tr>`;
-      }).join("");
-
     return `
-      <div class="exec-grid-2">
+      <div class="exec-grid-2 even">
         <section class="panel">
           <div class="panel-header">
             <h2>Score distribution</h2>
@@ -1056,26 +1261,113 @@
           </div>
         </section>
 
-        <section class="panel">
-          <div class="panel-header">
-            <h2>Persona × dimension</h2>
-            <span class="meta">avg score · darker = stronger</span>
-          </div>
-          ${heatRows ? `
-            <div style="overflow-x:auto;">
-              <table class="exec-heatmap">
-                <thead>
-                  <tr>
-                    <th class="row-label">Persona</th>
-                    ${dims.map(d => `<th>${esc(d)}</th>`).join("")}
-                  </tr>
-                </thead>
-                <tbody>${heatRows}</tbody>
-              </table>
-            </div>
-          ` : `<p style="color:var(--text-faint);font-style:italic;">No persona-tagged verdicts in this run.</p>`}
-        </section>
+        ${renderReliability(job, A)}
       </div>
+    `;
+  }
+
+  // Judge provenance — which model/provider actually produced every verdict, read
+  // from the per-juror model tags on the verdict set. This is meaningful in any
+  // environment: it shows whether the primary judge held for the whole run or the
+  // fallback chain silently kicked in (a degraded-run signal). The deterministic
+  // offline ("echo") provider only appears when no live provider was reachable, in
+  // which case it is flagged as a ship-blocking caveat — but in a healthy live run
+  // this panel simply confirms the judging model and single-vs-multi-provider mix.
+  function renderReliability(job, A) {
+    const palette = ["#6c5ce7", "#2f7a5b", "#b8853a", "#4b8fd6", "#7a6cff", "#5a9", "#c98"];
+    const providers = Object.entries(A.providerMix).sort((a, b) => b[1] - a[1]);
+    const jt = Math.max(1, A.jurorTotal);
+    const colorFor = (name, i) => /echo/i.test(name) ? "#b04444" : palette[i % palette.length];
+    const segs = providers.map(([name], i) =>
+      `<span class="seg" style="width:${(A.providerMix[name] / jt) * 100}%;background:${colorFor(name, i)};" title="${esc(name)} · ${A.providerMix[name]}"></span>`
+    ).join("");
+    const legend = providers.map(([name, n], i) =>
+      `<span><span class="swatch" style="background:${colorFor(name, i)};"></span>${esc(name)} <b style="color:var(--text);">${n}</b> <span style="color:var(--text-faint);">· ${pct(n / jt)}</span></span>`
+    ).join("");
+
+    // Top provider (the judge that scored the most cells) and its share.
+    const [topName, topN] = providers[0] || ["—", 0];
+    const topShare = topN / jt;
+    const providerCount = providers.length;
+
+    // Adaptive health read: offline fallback is ship-blocking; a split across
+    // multiple live providers means the primary degraded to fallback mid-run;
+    // a clean single-provider run just notes single-provider bias exposure.
+    let qCls, note;
+    if (A.offlineCount > 0) {
+      qCls = A.offlineRate >= 0.25 ? "crit" : "warn";
+      note = `<b>${A.offlineCount} of ${A.total}</b> verdicts (${pct(A.offlineRate)}) resolved to the <b>deterministic offline judge</b> (echo) — a stub score, not a real judgement, emitted when no live judge provider was reachable. Restore the judge provider and re-run before trusting the affected dimensions.`;
+    } else if (providerCount > 1) {
+      qCls = "warn";
+      note = `Judging spanned <b>${providerCount} providers</b> — <b>${pct(1 - topShare)}</b> of cells were scored by a fallback provider rather than the primary (<code>${esc(topName)}</code>). Expected under load, but confirm the primary was not degraded for the whole window.`;
+    } else {
+      qCls = "ok";
+      note = `All ${A.total} verdicts were scored live by <code>${esc(topName)}</code>. Single-provider run — for compliance-grade sign-off on high-stakes dimensions, consider a diverse jury to remove single-model bias.`;
+    }
+
+    return `
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Judge provenance</h2>
+          <span class="meta">which model scored the run</span>
+        </div>
+        <div class="exec-rel">
+          <div class="stat">
+            <div class="lbl">Scored by</div>
+            <div class="val" style="font-size:17px;line-height:1.3;">${esc(topName)}</div>
+            <div class="sub">${pct(topShare)} of cells · primary judge</div>
+          </div>
+          <div class="stat ${qCls === 'ok' ? '' : qCls}">
+            <div class="lbl">${A.offlineCount > 0 ? "Offline fallback" : "Providers used"}</div>
+            <div class="val">${A.offlineCount > 0 ? A.offlineCount : providerCount}</div>
+            <div class="sub">${A.offlineCount > 0 ? "deterministic (echo)" : (providerCount === 1 ? "single provider" : "incl. fallback")}</div>
+          </div>
+        </div>
+        <div class="exec-provider-bar">${segs || `<span class="seg" style="width:100%;background:var(--surface-alt);"></span>`}</div>
+        <div class="exec-provider-legend">${legend || `<span style="color:var(--text-faint);">No juror model tags recorded.</span>`}</div>
+        <div class="exec-quality-note ${qCls}">${note}</div>
+      </section>
+    `;
+  }
+
+  // Persona × dimension matrix — only meaningful with ≥2 personas (with a single
+  // cohort it just restates the dimension scorecard). Rendered full-width so many
+  // dimensions get room; the inner scroller absorbs the overflow past that.
+  function renderPersonaHeatmap(job, A) {
+    const activePersonas = A.heatmap.filter(r => r.support > 0);
+    if (activePersonas.length < 2) return "";
+
+    const dims = A.dims;
+    const heatRows = activePersonas
+      .sort((a, b) => b.support - a.support)
+      .map(row => {
+        const cells = dims.map(d => {
+          const v = row.cells[d];
+          if (v == null) return `<td class="empty">—</td>`;
+          const cls = classOfScore(v);
+          return `<td class="h-${cls}" title="${esc(row.persona)} × ${esc(d)} → ${v.toFixed(2)}">${v.toFixed(2)}</td>`;
+        }).join("");
+        return `<tr><th class="row-label">${esc(row.persona)} <span style="color:var(--text-faint);font-weight:400;">· ${row.support}</span></th>${cells}</tr>`;
+      }).join("");
+
+    return `
+      <section class="panel" style="margin-top:22px;">
+        <div class="panel-header">
+          <h2>Persona × dimension</h2>
+          <span class="meta">${activePersonas.length} personas × ${dims.length} dimensions · avg score · darker = stronger</span>
+        </div>
+        <div class="exec-heatmap-scroll">
+          <table class="exec-heatmap">
+            <thead>
+              <tr>
+                <th class="row-label">Persona</th>
+                ${dims.map(d => `<th>${esc(d)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>${heatRows}</tbody>
+          </table>
+        </div>
+      </section>
     `;
   }
 
@@ -1145,8 +1437,11 @@
     return juryHtml + failHtml;
   }
 
-  function renderMitigations(job) {
-    const applied = new Set(job.inputs.mitigations || []);
+  function renderMitigations(job, A) {
+    // Source of truth is the verdict set (A.appliedMitigations), which records
+    // what each verdict was actually scored under — the frozen job envelope
+    // frequently omits the mitigation list, which made this panel read "all off".
+    const applied = A.appliedMitigations || new Set(job.inputs.mitigations || []);
     const all = EV.MITIGATIONS;
     const cards = all.map(m => {
       const isOn = applied.has(m.id);
@@ -1193,20 +1488,16 @@
   }
 
   function renderAudit(job, A) {
-    const judges = job.inputs.judge_ids.map(id => `<code>${esc(id)}</code>`).join(" · ");
-    const dimsList = A.dims.map(d => `<code>${esc(d)}</code>`).join(" · ");
     return `
       <div class="exec-audit">
         <b>Audit &amp; reproducibility.</b>
         Job <code>${esc(job.job_id)}</code> · verdict set <code>${esc(job.verdict_set_id ?? "—")}</code> ·
         run <code>${esc(job.inputs.run_ids[0])}</code>${job.inputs.run_ids.length > 1 ? ` (+ ${job.inputs.run_ids.length - 1})` : ""}.<br/>
         Submitted by <b>${esc(job.created_by)}</b> at ${esc(EV.fmtTs(job.created_at))} ·
-        shipped by <b>${esc(job.completed_by ?? "—")}</b> at ${esc(EV.fmtTs(job.completed_at))}.<br/>
+        completed by <b>${esc(job.completed_by ?? "—")}</b> at ${esc(EV.fmtTs(job.completed_at))}.<br/>
         Mode <b>${esc(job.inputs.mode)}</b>${job.inputs.panel_id ? ` · panel <code>${esc(job.inputs.panel_id)}</code> · ` : " · "}aggregation <code>${esc(job.inputs.aggregation ?? "—")}</code>.<br/>
-        Judges: ${judges || "—"}.<br/>
-        Dimensions: ${dimsList || "—"}.<br/>
         Config hash <code style="font-size:10.5px;">${esc(job.config_hash)}</code> ·
-        storage <code>${esc(job.output?.storage_uri ?? "—")}</code>.<br/>
+        verdict set stored at <code>${esc(job.output?.storage_uri ?? job.verdict_set_id ?? "—")}</code>.<br/>
         <span style="color:var(--text-faint);">This report is auto-generated from the immutable verdict set; the same inputs always produce the same numbers.</span>
       </div>
     `;
@@ -1275,9 +1566,10 @@
     body.innerHTML = [
       renderHero(job, A),
       renderNarrativeAndDimensions(job, A),
-      renderHistogramAndHeatmap(job, A),
+      renderDistributionAndReliability(job, A),
+      renderPersonaHeatmap(job, A),
       renderJuryAndFailures(job, A),
-      renderMitigations(job),
+      renderMitigations(job, A),
       renderRecommendations(recs),
       renderAudit(job, A),
     ].join("");
