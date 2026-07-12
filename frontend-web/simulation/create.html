@@ -42,7 +42,7 @@
     <p class="eyebrow"><span class="dot"></span> Create simulation run</p>
     <h1>New simulation run <span class="qualifier">— pick seed set, adapter, knobs</span></h1>
     <p class="subtitle">
-      Pair a shipped Question-Generation seed set with an onboarded adapter, set the run knobs (mode, max-turns, session policy), preview the resolved config, and submit. The fake worker drives the run through queued → warming → running → finalizing → ready.
+      Pair a shipped Question-Generation seed set with an onboarded adapter, set the run knobs (mode, max-turns, session policy), preview the resolved config, and submit. The worker drives the run through queued → running → finalizing → ready.
     </p>
   </section>
 
@@ -131,18 +131,19 @@
 
         <div class="field" style="margin-bottom:20px;">
           <label>Mode</label>
+          <p class="mode-note" id="mode-note"></p>
           <div class="radio-cluster" id="mode-cluster"></div>
         </div>
 
         <div class="row-3" style="margin-bottom:20px;">
           <div class="field">
             <label for="max-turns">Max turns</label>
-            <input class="input mono" id="max-turns" type="number" min="1" max="32" value="8" />
+            <input class="input mono" id="max-turns" type="number" min="1" max="32" value="5" />
             <span class="hint">Hard cap on user+assistant turns per multi-turn conversation.</span>
           </div>
           <div class="field">
             <label for="concurrency">Concurrency</label>
-            <input class="input mono" id="concurrency" type="number" min="1" max="64" value="8" />
+            <input class="input mono" id="concurrency" type="number" min="1" max="64" value="5" />
             <span class="hint">Parallel conversations.</span>
           </div>
           <div class="field">
@@ -220,9 +221,9 @@
     adapter_id: null,
     adapter: null,
     mode: "multi_turn",
-    max_turns: 8,
+    max_turns: 5,
     min_turns: 1,
-    concurrency: 8,
+    concurrency: 5,
     seed: 42,
     session_policy: "per_conversation",
     user_simulator_model: "gpt-4.1",
@@ -233,6 +234,9 @@
     record_token_usage: true,
   };
   let step = 1;
+  // True while the mode was auto-clamped to single-turn by a single-turn target,
+  // so switching back to a conversational target can restore the multi-turn default.
+  let modeForcedSingle = false;
 
   // ---------- Step 1: seed sets ----------
   function renderSeedGrid() {
@@ -344,7 +348,7 @@
         <div class="stats">
           <span>v<b>${a.version}</b></span>
           <span><b>${a.capabilities?.rate_limit_per_min ?? "—"}</b>/min</span>
-          <span>${a.capabilities?.supports_streaming ? "stream ✓" : "stream ✗"}</span>
+          <span>${a.capabilities?.interaction_mode === "single_turn" ? "single-turn" : "multi-turn"}</span>
         </div>
         <div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);letter-spacing:0.04em;margin-top:6px;">${a.adapter_id}</div>
       `;
@@ -352,6 +356,10 @@
         e.preventDefault();
         draft.adapter_id = a.adapter_id;
         draft.adapter = a;
+        // A newly chosen target may change which run modes are legal — repaint
+        // the mode cluster and re-apply the turn/session locks before step 3.
+        renderModeCluster();
+        syncModeConstraints();
         renderAdapterGrid();
         paintSummary();
       });
@@ -360,25 +368,111 @@
   }
 
   // ---------- Step 3: knobs ----------
+  // The chosen adapter's declared interaction type gates the run modes: a
+  // single-turn (stateless) target can only be evaluated single-turn, so the
+  // other modes are locked; a conversational target opens all three.
+  function adapterInteractionMode() {
+    return draft.adapter?.capabilities?.interaction_mode === "single_turn"
+      ? "single_turn" : "multi_turn";
+  }
+
   function renderModeCluster() {
     const host = document.getElementById("mode-cluster");
     host.innerHTML = "";
+    const single = adapterInteractionMode() === "single_turn";
+    if (single) {
+      // Force the run mode into the only legal choice for a single-turn target,
+      // remembering we forced it so a later conversational pick can restore it.
+      draft.mode = "single_turn";
+      modeForcedSingle = true;
+    } else if (modeForcedSingle) {
+      // Back to a conversational target — undo the earlier forced clamp so the
+      // run defaults to multi-turn again instead of staying stuck on single.
+      draft.mode = "multi_turn";
+      modeForcedSingle = false;
+    }
     SIM.MODES.forEach(m => {
+      const locked = single && m.id !== "single_turn";
       const lab = document.createElement("label");
       if (draft.mode === m.id) lab.classList.add("checked");
+      if (locked) lab.classList.add("locked");
       lab.innerHTML = `
-        <input type="radio" name="mode" value="${m.id}" ${draft.mode === m.id ? "checked" : ""}/>
-        <div class="lab"><b>${m.label}</b><small>${m.blurb}</small></div>
+        <input type="radio" name="mode" value="${m.id}" ${draft.mode === m.id ? "checked" : ""} ${locked ? "disabled" : ""}/>
+        <div class="lab"><b>${m.label}</b><small>${locked ? "Needs a conversational (multi-turn) target." : m.blurb}</small></div>
       `;
-      lab.addEventListener("click", () => {
+      if (!locked) lab.addEventListener("click", () => {
         draft.mode = m.id;
+        modeForcedSingle = false; // deliberate choice — don't auto-restore later
         document.querySelectorAll('#mode-cluster label').forEach(l => l.classList.remove("checked"));
         lab.classList.add("checked");
+        syncModeConstraints();
         paintSummary();
       });
       host.appendChild(lab);
     });
+    const note = document.getElementById("mode-note");
+    if (note) {
+      if (!draft.adapter) note.textContent = "";
+      else note.innerHTML = single
+        ? `Target <b>${SIM.escapeHtml(draft.adapter.name)}</b> is a <b>single-turn</b> app — run mode is locked to single-turn.`
+        : `Target <b>${SIM.escapeHtml(draft.adapter.name)}</b> is <b>multi-turn</b> conversational — all run modes available.`;
+    }
   }
+
+  // Reflect a session-policy pick in both the draft and the radio UI.
+  function selectSessionPolicy(id) {
+    draft.session_policy = id;
+    document.querySelectorAll('#session-cluster label').forEach(l => {
+      const input = l.querySelector("input");
+      const on = input && input.value === id;
+      l.classList.toggle("checked", !!on);
+      if (input) input.checked = !!on;
+    });
+  }
+
+  // Mode drives the other knobs:
+  //  - single_turn locks Max turns to 1 (one exchange) and greys out Session
+  //    policy, which is moot when the session resets every question.
+  //  - auto applies a ready-to-ship preset the moment it's picked: cap at 5 turns,
+  //    5 parallel conversations, and a sticky per-conversation session.
+  //  - multi_turn just re-enables both without forcing values.
+  function syncModeConstraints() {
+    const mt = document.getElementById("max-turns");
+    const conc = document.getElementById("concurrency");
+    const hint = mt.parentElement.querySelector(".hint");
+    const single = draft.mode === "single_turn";
+    const auto = draft.mode === "auto";
+    if (single) {
+      if (!mt.disabled) mt.dataset.savedValue = mt.value; // remember multi-turn choice
+      draft.max_turns = 1;
+      mt.value = 1;
+      mt.disabled = true;
+      mt.style.opacity = "0.45";
+      mt.style.cursor = "not-allowed";
+      if (hint) hint.textContent = "Single-turn always runs one exchange (seed + one reply).";
+    } else {
+      if (mt.disabled) {
+        mt.disabled = false;
+        mt.value = mt.dataset.savedValue || 8;
+        draft.max_turns = Number(mt.value);
+      }
+      mt.style.opacity = "";
+      mt.style.cursor = "";
+      if (hint) hint.textContent = "Hard cap on user+assistant turns per multi-turn conversation.";
+    }
+    if (auto) {
+      draft.max_turns = 5; mt.value = 5;
+      draft.concurrency = 5; conc.value = 5;
+      selectSessionPolicy("per_conversation");
+    }
+    document.querySelectorAll('#session-cluster label').forEach(l => {
+      const input = l.querySelector("input");
+      if (input) input.disabled = single;
+      l.style.opacity = single ? "0.45" : "";
+      l.style.pointerEvents = single ? "none" : "";
+    });
+  }
+
   function renderSessionCluster() {
     const host = document.getElementById("session-cluster");
     host.innerHTML = "";
@@ -541,6 +635,7 @@
         id: draft.adapter.adapter_id,
         version: draft.adapter.version,
         transport: draft.adapter.transport,
+        interaction_mode: draft.adapter.capabilities?.interaction_mode || "multi_turn",
         ...(draft.adapter.transport === "rest" && { base_url: draft.adapter.transport_config.base_url }),
         ...(draft.adapter.transport === "mcp"  && { server_url: draft.adapter.transport_config.server_url }),
         ...(draft.adapter.transport === "a2a"  && {
@@ -573,6 +668,7 @@
   renderAdapterGrid();
   renderModeCluster();
   renderSessionCluster();
+  syncModeConstraints();
   paintStepper();
   paintSummary();
 

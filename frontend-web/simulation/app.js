@@ -5,7 +5,7 @@
 //
 // Persists adapters, runs, and traces to localStorage. A fake
 // worker (setTimeout-driven) advances any run in-flight through
-// queued → warming → running → finalizing → ready, while filling
+// queued → running → finalizing → ready, while filling
 // in conversation tiles + per-question traces along the way.
 //
 // Cross-app contract:
@@ -27,16 +27,16 @@ const QGEN_JOBS_KEY     = "aibcore.qgen.jobs.v1";
 // ---------- Reference data --------------------------------------------
 
 const PHASES = [
-  { state: "queued",     num: "00", label: "Queued"     },
-  { state: "warming",    num: "01", label: "Warming"    },
-  { state: "running",    num: "02", label: "Running"    },
-  { state: "finalizing", num: "03", label: "Finalizing" },
-  { state: "ready",      num: "04", label: "Ready"      },
+  { state: "queued",     num: "00", label: "Queued",     desc: "Job accepted and inputs frozen — waiting for a worker to pick it up." },
+  { state: "running",    num: "01", label: "Running",    desc: "Replaying each seed question against the adapter; traces stream in as conversations finish." },
+  { state: "finalizing", num: "02", label: "Finalizing", desc: "Closing adapter sessions and assembling the stop-reason summary." },
+  { state: "ready",      num: "03", label: "Ready",      desc: "Every conversation complete — traces stored and ready to evaluate." },
 ];
 const STATE_ORDER = PHASES.map(p => p.state);
 
 const STOP_REASONS = [
   { id: "goal_met",      label: "Goal met"       },
+  { id: "refused",       label: "Refused"        },
   { id: "max_turns",     label: "Max turns"      },
   { id: "user_gives_up", label: "User gives up"  },
   { id: "adapter_error", label: "Adapter error"  },
@@ -486,8 +486,7 @@ function hashString(s) {
 // ---------- Fake worker (state machine) -------------------------------
 //
 // Tick every TICK_MS:
-//   queued     → warming     (handshake)
-//   warming    → running     (start dispatch)
+//   queued     → running     (start dispatch)
 //   running    → finalizing  (when conversations_done == conversations_total)
 //   finalizing → ready       (terminal success)
 //
@@ -497,8 +496,7 @@ function hashString(s) {
 
 const TICK_MS = 4500;
 const PHASE_ADVANCE = {
-  queued:  "warming",
-  warming: "running",
+  queued:  "running",
 };
 
 function tick() {
@@ -508,7 +506,7 @@ function tick() {
     // Terminal — skip.
     if (run.state === "ready" || run.state === "failed" || run.state === "archived") continue;
 
-    // queued → warming, warming → running (instant on next tick)
+    // queued → running (instant on next tick)
     const nextState = PHASE_ADVANCE[run.state];
     if (nextState) {
       run.state = nextState;
@@ -548,7 +546,7 @@ function tick() {
       run.completed_by = run.events.at(-1)?.by ?? "worker-mock";
       run.completed_at = nowISO();
       // Compute stop_reason_breakdown from emitted traces
-      const breakdown = { goal_met: 0, max_turns: 0, user_gives_up: 0, adapter_error: 0, topic_drift: 0, manual_abort: 0 };
+      const breakdown = { goal_met: 0, refused: 0, max_turns: 0, user_gives_up: 0, adapter_error: 0, topic_drift: 0, manual_abort: 0 };
       for (const t of tracesForRun(run.run_id)) {
         if (breakdown[t.stop_reason] != null) breakdown[t.stop_reason]++;
       }
@@ -591,8 +589,17 @@ function appendSyntheticTrace(run, idx) {
   const replyClass = isAdversarial ? "refusal" : "helpful";
   turns.push(makeTurn(1, "assistant", pickReply(replyClass, q.question_id || `q_${idx}`), { ts: new Date(t0 + 1500).toISOString(), latency_ms: 1500, tokens: { in: 220 + idx * 12, out: 90 + idx * 6 } }));
 
+  // Resolve `auto` per question the way the live engine does (adversarial →
+  // multi-turn, otherwise single) so the offline demo's length and trace label
+  // agree. A single-turn target (stateless task app) clamps to one exchange no
+  // matter what the run asked for — same precedence as the engine.
+  const adapterSingleTurn = run.adapter_snapshot?.interaction_mode === "single_turn";
+  const resolvedMode = adapterSingleTurn
+    ? "single_turn"
+    : (run.inputs.mode === "auto" ? (isAdversarial ? "multi_turn" : "single_turn") : run.inputs.mode);
+
   let stopReason = "goal_met";
-  if (run.inputs.mode !== "single_turn") {
+  if (resolvedMode !== "single_turn") {
     const followups = PERSONA_FOLLOWUPS[personaId] || PERSONA_FOLLOWUPS.persona_novice_nora;
     const turnsToTake = Math.min(run.inputs.max_turns - 1, isAdversarial ? followups.length : 1 + Math.floor(Math.random() * 2));
     for (let i = 0; i < turnsToTake; i++) {
@@ -625,7 +632,7 @@ function appendSyntheticTrace(run, idx) {
     persona: q.persona, prompt_shape: q.prompt_shape, scenario: q.scenario,
     rubric_dimension: q.rubric_dimension, expected_behavior: q.expected_behavior,
     archive_cell: q.archive_cell || null,
-    mode: run.inputs.mode === "auto" ? (isAdversarial ? "multi_turn" : "single_turn") : run.inputs.mode,
+    mode: resolvedMode,
     session_policy: run.inputs.session_policy,
     session_id_used: `ctx_${Math.random().toString(16).slice(2, 10)}`,
     stop_reason: stopReason,
@@ -889,6 +896,7 @@ window.SIM = {
       endpoint: tc.base_url || tc.server_url || tc.agent_card_url || "",
       agent_card_url: tc.agent_card_url || "", skill_id: tc.skill_id || "",
       auth_scheme: (tc.auth && tc.auth.scheme) || "none",
+      interaction_mode: (a.capabilities && a.capabilities.interaction_mode) || "multi_turn",
     };
     EEOF.post("/adapters", { name: a.name, transport: a.transport, config })
       .then(() => hydrate()).catch(() => {});

@@ -210,10 +210,10 @@ const DIMENSIONS = [
 ];
 
 const PHASES = [
-  { state: "queued",            num: "00", label: "Queued" },
-  { state: "running",           num: "01", label: "Running" },
-  { state: "aggregating",       num: "02", label: "Aggregating" },
-  { state: "ready_for_review",  num: "03", label: "Ready for review" },
+  { state: "queued",            num: "00", label: "Queued",           desc: "Verdict request accepted and inputs frozen — waiting for a judge worker." },
+  { state: "running",           num: "01", label: "Running",          desc: "Each juror scores every trace cell; per-cell verdicts stream in as they land." },
+  { state: "aggregating",       num: "02", label: "Aggregating",      desc: "Reconciling juror scores into panel consensus and flagging disagreements." },
+  { state: "ready_for_review",  num: "03", label: "Ready for review", desc: "Verdicts assembled — awaiting a reviewer to sign off and ship." },
 ];
 const STATE_ORDER = PHASES.map(p => p.state).concat(["shipped"]);
 

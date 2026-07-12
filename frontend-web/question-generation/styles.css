@@ -1042,7 +1042,7 @@ table.token-table td .dot {
 }
 .jobs-table th,
 .jobs-table td {
-  text-align: left;
+  text-align: center;
   padding: 0.75rem 1rem;
   vertical-align: middle;
 }
@@ -1069,6 +1069,133 @@ table.token-table td .dot {
   color: var(--text);
   letter-spacing: 0.02em;
 }
+/* Job ID chip — a commit-sha-style token: hairline pill + hash glyph + copy affordance. */
+.job-id-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.3rem 0.22rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2, 8px);
+  background: var(--surface-alt);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.jobs-table tbody tr:hover .job-id-chip { border-color: var(--accent-weak, var(--border)); }
+.job-id-chip__hash {
+  color: var(--text-faint);
+  font-size: 11px;
+  user-select: none;
+}
+.job-id-chip__val {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.job-id-chip__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 120ms ease, transform 120ms ease, background 120ms ease, color 120ms ease;
+}
+.job-id-chip__copy::before {
+  /* two offset rounded rects = a "copy" glyph, drawn in CSS so no icon font is needed */
+  content: "";
+  width: 8px;
+  height: 9px;
+  border: 1.4px solid currentColor;
+  border-radius: 2px;
+  box-shadow: 2px -2px 0 -1.4px var(--surface-alt), 3px -3px 0 -1.4px currentColor;
+}
+.jobs-table tbody tr:hover .job-id-chip__copy,
+.job-id-chip__copy:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+.job-id-chip__copy:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.job-id-chip__copy.is-copied {
+  opacity: 1;
+  transform: scale(1);
+  color: var(--accent);
+}
+.job-id-chip__copy.is-copied::before {
+  /* swap the copy glyph for a check on success */
+  width: 4px;
+  height: 8px;
+  border: solid currentColor;
+  border-width: 0 1.6px 1.6px 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: translateY(-1px) rotate(45deg);
+}
+
+/* Automated-agent tag — marks a job finished by the async stage worker
+   (not a person), so "Completed by" reads honestly and distinctly. */
+.jobs-table .agent-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.16rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-alt);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.jobs-table .agent-tag__gear {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-faint);
+}
+
+/* Job ID as an eyebrow token on the detail page — mono, muted, click-to-copy. */
+.job-id-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.5rem;
+  padding: 0.14rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2, 8px);
+  background: var(--surface-alt);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.job-id-eyebrow:hover {
+  color: var(--text);
+  border-color: var(--accent-weak, var(--border));
+}
+.job-id-eyebrow.is-copied {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.job-id-eyebrow .job-id-chip__hash { color: var(--text-faint); }
 .jobs-table .ts {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1077,13 +1204,14 @@ table.token-table td .dot {
 .jobs-table .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: center;
 }
 .jobs-table .progress-cell {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 .jobs-table .progress-cell .progress-bar {
   display: block;
@@ -1091,7 +1219,7 @@ table.token-table td .dot {
   height: 4px;
   background: var(--surface-alt);
   border-radius: 2px;
-  margin-top: 4px;
+  margin: 4px auto 0;
   overflow: hidden;
 }
 .jobs-table .progress-cell .progress-bar i {
@@ -1170,6 +1298,8 @@ table.token-table td .dot {
 }
 .progress-strip .phase {
   position: relative;
+  display: flex;
+  flex-direction: column;
   padding: 14px 14px 12px;
   border-radius: var(--r-2);
   border: 1px solid var(--border);
@@ -1191,8 +1321,19 @@ table.token-table td .dot {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.progress-strip .phase .desc {
+  margin-top: 6px;
+  font-family: var(--font-body, inherit);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
 .progress-strip .phase .meta {
-  margin-top: 4px;
+  margin-top: auto;
+  padding-top: 8px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
@@ -1495,6 +1636,10 @@ table.token-table td .dot {
   box-shadow: 0 1px 3px var(--shadow);
 }
 .panel + .panel { margin-top: 22px; }
+/* Keep the panel rhythm consistent when a stat row sits between panels: reset the
+   intra-row margin and give a panel that follows a row the same vertical gap. */
+.row-2 > .panel + .panel, .row-3 > .panel + .panel { margin-top: 0; }
+.row-2 + .panel, .row-3 + .panel { margin-top: 22px; }
 .panel-header {
   display: flex; align-items: baseline; justify-content: space-between;
   margin-bottom: 18px;

@@ -271,3 +271,85 @@ async def test_multiturn_followup_is_grounded_in_history():
     assert sim_calls, "the user simulator was never invoked for a follow-up"
     assert all(n > 1 for n in sim_calls)  # more than just the opening prompt
     assert sim_calls == sorted(sim_calls)  # history grows across turns
+
+
+@pytest.mark.asyncio
+async def test_mode_controls_conversation_length():
+    """`mode` decides how long a conversation runs: single_turn is always one
+    exchange (ignoring max_turns), auto resolves per question from its shape."""
+    from eeof_core.models import PersonaRef, Question
+    from simulation_svc.sim import resolve_mode, simulate_conversation
+
+    class Provider:
+        name = "p"
+
+        async def chat(self, *, system, messages, max_tokens=1024, temperature=0.7):
+            return "reply"
+
+    def q(**kw) -> Question:
+        return Question(
+            id="q", seed_set_id="ss", prompt="hi",
+            persona=PersonaRef(id="p", version="1.0.0", name="N"),
+            **kw,
+        )
+
+    plain = q(shape="ambiguate", scenario="short.chat.easy", rubric="helpfulness")
+    adversarial = q(shape="adversify", scenario="short.chat.easy", rubric="safety")
+
+    # single_turn is one exchange even when max_turns says otherwise.
+    single = await simulate_conversation(plain, {}, Provider(), max_turns=5, mode="single_turn")
+    assert [t.role for t in single] == ["user", "agent"]
+
+    # auto: a plain answer-style question stays single-turn…
+    auto_plain = await simulate_conversation(plain, {}, Provider(), max_turns=5, mode="auto")
+    assert [t.role for t in auto_plain] == ["user", "agent"]
+
+    # …while an adversarial question runs the full multi-turn cap.
+    auto_adv = await simulate_conversation(adversarial, {}, Provider(), max_turns=3, mode="auto")
+    assert len(auto_adv) == 6  # 3 exchanges
+
+    # resolve_mode passes concrete modes through and only resolves "auto".
+    assert resolve_mode("multi_turn", plain) == "multi_turn"
+    assert resolve_mode("auto", plain) == "single_turn"
+    assert resolve_mode("auto", adversarial) == "multi_turn"
+
+
+@pytest.mark.asyncio
+async def test_single_turn_adapter_clamps_run_mode():
+    """A target onboarded as single_turn (stateless task app) runs one exchange
+    even when the run requested multi-turn or auto against an adversarial
+    question — there is no session to carry a conversation."""
+    from eeof_core.models import PersonaRef, Question
+    from simulation_svc.sim import resolve_mode, simulate_conversation
+
+    class Provider:
+        name = "p"
+
+        async def chat(self, *, system, messages, max_tokens=1024, temperature=0.7):
+            return "reply"
+
+    adversarial = Question(
+        id="q", seed_set_id="ss", prompt="hi",
+        persona=PersonaRef(id="p", version="1.0.0", name="N"),
+        shape="adversify", scenario="short.chat.hard", rubric="safety",
+    )
+    single_turn_adapter = {"capabilities": {"interaction_mode": "single_turn"}}
+    multi_turn_adapter = {"capabilities": {"interaction_mode": "multi_turn"}}
+
+    # Multi-turn asked, but a single_turn adapter clamps to one exchange…
+    clamped = await simulate_conversation(
+        adversarial, single_turn_adapter, Provider(), max_turns=6, mode="multi_turn"
+    )
+    assert [t.role for t in clamped] == ["user", "agent"]
+
+    # …while the same question against a conversational adapter runs the cap.
+    full = await simulate_conversation(
+        adversarial, multi_turn_adapter, Provider(), max_turns=6, mode="multi_turn"
+    )
+    assert len(full) == 12  # 6 exchanges
+
+    # resolve_mode reflects the clamp for the trace stamp, and defaults
+    # conversational when the adapter doesn't declare a type.
+    assert resolve_mode("auto", adversarial, single_turn_adapter) == "single_turn"
+    assert resolve_mode("auto", adversarial, multi_turn_adapter) == "multi_turn"
+    assert resolve_mode("auto", adversarial, {}) == "multi_turn"

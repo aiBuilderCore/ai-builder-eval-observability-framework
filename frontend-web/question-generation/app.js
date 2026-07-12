@@ -39,11 +39,11 @@ const STRATEGIES = [
 ];
 
 const PHASES = [
-  { state: "queued",            num: "00", label: "Queued" },
-  { state: "running",           num: "01", label: "Running" },
-  { state: "evolving",          num: "02", label: "Evolving" },
-  { state: "filtering",         num: "03", label: "Filtering" },
-  { state: "ready_for_review",  num: "04", label: "Ready for review" },
+  { state: "queued",            num: "00", label: "Queued",           desc: "Generation request accepted and inputs frozen — waiting for a worker." },
+  { state: "running",           num: "01", label: "Running",          desc: "Drafting seed questions for each persona × shape cell from the rubrics." },
+  { state: "evolving",          num: "02", label: "Evolving",         desc: "Applying evolution passes to deepen and diversify the drafted questions." },
+  { state: "filtering",         num: "03", label: "Filtering",        desc: "Dropping duplicates and off-rubric items, keeping only questions that pass quality gates." },
+  { state: "ready_for_review",  num: "04", label: "Ready for review", desc: "Seed set assembled — awaiting a reviewer to sign off and ship." },
 ];
 const STATE_ORDER = PHASES.map(p => p.state).concat(["shipped"]);
 
@@ -545,12 +545,25 @@ window.QG = {
         ? ai.prompt_shapes
         : (ai.shapes || []).map((s) => SHAPE_TO_UI[s] || s),
     };
+    // Completion actor + time come from the real audit trail: the terminal
+    // (ready/shipped) transition in j.events carries { ts, by }. Async stages are
+    // finished by the background worker, so surface it as the stage worker
+    // (e.g. "qgen-worker") rather than a hardcoded, person-looking "worker".
+    const evts = Array.isArray(j.events) ? j.events : [];
+    const terminalEv = [...evts].reverse().find(
+      (e) => ["ready", "shipped", "completed", "done"].includes(e.state));
+    const completedActor = shipped ? (terminalEv?.by || "worker") : null;
+    const isAgentActor = completedActor != null && /worker|system|agent/i.test(completedActor);
+    const completedLabel = completedActor
+      ? (isAgentActor ? `${j.stage || "qgen"}-worker` : completedActor)
+      : null;
     return {
       job_id: j.job_id,
       seed_set_id: r.seed_set_id || null,
       created_by: j.submitted_by, created_at: j.submitted_at,
-      completed_at: shipped ? j.updated_at : null,
-      completed_by: shipped ? "worker" : null,
+      completed_at: shipped ? (terminalEv?.ts || j.updated_at) : null,
+      completed_by: completedLabel,
+      completed_by_kind: completedActor ? (isAgentActor ? "agent" : "user") : null,
       config_hash: j.config_hash, inputs: uiInputs,
       state: uiState,
       progress: {

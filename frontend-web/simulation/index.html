@@ -111,6 +111,13 @@
 <script>
   const state = { search: "", filterState: null };
 
+  // Truncate long ULID run ids to a short head for display (run_01KX9…); the
+  // full id stays in the chip tooltip and on the copy button.
+  function shortRunId(id) {
+    if (!id) return "";
+    return id.length <= 10 ? id : `${id.slice(0, 9)}…`;
+  }
+
   function render() {
     const all = SIM.loadRuns();
     const adapters = SIM.loadAdapters();
@@ -118,7 +125,7 @@
     // pill counts
     const counts = {
       total: all.length,
-      active: all.filter(r => ["queued", "warming", "running", "finalizing"].includes(r.state)).length,
+      active: all.filter(r => ["queued", "running", "finalizing"].includes(r.state)).length,
       ready: all.filter(r => r.state === "ready").length,
       adapters: adapters.length,
     };
@@ -149,7 +156,7 @@
     const q = state.search.trim().toLowerCase();
     const filtered = all.filter(r => {
       if (state.filterState === "_active") {
-        if (!["queued", "warming", "running", "finalizing"].includes(r.state)) return false;
+        if (!["queued", "running", "finalizing"].includes(r.state)) return false;
       } else if (state.filterState && r.state !== state.filterState) {
         return false;
       }
@@ -198,7 +205,7 @@
       const adapterLabel = adapter.display_name || adapter.config?.display_name || adapter.name || adapter.id || "—";
 
       tr.innerHTML = `
-        <td><span class="id">${r.run_id}</span></td>
+        <td><span class="job-id-chip" title="${r.run_id}"><span class="job-id-chip__hash" aria-hidden="true">⌗</span><span class="job-id-chip__val">${shortRunId(r.run_id)}</span><button class="job-id-chip__copy" type="button" data-copy="${r.run_id}" title="Copy run ID" aria-label="Copy run ID"></button></span></td>
         <td>${r.created_by}</td>
         <td><span class="ts">${SIM.fmtTsShort(r.created_at)}</span></td>
         <td>
@@ -249,6 +256,20 @@
   document.getElementById("search").addEventListener("input", (e) => {
     state.search = e.target.value;
     render();
+  });
+
+  // Copy run ID from its chip without triggering the row navigation.
+  document.getElementById("rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest(".job-id-chip__copy");
+    if (!btn) return;
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(btn.dataset.copy);
+      btn.classList.add("is-copied");
+      setTimeout(() => btn.classList.remove("is-copied"), 1200);
+      SIM.toast?.(`Copied ${btn.dataset.copy}`, "Simulation");
+    } catch { /* clipboard unavailable — no-op */ }
   });
 
   render();

@@ -16,14 +16,14 @@ from .models.common import Principal
 
 def principal_from_bearer(authorization: str | None) -> Principal:
     # Dev auth: presence of a token is enough; real auth verifies + maps claims.
-    subject = "alex@acme"
+    subject = "nitin@acme"
     return Principal(subject=subject, tenant=settings.dev_tenant, workspace=settings.dev_workspace)
 
 
 def principal_from_headers(headers: Mapping[str, str]) -> Principal:
     get = lambda k, d: headers.get(k) or headers.get(k.title()) or d  # noqa: E731
     return Principal(
-        subject=get("x-subject", "alex@acme"),
+        subject=get("x-subject", "nitin@acme"),
         tenant=get("x-tenant", settings.dev_tenant),
         workspace=get("x-workspace", settings.dev_workspace),
     )

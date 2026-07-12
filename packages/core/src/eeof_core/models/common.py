@@ -20,7 +20,7 @@ def iso(dt: datetime | None = None) -> str:
 class Principal(BaseModel):
     """Resolved from the bearer token by the orchestrator; never client-supplied."""
 
-    subject: str = "alex@acme"
+    subject: str = "nitin@acme"
     tenant: str
     workspace: str
 
@@ -62,7 +62,7 @@ class Job(BaseModel):
     # running → ready/failed). Appended by the edge on submit and the worker on
     # each state change so every stage's job page can render a real timeline.
     events: list[dict[str, Any]] = Field(default_factory=list)
-    submitted_by: str = "alex@acme"
+    submitted_by: str = "nitin@acme"
     submitted_at: str = Field(default_factory=iso)
     updated_at: str = Field(default_factory=iso)
 
