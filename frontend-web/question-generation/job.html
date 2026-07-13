@@ -166,9 +166,15 @@
     const isActive  = ["queued","running","evolving","filtering"].includes(job.state);
 
     // ----- Page head -----
+    // The semantic label (rubric · strategies) is the title; the job id rides in
+    // the eyebrow as a mono token so it identifies without shouting.
+    const titleRubric = headRubricLabel.charAt(0).toUpperCase() + headRubricLabel.slice(1);
+    const titleStrats = strats.map(s => s.name).join(" · ");
     document.getElementById("head").innerHTML = `
-      <p class="eyebrow"><span class="dot"></span> Job</p>
-      <h1>${job.job_id} <span class="qualifier">— ${headRubricLabel} · ${strats.map(s => s.name).join(" · ") || "—"}</span></h1>
+      <p class="eyebrow"><span class="dot"></span> Job
+        <button class="job-id-eyebrow" type="button" data-copy="${job.job_id}" title="Copy job ID" aria-label="Copy job ID"><span class="job-id-chip__hash" aria-hidden="true">⌗</span>${job.job_id}</button>
+      </p>
+      <h1>${titleRubric}${titleStrats ? ` <span class="qualifier">· ${titleStrats}</span>` : ""}</h1>
       <p class="subtitle">
         Submitted by <b>${job.created_by}</b> at ${QG.fmtTs(job.created_at)}.
         ${job.completed_at ? `Completed by <b>${job.completed_by}</b> at ${QG.fmtTs(job.completed_at)}.` : ""}
@@ -182,6 +188,17 @@
         ${isReady ? '<button class="btn primary" id="ship" style="margin-left:auto;">Ship seed set →</button>' : ""}
       </div>
     `;
+
+    const idBtn = document.querySelector(".job-id-eyebrow");
+    if (idBtn) idBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(idBtn.dataset.copy);
+        idBtn.classList.add("is-copied");
+        setTimeout(() => idBtn.classList.remove("is-copied"), 1200);
+        QG.toast?.(`Copied ${idBtn.dataset.copy}`, "Question Generation");
+      } catch { /* clipboard unavailable — no-op */ }
+    });
+
     if (isReady) {
       document.getElementById("ship").onclick = async () => {
         const ok = await QG.confirmModal({
@@ -212,10 +229,10 @@
         p.state === "queued"    ? "" :
         p.state === "ready_for_review" ? (isShipped ? "shipped" : (isReady ? "awaiting ship" : "")) :
         "";
-      return `<div class="phase ${cls}"><div class="num">${p.num}</div><div class="label">${p.label}</div>${meta ? `<div class="meta">${meta}</div>` : ""}</div>`;
+      return `<div class="phase ${cls}"><div class="num">${p.num}</div><div class="label">${p.label}</div>${p.desc ? `<div class="desc">${p.desc}</div>` : ""}${meta ? `<div class="meta">${meta}</div>` : ""}</div>`;
     }).join("");
     if (isFailed) {
-      strip.insertAdjacentHTML("beforeend", `<div class="phase failed"><div class="num">--</div><div class="label">Failed</div></div>`);
+      strip.insertAdjacentHTML("beforeend", `<div class="phase failed"><div class="num">--</div><div class="label">Failed</div><div class="desc">The worker stopped before producing a seed set — see the timeline below.</div></div>`);
     }
 
     // ----- Inputs panel -----
@@ -298,7 +315,12 @@
     // ----- Audit timeline -----
     document.getElementById("timeline").innerHTML = job.events.map((e, i) => {
       const isLast = i === job.events.length - 1;
-      return `<li class="${isLast ? "" : "done"}"><b>${QG.phaseLabel(e.state) || e.state}</b> · ${QG.fmtTs(e.ts)} <span class="who">· by ${e.by}</span></li>`;
+      // phaseLabel returns the raw state for terminal states (ready/shipped)
+      // that aren't in PHASES; capitalize so the trail reads consistently
+      // (Queued · Running · Ready) instead of a lowercase straggler.
+      const mapped = QG.phaseLabel(e.state);
+      const label = mapped !== e.state ? mapped : e.state.charAt(0).toUpperCase() + e.state.slice(1);
+      return `<li class="${isLast ? "" : "done"}"><b>${label}</b> · ${QG.fmtTs(e.ts)} <span class="who">· by ${e.by}</span></li>`;
     }).join("");
   }
 

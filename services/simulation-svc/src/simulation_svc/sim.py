@@ -12,6 +12,16 @@ whole conversation so far plus the persona's goal and edge-case, so every
 follow-up is a genuine reaction to what the agent just said — pushing on anything
 unresolved rather than restating the opener. The first user message is always the
 verbatim seed prompt; `max_turns == 1` is a single exchange (seed + one reply).
+
+`mode` selects how long a conversation runs:
+  - ``single_turn`` — exactly one exchange, whatever ``max_turns`` says.
+  - ``multi_turn``  — up to ``max_turns`` exchanges.
+  - ``auto``        — decided per question: adversarial/hard questions run
+    multi-turn (up to ``max_turns``), simple answer-style questions run single.
+
+The adapter's declared interaction type overrides all of the above: a target
+onboarded as ``single_turn`` (a stateless task app) is always replayed as one
+exchange, since it holds no session for a conversation to build on.
 """
 
 from __future__ import annotations
@@ -19,6 +29,57 @@ from __future__ import annotations
 from eeof_core.models import Question, Turn
 
 from .adapters import agent_reply
+
+
+def _auto_prefers_multi_turn(question: Question) -> bool:
+    """Auto mode: infer per-question whether follow-up pressure is worthwhile.
+
+    Adversarial shapes and hard scenarios reward pushing the agent across
+    several turns; a simple answer-style question resolves in one exchange. This
+    reads only frozen question fields, so it stays deterministic for a run.
+    """
+    if getattr(question, "shape", "") == "adversify":
+        return True
+    if str(getattr(question, "scenario", "")).endswith(".hard"):
+        return True
+    return getattr(question, "rubric", "") == "safety"
+
+
+def adapter_interaction_mode(adapter_snapshot: dict | None) -> str:
+    """The target application's declared interaction type.
+
+    Set at onboarding on ``capabilities.interaction_mode``. A ``single_turn``
+    target is a stateless task app (one prompt → one answer, no session), so it
+    can only ever be replayed single-turn no matter what the run asked for.
+    Anything unset or unrecognised defaults to ``multi_turn`` (conversational).
+    """
+    caps = (adapter_snapshot or {}).get("capabilities", {}) or {}
+    im = caps.get("interaction_mode")
+    return im if im in ("single_turn", "multi_turn") else "multi_turn"
+
+
+def resolve_mode(mode: str, question: Question, adapter_snapshot: dict | None = None) -> str:
+    """Resolve ``auto`` to the concrete per-question mode; pass others through.
+
+    The adapter's declared interaction type takes precedence: a ``single_turn``
+    target clamps every run to a single exchange regardless of the requested
+    mode, because there is no session to carry a conversation.
+
+    Callers use this both to size the conversation and to stamp the *effective*
+    mode onto the trace, so ``auto`` runs are recorded as what they actually did.
+    """
+    if adapter_interaction_mode(adapter_snapshot) == "single_turn":
+        return "single_turn"
+    if mode == "auto":
+        return "multi_turn" if _auto_prefers_multi_turn(question) else "single_turn"
+    return mode
+
+
+def _effective_exchanges(mode: str, max_turns: int) -> int:
+    """Number of user→agent exchanges for a resolved (non-auto) mode."""
+    if mode == "single_turn":
+        return 1
+    return max(1, int(max_turns))
 
 # The simulator sees the full running transcript as chat history; this system
 # prompt tells it to react to that history in character.
@@ -48,7 +109,11 @@ def _persona_field(persona, *names: str, default: str = "") -> str:
 
 
 async def simulate_conversation(
-    question: Question, adapter_snapshot: dict, provider, max_turns: int = 12
+    question: Question,
+    adapter_snapshot: dict,
+    provider,
+    max_turns: int = 12,
+    mode: str = "multi_turn",
 ) -> list[Turn]:
     persona = question.persona
     tone = persona.tone or "casual"
@@ -63,7 +128,7 @@ async def simulate_conversation(
     )
 
     turns: list[Turn] = []
-    exchanges = max(1, int(max_turns))
+    exchanges = _effective_exchanges(resolve_mode(mode, question, adapter_snapshot), max_turns)
     for i in range(exchanges):
         # Open the exchange with a user message: the verbatim seed prompt on the
         # first turn, a history-grounded follow-up thereafter.

@@ -203,6 +203,13 @@
 <script>
   const state = { search: "", filterState: null };
 
+  // Truncate long ULID job ids to a short head for display (job_01KX9…); the
+  // full id stays in the chip tooltip and on the copy button.
+  function shortJobId(id) {
+    if (!id) return "";
+    return id.length <= 10 ? id : `${id.slice(0, 9)}…`;
+  }
+
   function aggregateThumbnail(scores) {
     if (!scores || Object.keys(scores).length === 0) return "—";
     const parts = Object.entries(scores).slice(0, 2).map(([k, v]) => {
@@ -223,7 +230,7 @@
     if (judgeIds.length > max) {
       shown.push(`<span style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);">+${judgeIds.length - max}</span>`);
     }
-    return `<div style="display:flex;gap:4px;flex-wrap:wrap;">${shown.join("")}</div>`;
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;align-items:center;">${shown.join("")}</div>`;
   }
 
   function render() {
@@ -291,10 +298,9 @@
       const bar = j.state === "failed" ? "" :
         `<span class="progress-bar"><i style="width:${pct}%"></i></span>`;
 
-      const runList = (j.inputs.run_ids || []).join(" · ");
       const idCell = `
-        <span class="id">${j.job_id}</span>
-        <span class="row-meta">${runList}${runList ? " · " : ""}${j.created_by}</span>
+        <span class="job-id-chip" title="${j.job_id}"><span class="job-id-chip__hash" aria-hidden="true">⌗</span><span class="job-id-chip__val">${shortJobId(j.job_id)}</span><button class="job-id-chip__copy" type="button" data-copy="${j.job_id}" title="Copy job ID" aria-label="Copy job ID"></button></span>
+        <span class="row-meta">${j.created_by}</span>
       `;
 
       const modePill = j.inputs.mode === "jury"
@@ -323,6 +329,20 @@
   document.getElementById("search").addEventListener("input", (e) => {
     state.search = e.target.value;
     render();
+  });
+
+  // Copy job ID from its chip without triggering the row navigation.
+  document.getElementById("rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest(".job-id-chip__copy");
+    if (!btn) return;
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(btn.dataset.copy);
+      btn.classList.add("is-copied");
+      setTimeout(() => btn.classList.remove("is-copied"), 1200);
+      EV.toast?.(`Copied ${btn.dataset.copy}`, "Evaluation");
+    } catch { /* clipboard unavailable — no-op */ }
   });
 
   render();

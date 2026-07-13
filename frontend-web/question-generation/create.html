@@ -107,6 +107,10 @@
         <div class="form-section" style="border-top:0;padding-top:0;">
           <h2><span class="num">01</span> Pick personas</h2>
           <p class="sub">Each persona is a frozen perspective the LLM conditions on. Multi-select. Each selection becomes one row of the (persona × strategy × scenario) generation grid.</p>
+          <div class="pick-actions" id="persona-actions" style="display:none;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;">
+            <span id="persona-count" style="font-size:12px;color:var(--text-muted);"></span>
+            <button type="button" class="btn subtle" id="persona-select-all">Select all</button>
+          </div>
           <div class="pick-grid" id="persona-pick"></div>
         </div>
       </section>
@@ -453,13 +457,34 @@
          <p style="margin:0;color:var(--text-muted);">${msg}</p>
        </div>`;
   }
+  const personaActions = document.getElementById("persona-actions");
+  const personaSelectAll = document.getElementById("persona-select-all");
+  const personaCount = document.getElementById("persona-count");
+
+  // Repaint every card's checked state from draft.personas and sync the
+  // select-all control (label flips to "Clear all" when everything is picked).
+  function syncPersonaChecks() {
+    personaHost.querySelectorAll("label[data-id]").forEach(lab => {
+      const on = draft.personas.includes(lab.dataset.id);
+      lab.classList.toggle("checked", on);
+      const box = lab.querySelector("input");
+      if (box) box.checked = on;
+    });
+    const total = QG.PERSONAS.length;
+    const allOn = total > 0 && total === draft.personas.length;
+    if (personaSelectAll) personaSelectAll.textContent = allOn ? "Clear all" : "Select all";
+    if (personaCount) personaCount.textContent = `${draft.personas.length} of ${total} selected`;
+  }
+
   function buildPersonaPicker() {
     // Never paint stale/mock personas: if the live list hasn't arrived (or the
     // fetch failed), show an honest notice instead of the seed identities.
     if (!QG.PERSONAS.length) {
       personaNotice("No personas available from the backend. Refresh, or create one in Persona Lab.");
+      if (personaActions) personaActions.style.display = "none";
       return;
     }
+    if (personaActions) personaActions.style.display = "flex";
     personaHost.innerHTML = "";
     QG.PERSONAS.forEach(p => {
       const lab = document.createElement("label");
@@ -475,8 +500,7 @@
         e.preventDefault();
         const idx = draft.personas.indexOf(p.id);
         if (idx >= 0) draft.personas.splice(idx, 1); else draft.personas.push(p.id);
-        lab.classList.toggle("checked");
-        lab.querySelector("input").checked = draft.personas.includes(p.id);
+        syncPersonaChecks();
         paintRubric();
         reapplyShapes();
         reapplyScenarios();
@@ -484,6 +508,19 @@
       };
       personaHost.appendChild(lab);
     });
+    syncPersonaChecks();
+  }
+
+  if (personaSelectAll) {
+    personaSelectAll.onclick = () => {
+      const allOn = QG.PERSONAS.length > 0 && QG.PERSONAS.length === draft.personas.length;
+      draft.personas = allOn ? [] : QG.PERSONAS.map(p => p.id);
+      syncPersonaChecks();
+      paintRubric();
+      reapplyShapes();
+      reapplyScenarios();
+      renderSummary();
+    };
   }
   // Live mode: don't paint anything until the first hydrate resolves, so the
   // picker only ever shows real backend personas — no seed/mock flash, and no

@@ -111,6 +111,13 @@
 <script>
   const state = { search: "", filterState: null };
 
+  // Truncate long ULID run ids to a short head for display (run_01KX9…); the
+  // full id stays in the chip tooltip and on the copy button.
+  function shortRunId(id) {
+    if (!id) return "";
+    return id.length <= 10 ? id : `${id.slice(0, 9)}…`;
+  }
+
   function render() {
     const all = SIM.loadRuns();
     const adapters = SIM.loadAdapters();
@@ -118,7 +125,7 @@
     // pill counts
     const counts = {
       total: all.length,
-      active: all.filter(r => ["queued", "warming", "running", "finalizing"].includes(r.state)).length,
+      active: all.filter(r => ["queued", "running", "finalizing"].includes(r.state)).length,
       ready: all.filter(r => r.state === "ready").length,
       adapters: adapters.length,
     };
@@ -149,7 +156,7 @@
     const q = state.search.trim().toLowerCase();
     const filtered = all.filter(r => {
       if (state.filterState === "_active") {
-        if (!["queued", "warming", "running", "finalizing"].includes(r.state)) return false;
+        if (!["queued", "running", "finalizing"].includes(r.state)) return false;
       } else if (state.filterState && r.state !== state.filterState) {
         return false;
       }
@@ -198,7 +205,7 @@
       const adapterLabel = adapter.display_name || adapter.config?.display_name || adapter.name || adapter.id || "—";
 
       tr.innerHTML = `
-        <td><span class="id">${r.run_id}</span></td>
+        <td><span class="job-id-chip" title="${r.run_id}"><span class="job-id-chip__hash" aria-hidden="true">⌗</span><span class="job-id-chip__val">${shortRunId(r.run_id)}</span><button class="job-id-chip__copy" type="button" data-copy="${r.run_id}" title="Copy run ID" aria-label="Copy run ID"></button></span></td>
         <td>${r.created_by}</td>
         <td><span class="ts">${SIM.fmtTsShort(r.created_at)}</span></td>
         <td>
@@ -225,11 +232,16 @@
         card.className = "adapter-card";
         const url = a.transport_config?.base_url || a.transport_config?.server_url || a.transport_config?.agent_card_url || "—";
         const smoke = a.smoke_test?.passed ? `<span class="transport-pill" style="color:var(--stop-goal);background:var(--stop-goal-bg);border-color:transparent;">smoke ✓</span>` : `<span class="transport-pill" style="color:var(--stop-err);background:var(--stop-err-bg);border-color:transparent;">smoke ✗</span>`;
+        const singleTurn = a.capabilities?.interaction_mode === "single_turn";
+        const turnLabel = singleTurn ? "single-turn" : "multi-turn";
         card.innerHTML = `
           <div class="head">
             <div class="name">${SIM.escapeHtml(a.name)}</div>
-            <span class="transport-pill ${a.transport}">${a.transport}</span>
           </div>
+          <span class="pill-group">
+            <span class="turn-pill ${singleTurn ? "single" : "multi"}" title="Application type">${turnLabel}</span>
+            <span class="transport-pill ${a.transport}">${a.transport}</span>
+          </span>
           <div class="url">${SIM.escapeHtml(url)}</div>
           <div class="stats">
             <span>v<b>${a.version}</b></span>
@@ -249,6 +261,20 @@
   document.getElementById("search").addEventListener("input", (e) => {
     state.search = e.target.value;
     render();
+  });
+
+  // Copy run ID from its chip without triggering the row navigation.
+  document.getElementById("rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest(".job-id-chip__copy");
+    if (!btn) return;
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(btn.dataset.copy);
+      btn.classList.add("is-copied");
+      setTimeout(() => btn.classList.remove("is-copied"), 1200);
+      SIM.toast?.(`Copied ${btn.dataset.copy}`, "Simulation");
+    } catch { /* clipboard unavailable — no-op */ }
   });
 
   render();

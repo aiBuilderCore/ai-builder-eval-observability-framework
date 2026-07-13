@@ -38,7 +38,10 @@
   // Logged-in operator — synthetic demo identity, not a persona and not real
   // customer data. Shown in the sidebar user block. Nitin is the workspace admin:
   // the only role allowed to register teams and onboard members (see settings).
-  var USER = { name: 'Nitin K', role: 'Workspace Admin', tenant: 'acme-corp', initials: 'NK', admin: true };
+  // These are only defaults for offline/static preview — when the edge is live,
+  // hydrateUser() overwrites them from GET /me so the sidebar identity and every
+  // job's submitted_by come from one backend source (nitin@acme).
+  var USER = { name: 'Nitin K', email: 'nitin@acme', role: 'Workspace Admin', tenant: 'acme-corp', initials: 'NK', admin: true };
 
   // Compact inline icons (16×16 stroke). One per stage + settings.
   var ICON = {
@@ -224,7 +227,7 @@
     '  display: flex; align-items: center; gap: 0.6rem;',
     '  padding: 0.5rem 0.7rem; margin: 1px 0;',
     '  color: var(--text-muted); text-decoration: none;',
-    '  border-radius: 8px; font-size: 13.5px; font-weight: 500;',
+    '  border-radius: 8px; font-size: 13.5px; font-weight: 500; line-height: 1.25;',
     '  transition: color 150ms ease, background-color 150ms ease;',
     '}',
     '.aibc-nav-link:hover { color: var(--text); background: var(--surface-alt); }',
@@ -442,12 +445,12 @@
     var links = [navLink(SECTION_LANDING, 'dashboard', 'Dashboard', !activeSub)];
     SUB_APPS.forEach(function (s) {
       var url = new URL(s.slug + '/index.html', sectionUrl).href;
-      links.push(navLink(url, s.slug, s.label, s.slug === activeSub && !isCatalog));
-      // Judge Catalogue sits directly under Evaluation — the sync judge registry.
+      // Judge Catalogue sits directly above Evaluation — the sync judge registry.
       if (s.slug === 'evaluation') {
         var catUrl = new URL('evaluation/catalog.html', sectionUrl).href;
         links.push(navLink(catUrl, 'judges', 'Judge Catalogue', isCatalog));
       }
+      links.push(navLink(url, s.slug, s.label, s.slug === activeSub && !isCatalog));
     });
     var scroll = '<div class="aibc-sidebar__scroll">' + links.join('\n') + '</div>';
 
@@ -457,9 +460,9 @@
       '  <button type="button" class="aibc-user" title="Account (demo)">',
       '    <span class="aibc-user__avatar" aria-hidden="true">' + escapeHtml(USER.initials) + '</span>',
       '    <span class="aibc-user__meta">',
-      '      <span class="aibc-user__name">' + escapeHtml(USER.name) +
+      '      <span class="aibc-user__name"><span class="aibc-user__nametext">' + escapeHtml(USER.name) + '</span>' +
       (USER.admin ? ' <span class="aibc-user__badge">admin</span>' : '') + '</span>',
-      '      <span class="aibc-user__sub">' + escapeHtml(USER.role + ' · ' + USER.tenant) + '</span>',
+      '      <span class="aibc-user__sub" title="' + escapeHtml(USER.email) + '">' + escapeHtml(USER.email) + '</span>',
       '    </span>',
       '    <span class="aibc-user__caret" aria-hidden="true">▾</span>',
       '  </button>',
@@ -595,6 +598,29 @@
     wireThemeToggle();
     wireWorkspaceSwitcher();
     hydrateSpend();
+    hydrateUser();
+  }
+
+  // Replace the default sidebar identity with the resolved principal from GET
+  // /me, so the operator shown here is the same identity the backend records as
+  // submitted_by on every job/run. Silent no-op offline (defaults stay).
+  function hydrateUser() {
+    if (!window.EEOF || typeof EEOF.me !== 'function') return;
+    EEOF.me().then(function (u) {
+      if (!u) return;
+      USER.name = u.name || USER.name;
+      USER.email = u.email || u.subject || USER.email;
+      USER.initials = u.initials || USER.initials;
+      USER.role = u.role || USER.role;
+      USER.tenant = u.tenant || USER.tenant;
+      USER.admin = !!u.admin;
+      var av = document.querySelector('.aibc-user__avatar');
+      var nm = document.querySelector('.aibc-user__nametext');
+      var sub = document.querySelector('.aibc-user__sub');
+      if (av) av.textContent = USER.initials;
+      if (nm) nm.textContent = USER.name;
+      if (sub) { sub.textContent = USER.email; sub.setAttribute('title', USER.email); }
+    }).catch(function () {});
   }
 
   // Replace the static per-stage spend chip with the real derived figure from

@@ -110,7 +110,18 @@
 
     document.title = `Simulation — ${run.run_id} · Verity`;
     document.getElementById("crumb-run").textContent = run.run_id;
-    document.getElementById("head-id").textContent = run.run_id;
+    // Run id rides in the eyebrow as a mono, click-to-copy token; the h1 stays
+    // the semantic label (transport · mode).
+    const headId = document.getElementById("head-id");
+    headId.innerHTML = `<button class="job-id-eyebrow" type="button" data-copy="${run.run_id}" title="Copy run ID" aria-label="Copy run ID"><span class="job-id-chip__hash" aria-hidden="true">⌗</span>${run.run_id}</button>`;
+    headId.querySelector(".job-id-eyebrow").addEventListener("click", async (ev) => {
+      try {
+        await navigator.clipboard.writeText(run.run_id);
+        ev.currentTarget.classList.add("is-copied");
+        setTimeout(() => ev.currentTarget.classList.remove("is-copied"), 1200);
+        SIM.toast?.(`Copied ${run.run_id}`, "Simulation");
+      } catch { /* clipboard unavailable — no-op */ }
+    });
     document.getElementById("head-title").innerHTML = `Run <span class="qualifier">— ${run.adapter_snapshot?.transport?.toUpperCase() || "?"} · ${run.inputs?.mode || "—"}</span>`;
     document.getElementById("head-subtitle").innerHTML = `
       Submitted by <b>${run.created_by}</b> at <code>${SIM.fmtTs(run.created_at)}</code>.
@@ -132,8 +143,17 @@
     // Stop reason histogram
     renderStopBar(run);
 
-    // Throughput
-    document.getElementById("throughput-meta").textContent = `seed=${run.inputs?.seed ?? "—"} · concurrency=${run.inputs?.concurrency}`;
+    // Throughput — header meta shows the concurrency knob and a real derived
+    // rate (conversations per minute) rather than a `seed` the backend never
+    // froze, which always rendered as a dead "seed=—".
+    const _p = run.progress || {};
+    const _done = _p.conversations_done || 0;
+    const _wall = _p.wallclock_s || 0;
+    const _rate = (_done > 0 && _wall > 0)
+      ? `${(_done / (_wall / 60)).toFixed(1)} convos/min`
+      : (_done > 0 ? "measuring…" : "not started");
+    document.getElementById("throughput-meta").textContent =
+      `concurrency=${run.inputs?.concurrency ?? "—"} · ${_rate}`;
     document.getElementById("throughput-kv").innerHTML = `
       <dt>Conversations</dt><dd><code>${run.progress.conversations_done}</code> / <code>${run.progress.conversations_total}</code> · failed <code>${run.progress.conversations_failed ?? 0}</code></dd>
       <dt>Turns total</dt><dd><code>${run.progress.turns_total}</code></dd>
@@ -197,12 +217,12 @@
     (run.events || []).forEach((ev, i) => {
       const li = document.createElement("li");
       if (i < run.events.length - 1 || run.state === "ready" || run.state === "failed") li.classList.add("done");
-      li.innerHTML = `<b>${SIM.escapeHtml(ev.state)}</b> · <span class="who">${SIM.escapeHtml(ev.by)}</span>${ev.note ? ` · <span class="who">${SIM.escapeHtml(ev.note)}</span>` : ""} <span style="color:var(--text-faint);float:right;">${SIM.fmtTsShort(ev.ts)}</span>`;
+      li.innerHTML = `<b>${SIM.escapeHtml(SIM.phaseLabel(ev.state))}</b> · <span class="who">${SIM.escapeHtml(ev.by)}</span>${ev.note ? ` · <span class="who">${SIM.escapeHtml(ev.note)}</span>` : ""} <span style="color:var(--text-faint);float:right;">${SIM.fmtTsShort(ev.ts)}</span>`;
       list.appendChild(li);
     });
 
     // Action buttons
-    const isInFlight = ["queued", "warming", "running", "finalizing"].includes(run.state);
+    const isInFlight = ["queued", "running", "finalizing"].includes(run.state);
     document.getElementById("abort-btn").style.display = isInFlight ? "" : "none";
     document.getElementById("eval-link").style.display = run.state === "ready" ? "" : "none";
     document.getElementById("eval-link").href = `../evaluation/index.html?run=${encodeURIComponent(run.run_id)}`;
@@ -224,23 +244,31 @@
             : s === "finalizing"
               ? "closing sessions"
               : s === "ready"
-                ? `${run.output?.trace_count ?? "—"} traces`
+                ? `${run.output?.trace_count ?? run.progress.conversations_done ?? "—"} traces`
                 : "")
         : "";
       const div = document.createElement("div");
       div.className = "phase " + cls;
-      div.innerHTML = `<div class="num">${phase.num}</div><div class="label">${phase.label}</div>${meta ? `<div class="meta">${meta}</div>` : ""}`;
+      div.innerHTML = `<div class="num">${phase.num}</div><div class="label">${phase.label}</div>`
+        + (phase.desc ? `<div class="desc">${phase.desc}</div>` : "")
+        + (meta ? `<div class="meta">${meta}</div>` : "");
       host.appendChild(div);
     });
   }
 
   function renderStopBar(run) {
+    // Canonical key set = the legend's stop reasons, so the bar segments, the
+    // legend counts, and the "N terminations" total are always computed over the
+    // same reasons. (A backend reason missing from this list would otherwise be
+    // summed into the total but never drawn, leaving the bar short of 100% and
+    // out of step with throughput's conversations_done.)
+    const keys = SIM.STOP_REASONS.map(r => r.id);
     const breakdown = run.output?.stop_reason_breakdown || (() => {
-      const b = { goal_met: 0, max_turns: 0, user_gives_up: 0, adapter_error: 0, topic_drift: 0, manual_abort: 0 };
+      const b = {}; keys.forEach(k => (b[k] = 0));
       for (const t of SIM.tracesForRun(run.run_id)) if (b[t.stop_reason] != null) b[t.stop_reason]++;
       return b;
     })();
-    const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+    const total = keys.reduce((a, k) => a + (breakdown[k] || 0), 0);
     document.getElementById("stop-meta").textContent = total ? `${total} terminations` : "n/a (run pending)";
 
     const bar = document.getElementById("stop-bar");
@@ -248,7 +276,7 @@
     if (total === 0) {
       bar.innerHTML = `<i class="manual_abort" style="width:100%;background:var(--surface-alt);"></i>`;
     } else {
-      ["goal_met", "max_turns", "user_gives_up", "adapter_error", "topic_drift", "manual_abort"].forEach(k => {
+      keys.forEach(k => {
         const v = breakdown[k] || 0;
         if (v === 0) return;
         const seg = document.createElement("i");

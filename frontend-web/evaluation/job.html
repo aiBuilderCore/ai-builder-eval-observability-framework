@@ -198,14 +198,15 @@
       div.innerHTML = `
         <div class="num">${p.num}</div>
         <div class="label">${p.label}</div>
-        <div class="meta">${metaText}</div>
+        ${p.desc ? `<div class="desc">${p.desc}</div>` : ""}
+        ${metaText ? `<div class="meta">${metaText}</div>` : ""}
       `;
       host.appendChild(div);
     });
     // Add a final shipped phase
     const ship = document.createElement("div");
     ship.className = "phase" + (job.state === "shipped" ? " done active" : "");
-    ship.innerHTML = `<div class="num">04</div><div class="label">Shipped</div><div class="meta">${job.completed_at ? EV.fmtTsShort(job.completed_at) : "—"}</div>`;
+    ship.innerHTML = `<div class="num">04</div><div class="label">Shipped</div><div class="desc">Signed off and published to the observability plane for tracking.</div><div class="meta">${job.completed_at ? EV.fmtTsShort(job.completed_at) : "—"}</div>`;
     host.appendChild(ship);
   }
 
@@ -415,7 +416,21 @@
     }
     document.title = `Evaluation — ${job.job_id} · Verity`;
 
-    document.getElementById("title").innerHTML = `Job <code style="font-size:0.6em;background:var(--surface-alt);padding:0.1em 0.35em;border-radius:4px;border:1px solid var(--border);">${job.job_id}</code> <span class="qualifier" id="title-meta">— ${EV.phaseLabel(job.state)}</span>`;
+    // The semantic label (mode · state) is the title; the job id rides in the
+    // eyebrow as a mono, click-to-copy token so it identifies without shouting.
+    document.getElementById("title").innerHTML = `${job.inputs.mode === "jury" ? "Jury" : "Judge"} evaluation <span class="qualifier" id="title-meta">· ${EV.phaseLabel(job.state)}</span>`;
+    const evalEyebrow = document.querySelector(".page-head .eyebrow");
+    if (evalEyebrow) {
+      evalEyebrow.innerHTML = `<span class="dot"></span> Job <button class="job-id-eyebrow" type="button" data-copy="${job.job_id}" title="Copy job ID" aria-label="Copy job ID"><span class="job-id-chip__hash" aria-hidden="true">⌗</span>${job.job_id}</button>`;
+      evalEyebrow.querySelector(".job-id-eyebrow").addEventListener("click", async (ev) => {
+        try {
+          await navigator.clipboard.writeText(job.job_id);
+          ev.currentTarget.classList.add("is-copied");
+          setTimeout(() => ev.currentTarget.classList.remove("is-copied"), 1200);
+          EV.toast?.(`Copied ${job.job_id}`, "Evaluation");
+        } catch { /* clipboard unavailable — no-op */ }
+      });
+    }
 
     const dims = EV.dimensionsFromJudges(job.inputs.judge_ids);
     document.getElementById("subtitle").innerHTML =

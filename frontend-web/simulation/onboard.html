@@ -54,6 +54,31 @@
   </section>
 
   <section class="panel">
+    <div class="app-type" id="app-type">
+      <div class="app-type__head">
+        <h2><span class="num">◆ Type</span>Application type</h2>
+        <p class="sub">Is the target a stateless task app or a conversational agent? This is a property of the system under test — it decides which run modes it can be evaluated with. Pick before choosing a transport.</p>
+      </div>
+      <div class="radio-cluster app-type__cluster" id="app-type-cluster">
+        <label data-app-type="multi_turn" class="checked">
+          <input type="radio" name="app-type" value="multi_turn" checked />
+          <div class="lab">
+            <b>Multi-turn · conversational</b>
+            <small>Holds session state and reacts to follow-ups — clarifications, back-and-forth, escalation across turns. Opens all three run modes (single-turn, multi-turn, auto).</small>
+            <small class="ex">e.g. customer-support chatbot · retirement-planning assistant · coding copilot · booking &amp; scheduling agent</small>
+          </div>
+        </label>
+        <label data-app-type="single_turn">
+          <input type="radio" name="app-type" value="single_turn" />
+          <div class="lab">
+            <b>Single-turn · stateless task</b>
+            <small>Each request is independent — one prompt in, one answer out, no memory of earlier messages. Runs are locked to single-turn (there is no session to carry a conversation).</small>
+            <small class="ex">e.g. classify a ticket's urgency · summarize a document · extract fields from an invoice · moderate a piece of content</small>
+          </div>
+        </label>
+      </div>
+    </div>
+
     <div class="transport-tabs" role="tablist" id="tabs">
       <button class="transport-tab active" role="tab" data-tab="rest">
         <div class="tag">01 · REST</div>
@@ -393,6 +418,47 @@
     panes.forEach(p => p.classList.toggle("active", p.id === `pane-${id}`));
   });
 
+  // ---------- Application type ----------
+  // A property of the target itself (stateless task vs. conversational agent),
+  // stamped onto every committed adapter's capabilities and read by the run
+  // wizard to decide which run modes are offered. Shared across all transports.
+  let appType = "multi_turn";
+  function selectAppType(v) {
+    appType = (v === "single_turn") ? "single_turn" : "multi_turn";
+    document.querySelectorAll('#app-type-cluster label').forEach(l => {
+      const on = l.dataset.appType === appType;
+      l.classList.toggle("checked", on);
+      const input = l.querySelector("input");
+      if (input) input.checked = on;
+    });
+  }
+  document.querySelectorAll('#app-type-cluster label').forEach(l => {
+    l.addEventListener("click", () => selectAppType(l.dataset.appType));
+  });
+
+  // ---------- Edit mode ----------
+  // onboard.html doubles as the adapter editor: `?edit=<adapter_id>` hydrates the
+  // matching transport form; re-commit keeps the id and bumps the version in place.
+  let editingAdapter = null;
+  const editId = new URLSearchParams(location.search).get("edit");
+
+  function activateTab(id) {
+    document.querySelectorAll(".transport-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === id));
+    panes.forEach(p => p.classList.toggle("active", p.id === `pane-${id}`));
+  }
+
+  // Identity block for a committed adapter — a fresh id + v1 when onboarding, or
+  // the existing id with a bumped version when editing.
+  function adapterIdentity(transport, name) {
+    return editingAdapter
+      ? { adapter_id: editingAdapter.adapter_id, name, transport,
+          version: (editingAdapter.version || 1) + 1,
+          created_by: editingAdapter.created_by || "user@team",
+          created_at: editingAdapter.created_at || SIM.nowISO() }
+      : { adapter_id: SIM.newAdapterId(), name, transport,
+          version: 1, created_by: "user@team", created_at: SIM.nowISO() };
+  }
+
   // ---------- REST: auth-scheme conditional fields ----------
   const restAuthSel = document.getElementById("rest-auth-scheme");
   const restCredWrap = document.getElementById("rest-credref-wrap");
@@ -451,6 +517,7 @@
         supports_tools: false,
         max_concurrent_sessions: 16,
         rate_limit_per_min: Number(document.getElementById("rest-rate").value),
+        interaction_mode: appType,
       },
     };
   }
@@ -474,18 +541,13 @@
     if (!restSmokePassed) return;
     const cfg = readRestForm();
     const adapter = {
-      adapter_id: SIM.newAdapterId(),
-      name: cfg.name,
-      transport: "rest",
-      version: 1,
-      created_by: "user@team",
-      created_at: SIM.nowISO(),
+      ...adapterIdentity("rest", cfg.name),
       capabilities: cfg.capabilities,
       smoke_test: { ts: SIM.nowISO(), ping_prompt: "say hello", ping_response_excerpt: "Hello! How can I help you today?", passed: true },
       transport_config: cfg.transport_config,
     };
     SIM.upsertAdapter(adapter);
-    SIM.toast(`Committed <b>${adapter.name}</b> · ${adapter.adapter_id}`, "REST");
+    SIM.toast(`${editingAdapter ? "Saved" : "Committed"} <b>${adapter.name}</b> · v${adapter.version}`, "REST");
     setTimeout(() => location.href = "./index.html", 700);
   });
 
@@ -549,13 +611,8 @@
     if (!mcpSmokePassed || !mcpToolPicked) return;
     const sessionMode = document.querySelector('input[name="mcp-session"]:checked')?.value || "header";
     const adapter = {
-      adapter_id: SIM.newAdapterId(),
-      name: document.getElementById("mcp-name").value.trim(),
-      transport: "mcp",
-      version: 1,
-      created_by: "user@team",
-      created_at: SIM.nowISO(),
-      capabilities: { supports_streaming: true, supports_session_id: sessionMode === "header", supports_tools: true, max_concurrent_sessions: 24, rate_limit_per_min: 300 },
+      ...adapterIdentity("mcp", document.getElementById("mcp-name").value.trim()),
+      capabilities: { supports_streaming: true, supports_session_id: sessionMode === "header", supports_tools: true, max_concurrent_sessions: 24, rate_limit_per_min: 300, interaction_mode: appType },
       smoke_test: { ts: SIM.nowISO(), ping_prompt: "say hello", ping_response_excerpt: "Hi — how can I help?", passed: true },
       transport_config: {
         server_url: document.getElementById("mcp-url").value.trim(),
@@ -571,7 +628,7 @@
       },
     };
     SIM.upsertAdapter(adapter);
-    SIM.toast(`Committed <b>${adapter.name}</b> · ${adapter.adapter_id}`, "MCP");
+    SIM.toast(`${editingAdapter ? "Saved" : "Committed"} <b>${adapter.name}</b> · v${adapter.version}`, "MCP");
     setTimeout(() => location.href = "./index.html", 700);
   });
 
@@ -646,13 +703,8 @@
   a2aCommitBtn.addEventListener("click", () => {
     if (!a2aSmokePassed || !a2aSkillPicked || !a2aCardSnapshot) return;
     const adapter = {
-      adapter_id: SIM.newAdapterId(),
-      name: document.getElementById("a2a-name").value.trim(),
-      transport: "a2a",
-      version: 1,
-      created_by: "user@team",
-      created_at: SIM.nowISO(),
-      capabilities: { supports_streaming: document.getElementById("a2a-rpc").value === "message/stream", supports_session_id: true, supports_tools: false, max_concurrent_sessions: 32, rate_limit_per_min: 600 },
+      ...adapterIdentity("a2a", document.getElementById("a2a-name").value.trim()),
+      capabilities: { supports_streaming: document.getElementById("a2a-rpc").value === "message/stream", supports_session_id: true, supports_tools: false, max_concurrent_sessions: 32, rate_limit_per_min: 600, interaction_mode: appType },
       smoke_test: { ts: SIM.nowISO(), ping_prompt: "say hello", ping_response_excerpt: "Hello! What can I help you with?", passed: true },
       transport_config: {
         agent_card_url: document.getElementById("a2a-card").value.trim(),
@@ -664,9 +716,161 @@
       },
     };
     SIM.upsertAdapter(adapter);
-    SIM.toast(`Committed <b>${adapter.name}</b> · ${adapter.adapter_id}`, "A2A");
+    SIM.toast(`${editingAdapter ? "Saved" : "Committed"} <b>${adapter.name}</b> · v${adapter.version}`, "A2A");
     setTimeout(() => location.href = "./index.html", 700);
   });
+
+  // ================= Edit hydration =================
+  function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+  function asText(v) {
+    if (v == null) return "null";
+    return typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  }
+  // An edited adapter was already smoke-tested at onboard time, so enable commit
+  // immediately and relabel the button as a save.
+  function enableCommit(t) {
+    if (t === "rest") { restSmokePassed = true; restCommitBtn.disabled = false; restCommitBtn.textContent = "Save changes"; }
+    if (t === "mcp")  { mcpSmokePassed  = true; mcpCommitBtn.disabled  = false; mcpCommitBtn.textContent  = "Save changes"; }
+    if (t === "a2a")  { a2aSmokePassed  = true; a2aCommitBtn.disabled  = false; a2aCommitBtn.textContent  = "Save changes"; }
+  }
+
+  function hydrateRest(a) {
+    // Two shapes: the rich offline seed (base_url / auth.scheme / operations) and
+    // the flat live-backend config (endpoint / auth_scheme). Accept either.
+    const tc = a.transport_config || {}, auth = tc.auth || {}, ops = tc.operations || {};
+    setVal("rest-name", a.name || "");
+    setVal("rest-base", tc.base_url || tc.endpoint || "");
+    setVal("rest-auth-scheme", auth.scheme || tc.auth_scheme || "bearer");
+    setVal("rest-credref", auth.credential_ref || "");
+    setVal("rest-header-name", auth.header_name || "");
+    if (tc.headers) setVal("rest-headers", JSON.stringify(tc.headers, null, 2));
+    paintRestAuth();
+    if (ops.send_message) {
+      setVal("rest-send-path", ops.send_message.path || "");
+      setVal("rest-send-resp-text", ops.send_message.response?.assistant_text || "");
+      if (ops.send_message.body !== undefined) setVal("rest-send-body", asText(ops.send_message.body));
+    }
+    if (ops.reset_session) {
+      setVal("rest-reset-path", ops.reset_session.path || "");
+      setVal("rest-reset-body", asText(ops.reset_session.body));
+    }
+    if (ops.create_session) {
+      setVal("rest-create-path", ops.create_session.path || "");
+      setVal("rest-create-sid", ops.create_session.response?.session_id || "");
+    }
+    if (tc.timeout_s != null) setVal("rest-timeout", tc.timeout_s);
+    if (tc.retry?.max_attempts != null) setVal("rest-retries", tc.retry.max_attempts);
+    if (a.capabilities?.rate_limit_per_min != null) setVal("rest-rate", a.capabilities.rate_limit_per_min);
+    enableCommit("rest");
+  }
+
+  function renderMcpTools(tools, pickedName) {
+    const list = document.getElementById("mcp-tools");
+    list.style.display = "";
+    list.innerHTML = "";
+    tools.forEach((t) => {
+      const on = t.name === pickedName;
+      const lab = document.createElement("label");
+      if (on) { lab.classList.add("checked"); mcpToolPicked = t; }
+      lab.innerHTML = `
+        <input type="radio" name="mcp-tool" value="${t.name}" ${on ? "checked" : ""}/>
+        <div><div class="name">${t.name}</div><div class="desc">${t.description || ""}</div></div>`;
+      lab.addEventListener("click", () => {
+        document.querySelectorAll("#mcp-tools label").forEach(l => l.classList.remove("checked"));
+        lab.classList.add("checked");
+        mcpToolPicked = t;
+      });
+      list.appendChild(lab);
+    });
+  }
+
+  function hydrateMcp(a) {
+    const tc = a.transport_config || {}, auth = tc.auth || {};
+    setVal("mcp-name", a.name || "");
+    setVal("mcp-url", tc.server_url || tc.endpoint || "");
+    setVal("mcp-auth-scheme", auth.scheme || tc.auth_scheme || "bearer");
+    setVal("mcp-credref", auth.credential_ref || "");
+    const sm = tc.session_mode || "header";
+    document.querySelectorAll('input[name="mcp-session"]').forEach(r => {
+      const on = r.value === sm;
+      r.checked = on;
+      r.closest("label").classList.toggle("checked", on);
+    });
+    const tools = (tc.discovered_tools && tc.discovered_tools.length)
+      ? tc.discovered_tools
+      : [{ name: tc.chat_tool?.name || "chat", description: "Conversational interface" }];
+    renderMcpTools(tools, tc.chat_tool?.name || tools[0]?.name);
+    enableCommit("mcp");
+  }
+
+  function renderA2aSkills(skills, pickedId) {
+    const list = document.getElementById("a2a-skills");
+    list.innerHTML = "";
+    skills.forEach((sk) => {
+      const on = sk.id === pickedId;
+      const lab = document.createElement("label");
+      if (on) { lab.classList.add("checked"); a2aSkillPicked = sk; }
+      lab.innerHTML = `
+        <input type="radio" name="a2a-skill" value="${sk.id}" ${on ? "checked" : ""}/>
+        <div>
+          <div class="name">${sk.name} · <code style="font-size:11px;">${sk.id}</code></div>
+          <div class="desc">${sk.description || ""} · in: ${(sk.inputModes || []).join(", ")} · out: ${(sk.outputModes || []).join(", ")}</div>
+        </div>`;
+      lab.addEventListener("click", () => {
+        document.querySelectorAll("#a2a-skills label").forEach(l => l.classList.remove("checked"));
+        lab.classList.add("checked");
+        a2aSkillPicked = sk;
+      });
+      list.appendChild(lab);
+    });
+  }
+
+  function hydrateA2a(a) {
+    const tc = a.transport_config || {}, auth = tc.auth || {};
+    setVal("a2a-name", a.name || "");
+    setVal("a2a-card", tc.agent_card_url || tc.endpoint || "");
+    setVal("a2a-credref", auth.credential_ref || "");
+    setVal("a2a-rpc", tc.rpc_method || "message/stream");
+    const card = tc.agent_card_snapshot;
+    if (card) {
+      a2aCardSnapshot = card;
+      document.getElementById("a2a-card-snapshot").style.display = "";
+      document.getElementById("a2a-name-out").textContent = card.name || a.name || "—";
+      document.getElementById("a2a-ver-out").textContent = card.version || "—";
+      document.getElementById("a2a-auth-out").innerHTML = `<code>${auth.scheme || "bearer"}</code>`;
+      renderA2aSkills(card.skills || [], tc.skill_id);
+      document.getElementById("a2a-skill-section").style.display = "";
+      document.getElementById("a2a-rpc-section").style.display = "";
+    }
+    enableCommit("a2a");
+  }
+
+  function applyEdit(a) {
+    editingAdapter = a;
+    selectAppType(a.capabilities?.interaction_mode || "multi_turn");
+    document.title = `Simulation — Edit ${a.name} · Verity`;
+    const eyebrow = document.querySelector(".page-head .eyebrow");
+    if (eyebrow) eyebrow.innerHTML = `<span class="dot"></span> Edit adapter`;
+    const h1 = document.querySelector(".page-head h1");
+    if (h1) h1.innerHTML = `Edit adapter <span class="qualifier">— ${a.name} · v${a.version}</span>`;
+    const crumb = document.querySelector(".product-name b");
+    if (crumb) crumb.textContent = "Edit adapter";
+    activateTab(a.transport);
+    if (a.transport === "rest") hydrateRest(a);
+    else if (a.transport === "mcp") hydrateMcp(a);
+    else if (a.transport === "a2a") hydrateA2a(a);
+  }
+
+  if (editId) {
+    const load = () => {
+      const a = SIM.getAdapter(editId);
+      if (a) applyEdit(a);
+      else SIM.toast(`Adapter <b>${editId}</b> not found`, "Edit");
+    };
+    // Live mode resolves adapters after the first hydrate; offline is synchronous.
+    if (window.SIM && SIM.ready && typeof SIM.ready.then === "function") SIM.ready.then(load);
+    else load();
+  }
 </script>
 
 </body>

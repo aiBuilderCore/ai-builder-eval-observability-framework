@@ -46,6 +46,14 @@ async def register_adapter(tenant: str, draft: AdapterDraft) -> Adapter:
             "supports_streaming": True, "supports_session_id": draft.transport != "rest",
             "supports_tools": draft.transport in ("mcp", "a2a"),
             "max_concurrent_sessions": 32, "rate_limit_per_min": 600,
+            # Whether the target holds session state. Declared at onboarding; a
+            # "single_turn" (stateless) target clamps every run to one exchange
+            # and hides the multi-turn / auto run modes. Defaults conversational.
+            "interaction_mode": (
+                cfg.get("interaction_mode")
+                if cfg.get("interaction_mode") in ("single_turn", "multi_turn")
+                else "multi_turn"
+            ),
         },
         smoke_test={
             "ts": iso(),
@@ -111,6 +119,11 @@ async def ensure_builtin_adapters(tenant: str) -> None:
                     "agent": agent["id"],
                     "display_name": agent["name"],
                     "domain": agent["domain"],
+                    # Declare the app type explicitly rather than leaning on the
+                    # register_adapter default, so the bootstrapped adapter row
+                    # always carries capabilities.interaction_mode — the built-in
+                    # 401(k) planner is conversational (multi-turn).
+                    "interaction_mode": agent.get("interaction_mode", "multi_turn"),
                 },
             ),
         )

@@ -56,6 +56,27 @@ def principal(authorization: str | None = Header(default=None)) -> Principal:
 
 
 # ----------------------------------------------------------------------------
+# Identity — the resolved principal is the single source of truth for "who is
+# acting". The SPA renders its user block from this instead of hardcoding a
+# name/email, so the sidebar identity and every submitted_by stay consistent.
+# ----------------------------------------------------------------------------
+@api.get("/me")
+async def me(p: Principal = Depends(principal)) -> dict:
+    # Dev identity: one synthetic workspace operator. subject is the canonical
+    # email used for submitted_by across the pipeline.
+    return {
+        "subject": p.subject,
+        "email": p.subject,
+        "name": "Nitin K",
+        "initials": "NK",
+        "role": "Workspace Admin",
+        "tenant": p.tenant,
+        "workspace": p.workspace,
+        "admin": True,
+    }
+
+
+# ----------------------------------------------------------------------------
 # Personas (sync) -> persona-svc
 # ----------------------------------------------------------------------------
 @api.get("/personas")

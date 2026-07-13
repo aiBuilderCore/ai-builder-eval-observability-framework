@@ -142,6 +142,14 @@
 <script>
   const state = { search: "", filterState: null };
 
+  // Truncate long ULID job ids to a short head for display (job_01KX9…) so the
+  // column stays compact. The full id stays intact in the chip's tooltip and on
+  // the copy button — nothing is actually shortened.
+  function shortJobId(id) {
+    if (!id) return "";
+    return id.length <= 10 ? id : `${id.slice(0, 9)}…`;
+  }
+
   function render() {
     const all = QG.loadJobs();
 
@@ -235,14 +243,22 @@
         || j.progress.questions_generated
         || (j.state === "queued" ? "—" : "—");
 
+      const completedBy = j.completed_by
+        ? (j.completed_by_kind === "agent"
+            ? `<span class="agent-tag" title="Completed automatically by the ${j.completed_by} at ${QG.fmtTs(j.completed_at)}"><span class="agent-tag__gear" aria-hidden="true">⚙</span>${j.completed_by}</span>`
+            : j.completed_by)
+        : "—";
+
       tr.innerHTML = `
-        <td><span class="id">${j.job_id}</span></td>
+        <td><span class="job-id-chip" title="${j.job_id}">
+              <span class="job-id-chip__hash" aria-hidden="true">⌗</span><span class="job-id-chip__val">${shortJobId(j.job_id)}</span><button class="job-id-chip__copy" type="button" data-copy="${j.job_id}" title="Copy job ID" aria-label="Copy job ID"></button>
+            </span></td>
         <td>${j.created_by}</td>
         <td><span class="ts">${QG.fmtTsShort(j.created_at)}</span></td>
         <td><span class="state-pill ${j.state}">${QG.phaseLabel(j.state)}</span></td>
         <td><div class="progress-cell">${progress}${bar}</div></td>
         <td class="num">${qcount}</td>
-        <td>${j.completed_by ?? "—"}</td>
+        <td>${completedBy}</td>
         <td><span class="ts">${QG.fmtTsShort(j.completed_at)}</span></td>
       `;
       rows.appendChild(tr);
@@ -252,6 +268,20 @@
   document.getElementById("search").addEventListener("input", (e) => {
     state.search = e.target.value;
     render();
+  });
+
+  // Copy job ID from its chip without triggering the row navigation.
+  document.getElementById("rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest(".job-id-chip__copy");
+    if (!btn) return;
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(btn.dataset.copy);
+      btn.classList.add("is-copied");
+      setTimeout(() => btn.classList.remove("is-copied"), 1200);
+      QG.toast?.(`Copied ${btn.dataset.copy}`, "Question Generation");
+    } catch { /* clipboard unavailable — no-op */ }
   });
 
   render();

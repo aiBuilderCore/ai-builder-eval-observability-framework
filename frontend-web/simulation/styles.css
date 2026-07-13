@@ -44,6 +44,8 @@
   /* Stop-reason hues — light mode */
   --stop-goal:    #2f7a5b;
   --stop-goal-bg: rgba(47, 122, 91, 0.14);
+  --stop-refused:    #3f72a4;
+  --stop-refused-bg: rgba(63, 114, 164, 0.14);
   --stop-max:     #b8853a;
   --stop-max-bg:  rgba(184, 133, 58, 0.14);
   --stop-give:    #7d5b7e;
@@ -75,6 +77,8 @@
 
     --stop-goal:    #6dc1a0;
     --stop-goal-bg: rgba(109, 193, 160, 0.14);
+    --stop-refused:    #7fa8d0;
+    --stop-refused-bg: rgba(127, 168, 208, 0.14);
     --stop-max:     #d4a85f;
     --stop-max-bg:  rgba(212, 168, 95, 0.14);
     --stop-give:    #b58fb6;
@@ -105,6 +109,8 @@
 
   --stop-goal:    #6dc1a0;
   --stop-goal-bg: rgba(109, 193, 160, 0.14);
+  --stop-refused:    #7fa8d0;
+  --stop-refused-bg: rgba(127, 168, 208, 0.14);
   --stop-max:     #d4a85f;
   --stop-max-bg:  rgba(212, 168, 95, 0.14);
   --stop-give:    #b58fb6;
@@ -314,8 +320,22 @@ header.top .row {
 .textarea.code { font-family: var(--font-mono); font-size: 13px; min-height: 200px; }
 .input.mono { font-family: var(--font-mono); font-size: 14px; }
 
-.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+.row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: stretch; }
+/* Cards in a stat row share one height (grid stretch). The stop-reason
+   histogram is far shorter than the throughput key/value grid, so center its
+   bar+legend in the card instead of leaving it stranded at the top with a big
+   empty gap — the two cards then read as balanced and aligned. */
+.row-2 > .panel, .row-3 > .panel { display: flex; flex-direction: column; }
+/* The page stacks panels vertically with `.panel + .panel { margin-top }`; inside
+   a stat row that rule would push the 2nd panel down and break the shared row
+   height, so reset it for panels that are grid cells. */
+.row-2 > .panel + .panel, .row-3 > .panel + .panel { margin-top: 0; }
+/* A panel that follows a stat row isn't caught by `.panel + .panel`, so it would
+   butt right up against the row — give it the same vertical gap. */
+.row-2 + .panel, .row-3 + .panel { margin-top: 22px; }
+.row-2 > .panel .stop-bar { margin-top: auto; }
+.row-2 > .panel .stop-legend { margin-bottom: auto; }
 
 /* ---------- Filter bar ---------- */
 .filter-bar {
@@ -374,7 +394,7 @@ header.top .row {
   background: var(--surface);
 }
 .runs-table th, .runs-table td {
-  text-align: left; padding: 0.75rem 1rem;
+  text-align: center; padding: 0.75rem 1rem;
   vertical-align: middle;
 }
 .runs-table th {
@@ -393,22 +413,101 @@ header.top .row {
   font-family: var(--font-mono); font-size: 12px;
   color: var(--text); letter-spacing: 0.02em;
 }
+/* Run ID chip — a commit-sha-style token: hairline pill + hash glyph + copy affordance. */
+.job-id-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.3rem 0.22rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2, 8px);
+  background: var(--surface-alt);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+tr:hover .job-id-chip { border-color: var(--accent-weak, var(--border)); }
+.job-id-chip__hash { color: var(--text-faint); font-size: 11px; user-select: none; }
+.job-id-chip__val { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.job-id-chip__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 120ms ease, transform 120ms ease, background 120ms ease, color 120ms ease;
+}
+.job-id-chip__copy::before {
+  content: "";
+  width: 8px;
+  height: 9px;
+  border: 1.4px solid currentColor;
+  border-radius: 2px;
+  box-shadow: 2px -2px 0 -1.4px var(--surface-alt), 3px -3px 0 -1.4px currentColor;
+}
+tr:hover .job-id-chip__copy,
+.job-id-chip__copy:focus-visible { opacity: 1; transform: scale(1); }
+.job-id-chip__copy:hover { background: var(--accent-soft); color: var(--accent); }
+.job-id-chip__copy.is-copied { opacity: 1; transform: scale(1); color: var(--accent); }
+.job-id-chip__copy.is-copied::before {
+  width: 4px;
+  height: 8px;
+  border: solid currentColor;
+  border-width: 0 1.6px 1.6px 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: translateY(-1px) rotate(45deg);
+}
+/* Run ID as an eyebrow token on the detail page — mono, muted, click-to-copy. */
+.job-id-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.4rem;
+  padding: 0.14rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2, 8px);
+  background: var(--surface-alt);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.job-id-eyebrow:hover { color: var(--text); border-color: var(--accent-weak, var(--border)); }
+.job-id-eyebrow.is-copied { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.job-id-eyebrow .job-id-chip__hash { color: var(--text-faint); }
 .runs-table .ts {
   font-family: var(--font-mono); font-size: 12px;
   color: var(--text-muted);
 }
 .runs-table .num {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums; text-align: right;
+  font-variant-numeric: tabular-nums; text-align: center;
 }
 .runs-table .progress-cell {
   font-family: var(--font-mono); font-size: 12px;
   color: var(--text-muted); font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 .runs-table .progress-cell .progress-bar {
   display: block; width: 80px; height: 4px;
   background: var(--surface-alt); border-radius: 2px;
-  margin-top: 4px; overflow: hidden;
+  margin: 4px auto 0; overflow: hidden;
 }
 .runs-table .progress-cell .progress-bar i {
   display: block; height: 100%;
@@ -475,6 +574,23 @@ header.top .row {
 .transport-pill.mcp   { color: #2f7a5b; border-color: rgba(47, 122, 91, 0.3);  background: rgba(47, 122, 91, 0.06);  }
 .transport-pill.a2a   { color: var(--accent); border-color: rgba(124, 58, 237, 0.3); background: var(--accent-soft); }
 
+.pill-group { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Application type — how the adapter is driven at runtime. */
+.turn-pill {
+  display: inline-flex; align-items: center;
+  padding: 0.15rem 0.55rem; border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.turn-pill.multi  { color: #2f6fb8; border-color: rgba(47, 111, 184, 0.3); background: rgba(47, 111, 184, 0.06); }
+.turn-pill.single { color: #8a6d3b; border-color: rgba(138, 109, 59, 0.3);  background: rgba(138, 109, 59, 0.07); }
+
 /* ---------- Panels ---------- */
 .panel {
   background: var(--surface);
@@ -532,12 +648,14 @@ header.top .row {
 /* ---------- Progress strip (run lifecycle) ---------- */
 .progress-strip {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin: 18px 0 8px;
 }
 .progress-strip .phase {
   position: relative;
+  display: flex;
+  flex-direction: column;
   padding: 14px 14px 12px;
   border-radius: var(--r-2);
   border: 1px solid var(--border);
@@ -555,8 +673,17 @@ header.top .row {
   color: var(--text);
   text-transform: uppercase; letter-spacing: 0.04em;
 }
+.progress-strip .phase .desc {
+  margin-top: 6px;
+  font-family: var(--font-body, inherit);
+  font-size: 11px; line-height: 1.45;
+  color: var(--text-muted);
+  font-weight: 400; letter-spacing: 0;
+  text-transform: lowercase;
+}
 .progress-strip .phase .meta {
-  margin-top: 4px;
+  margin-top: auto;
+  padding-top: 8px;
   font-family: var(--font-mono);
   font-size: 11px; color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -721,6 +848,17 @@ header.top .row {
   font-size: 14.5px; font-family: var(--font-display);
 }
 .radio-cluster label .lab small { font-size: 13px; color: var(--text-muted); }
+/* A run mode the chosen target can't support (e.g. multi-turn against a
+   single-turn app): shown but greyed and unclickable. */
+.radio-cluster label.locked {
+  opacity: 0.5; cursor: not-allowed; background: var(--surface-alt);
+}
+.radio-cluster label.locked:hover { border-color: var(--border); }
+.radio-cluster label.locked input { cursor: not-allowed; }
+.mode-note {
+  font-size: 12.5px; color: var(--text-muted);
+  margin: 0 0 10px; line-height: 1.5;
+}
 
 /* ===========================================================
    Simulation-specific components
@@ -730,32 +868,33 @@ header.top .row {
 .transport-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px; padding: 6px;
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--r-3);
+  gap: 8px;
   margin-bottom: 22px;
 }
 .transport-tab {
   padding: 14px 16px;
   border-radius: var(--r-2);
-  border: 1px solid transparent;
+  border: none;
   background: transparent;
   text-align: left;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background 160ms ease;
 }
-.transport-tab:hover { background: var(--surface); border-color: var(--border); }
+.transport-tab:hover:not(.active) { background: var(--surface); }
 .transport-tab.active {
-  background: var(--surface);
-  border-color: var(--accent);
-  box-shadow: 0 1px 3px var(--shadow);
+  background: var(--accent-soft);
 }
+/* html.aibc-chrome prefix out-specifies the shared `.tag` pill in _app.css so the
+   transport tag reads as a plain mono label, not a boxed chip. */
+html.aibc-chrome .transport-tab .tag,
 .transport-tab .tag {
   font-family: var(--font-mono);
   font-size: 10.5px; letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--accent);
+  background: transparent;
+  border: none;
+  padding: 0;
   margin-bottom: 6px;
 }
 .transport-tab .name {
@@ -896,6 +1035,27 @@ header.top .row {
   margin-left: 6px;
 }
 
+/* ---------- Application type (onboarding) ---------- */
+.app-type { padding-bottom: 22px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+.app-type__head h2 {
+  font-family: var(--font-display); font-size: 17px; font-weight: 600;
+  letter-spacing: -0.01em; margin: 0 0 4px; color: var(--text);
+}
+.app-type__head h2 .num {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em;
+  color: var(--accent); text-transform: uppercase; margin-right: 12px; font-weight: 500;
+}
+.app-type__head .sub {
+  color: var(--text-muted); font-size: 13.5px; margin: 0 0 16px;
+  max-width: 72ch; line-height: 1.6;
+}
+.app-type__cluster { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.app-type__cluster .lab .ex {
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint);
+  letter-spacing: 0.01em; margin-top: 5px; line-height: 1.55;
+}
+@media (max-width: 720px) { .app-type__cluster { grid-template-columns: 1fr; } }
+
 /* ---------- Onboarding form ---------- */
 .onboard-form { display: flex; flex-direction: column; gap: 22px; }
 .onboard-form .form-section {
@@ -1017,8 +1177,9 @@ header.top .row {
 /* ---------- Adapter cards (runs list / picker) ---------- */
 .adapter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 340px));
   gap: 14px;
+  justify-content: start;
 }
 .adapter-card {
   background: var(--surface);
@@ -1098,6 +1259,7 @@ header.top .row {
 }
 .conv-tile .meta b { color: var(--text-muted); font-weight: 500; }
 .conv-tile.goal_met       { border-left: 3px solid var(--stop-goal); }
+.conv-tile.refused        { border-left: 3px solid var(--stop-refused); }
 .conv-tile.max_turns      { border-left: 3px solid var(--stop-max); }
 .conv-tile.user_gives_up  { border-left: 3px solid var(--stop-give); }
 .conv-tile.adapter_error  { border-left: 3px solid var(--stop-err); }
@@ -1118,6 +1280,7 @@ header.top .row {
   transition: width 200ms ease;
 }
 .stop-bar i.goal_met      { background: var(--stop-goal); }
+.stop-bar i.refused       { background: var(--stop-refused); }
 .stop-bar i.max_turns     { background: var(--stop-max); }
 .stop-bar i.user_gives_up { background: var(--stop-give); }
 .stop-bar i.adapter_error { background: var(--stop-err); }
@@ -1135,6 +1298,7 @@ header.top .row {
   width: 10px; height: 10px; border-radius: 2px;
 }
 .stop-legend .item.goal_met      .swatch { background: var(--stop-goal); }
+.stop-legend .item.refused       .swatch { background: var(--stop-refused); }
 .stop-legend .item.max_turns     .swatch { background: var(--stop-max); }
 .stop-legend .item.user_gives_up .swatch { background: var(--stop-give); }
 .stop-legend .item.adapter_error .swatch { background: var(--stop-err); }
@@ -1151,6 +1315,7 @@ header.top .row {
   text-transform: uppercase;
 }
 .stop-pill.goal_met      { color: var(--stop-goal);   background: var(--stop-goal-bg);  }
+.stop-pill.refused       { color: var(--stop-refused);background: var(--stop-refused-bg);}
 .stop-pill.max_turns     { color: var(--stop-max);    background: var(--stop-max-bg);   }
 .stop-pill.user_gives_up { color: var(--stop-give);   background: var(--stop-give-bg);  }
 .stop-pill.adapter_error { color: var(--stop-err);    background: var(--stop-err-bg);   }

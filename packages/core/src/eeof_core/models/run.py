@@ -26,7 +26,7 @@ class Adapter(AdapterDraft):
     id: str
     version: int = 1
     created_at: str = Field(default_factory=iso)
-    created_by: str = "alex@acme"
+    created_by: str = "nitin@acme"
     smoke_ok: bool = True
     # Rich fields surfaced by the onboarding / registry UI.
     capabilities: dict[str, Any] = Field(default_factory=dict)
@@ -62,7 +62,6 @@ class TraceRef(BaseModel):
 
 class RunState(StrEnum):
     queued = "queued"
-    warming = "warming"
     running = "running"
     finalizing = "finalizing"
     ready = "ready"
@@ -82,7 +81,7 @@ class Run(BaseModel):
     completed: int = 0
     trace_ids: list[str] = Field(default_factory=list)
     created_at: str = Field(default_factory=iso)
-    created_by: str = "alex@acme"
+    created_by: str = "nitin@acme"
     completed_at: str | None = None
     failure_reason: str = ""
     inputs: dict[str, Any] = Field(default_factory=dict)

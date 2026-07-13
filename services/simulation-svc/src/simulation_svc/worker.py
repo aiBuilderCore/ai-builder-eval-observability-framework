@@ -24,7 +24,7 @@ from eeof_core.models.common import iso
 from eeof_core.providers import get_provider
 from eeof_core.worker import BaseWorker
 
-from .sim import simulate_conversation
+from .sim import resolve_mode, simulate_conversation
 
 _STOP_REASONS = ["goal_met", "goal_met", "goal_met", "max_turns", "user_gives_up", "topic_drift"]
 
@@ -84,28 +84,31 @@ class SimWorker(BaseWorker):
         seed_set_id = inputs["seed_set_id"]
         adapter_snapshot = inputs.get("adapter_snapshot", {})
         max_turns = int(inputs.get("max_turns", 12))
+        mode = inputs.get("mode", "multi_turn")
         concurrency = int(inputs.get("concurrency", 8))
         started = time.time()
 
         rows = await get_table().query(keys.question_pk(seed_set_id), "QUESTION#")
         questions = [Question.model_validate(r["data"]) for r in rows]
 
+        # Persist the run in `running` from the outset. There is no separate
+        # warm-up work to do, so a distinct `warming` state would only ever flip
+        # instantly and read as a dead card in the UI — open the audit trail with
+        # the real queued→running transition instead.
         run = Run(
             id=run_id, tenant=job.tenant, workspace=job.workspace,
             seed_set_id=seed_set_id, seed_set_question_count=len(questions),
             adapter_snapshot=adapter_snapshot, config_hash=job.config_hash or "",
-            state=RunState.warming, total_questions=len(questions),
+            state=RunState.running, total_questions=len(questions),
             created_by=job.submitted_by, inputs=inputs,
-            progress={"phase": "warming", "conversations_total": len(questions),
+            progress={"phase": "running", "conversations_total": len(questions),
                       "conversations_done": 0, "conversations_failed": 0,
                       "turns_total": 0, "tokens_in": 0, "tokens_out": 0, "wallclock_s": 0},
-            events=[{"ts": iso(), "state": "queued", "by": job.submitted_by}],
+            events=[{"ts": iso(), "state": "queued", "by": job.submitted_by},
+                    {"ts": iso(), "state": "running", "by": "worker"}],
         )
         await self._save_run(run)
 
-        run.state = RunState.running
-        run.progress["phase"] = "running"
-        run.events.append({"ts": iso(), "state": "running", "by": "worker"})
         sem = asyncio.Semaphore(concurrency)
         lock = asyncio.Lock()
         stop_breakdown: dict[str, int] = {}
@@ -114,7 +117,9 @@ class SimWorker(BaseWorker):
 
         async def run_one(q: Question) -> None:
             async with sem:
-                turns = await simulate_conversation(q, adapter_snapshot, provider, max_turns)
+                turns = await simulate_conversation(
+                    q, adapter_snapshot, provider, max_turns, mode
+                )
             stop = _stop_reason(q, turns)
             turn_dicts, tin, tout, agent_turns = _enrich_turns(q, turns)
             failed = stop == "adapter_error"
@@ -126,7 +131,7 @@ class SimWorker(BaseWorker):
                 "shape": q.shape, "scenario": q.scenario, "rubric": q.rubric,
                 "prompt_shape": {"id": q.shape, "version": 1},
                 "rubric_dimension": q.rubric, "expected_behavior": q.expected_behavior,
-                "mode": inputs.get("mode", "multi_turn"),
+                "mode": resolve_mode(mode, q, adapter_snapshot),
                 "session_id_used": f"ctx_{_h(trace_id) % 10**8:08x}",
                 "stop_reason": stop,
                 "turns": turn_dicts,
@@ -166,15 +171,30 @@ class SimWorker(BaseWorker):
                 totals["turns"] += agent_turns
                 totals["tin"] += tin
                 totals["tout"] += tout
-                if totals["done"] % 3 == 0 or totals["done"] == len(questions):
-                    run.completed = totals["done"]
-                    run.progress.update(conversations_done=totals["done"],
-                                        conversations_failed=totals["failed"],
-                                        turns_total=totals["turns"],
-                                        tokens_in=totals["tin"], tokens_out=totals["tout"])
-                    await self.progress(job, totals["done"], len(questions), "running")
+                # Checkpoint on every completed conversation so throughput
+                # (convos / turns / tokens / wallclock) and the audit trail
+                # hydrate live as the run flows — not in coarse 3-convo jumps.
+                # The write is keyed by (PK, SK), so it updates the single run
+                # row in place; the status push drives the socket repaint.
+                run.completed = totals["done"]
+                run.progress.update(conversations_done=totals["done"],
+                                    conversations_failed=totals["failed"],
+                                    turns_total=totals["turns"],
+                                    tokens_in=totals["tin"], tokens_out=totals["tout"],
+                                    wallclock_s=int(time.time() - started))
+                await self._save_run(run)
+                await self.progress(job, totals["done"], len(questions), "running")
 
         await asyncio.gather(*(run_one(q) for q in questions))
+
+        # Finalizing — close sessions and assemble the run summary. Emitted as a
+        # real phase (persisted + pushed) so the progress strip and audit trail
+        # show it instead of jumping straight from running to ready.
+        run.state = RunState.finalizing
+        run.progress.update(phase="finalizing", wallclock_s=int(time.time() - started))
+        run.events.append({"ts": iso(), "state": "finalizing", "by": "worker"})
+        await self._save_run(run)
+        await self.progress(job, totals["done"], len(questions), "finalizing")
 
         run.state = RunState.ready
         run.completed = totals["done"]

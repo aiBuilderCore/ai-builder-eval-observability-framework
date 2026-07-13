@@ -141,6 +141,9 @@
     post: (p, b) => req("POST", p, b),
     put: (p, b) => req("PUT", p, b),
     del: (p) => req("DELETE", p),
+    // Resolved identity (subject/email/name) — the sidebar renders from this so
+    // the user block and every submitted_by share one backend source of truth.
+    me: () => req("GET", "/me"),
     submitAndWatch,
     watchJob,
     pollJob,

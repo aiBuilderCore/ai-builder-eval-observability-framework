@@ -66,7 +66,7 @@ class Persona(PersonaDraft):
     id: str
     created_at: str = Field(default_factory=iso)
     updated_at: str = Field(default_factory=iso)
-    created_by: str = "alex@acme"
+    created_by: str = "nitin@acme"
     archived: bool = False
 
 
