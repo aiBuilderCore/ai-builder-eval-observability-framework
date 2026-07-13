@@ -73,6 +73,16 @@ async def test_full_pipeline():
     # verdicts are queryable by run via the GSI
     by_run = await get_table().query_gsi(f"RUN#{run_id}", "VERDICT#")
     assert len(by_run) == 3
+    # Live-streaming wiring: the verdict-set row is written (so the UI can fetch
+    # it by id mid-run) and the progress rides verdict_set_id + running pass/fail
+    # so the KPI strip and verdict list paint before completion.
+    vs_row = await get_table().get(keys.verdictset_pk(TENANT), keys.verdictset_sk(vs_id))
+    assert vs_row is not None
+    detail = eval_job.progress.detail
+    assert detail["verdict_set_id"] == vs_id
+    assert detail["pass_count"] + detail["fail_count"] == 3
+    # Audit trail dots out the phases, not just queued→ready.
+    assert "aggregating" in [e["state"] for e in eval_job.events]
 
     # 4. Evidence pack + deploy gate
     obs_job = _job("observability.evidence", "obs", {

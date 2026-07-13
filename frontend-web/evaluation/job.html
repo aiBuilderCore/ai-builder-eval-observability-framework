@@ -173,7 +173,7 @@
 
 <script src="../_api.js"></script>
 
-<script src="app.js"></script>
+<script src="app.js?v=evalfix1"></script>
 <script>
   function getQuery(name) {
     return new URLSearchParams(location.search).get(name);
@@ -213,8 +213,9 @@
   function renderKpis(job) {
     const host = document.getElementById("kpis");
     const pct = job.progress.cells_total ? Math.round(100 * job.progress.cells_done / job.progress.cells_total) : 0;
-    const passCount = job.output?.pass_count ?? "—";
-    const failCount = job.output?.fail_count ?? "—";
+    // Paint pass/fail live from the running tallies; fall back to the final output.
+    const passCount = job.output?.pass_count ?? job.progress.pass_count ?? "—";
+    const failCount = job.output?.fail_count ?? job.progress.fail_count ?? "—";
     const consensus = job.progress.consensus_rate ? `${(job.progress.consensus_rate * 100).toFixed(0)}%` : "—";
     host.innerHTML = `
       <div class="kpi">
