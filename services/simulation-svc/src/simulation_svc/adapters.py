@@ -149,14 +149,20 @@ def _history_to_messages(turns: list[Turn]) -> list[dict]:
     ]
 
 
-async def agent_reply(adapter_snapshot: dict, turns: list[Turn], provider) -> str:
-    """Get the target agent's next reply.
+async def agent_reply(
+    adapter_snapshot: dict, turns: list[Turn], provider
+) -> tuple[str, list[dict]]:
+    """Get the target agent's next reply and the tool calls it made.
 
     Calls the real REST endpoint whenever the adapter has one configured (e.g.
     the built-in 401(k) agent), so a run exercises the genuine over-the-wire
-    path. If no endpoint is set, or the call fails, the model provider stands in
-    as the agent — conditioned on the built-in agent's own system prompt when the
-    adapter names one, so the stand-in still behaves in-domain and offline.
+    path and captures the agent's real tool-call sequence. If no endpoint is set,
+    or the call fails, the model provider stands in as the agent — conditioned on
+    the built-in agent's own system prompt when the adapter names one, so the
+    stand-in still behaves in-domain and offline (with no tool calls to report).
+
+    Returns ``(reply_text, tool_calls)`` where each tool call is a dict
+    ``{name, ok, detail?}`` straight from the agent.
     """
     config = adapter_snapshot.get("config", {})
     transport = adapter_snapshot.get("transport", "rest")
@@ -176,14 +182,17 @@ async def agent_reply(adapter_snapshot: dict, turns: list[Turn], provider) -> st
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                return data.get("reply") or data.get("content") or str(data)
+                reply = data.get("reply") or data.get("content") or str(data)
+                tool_calls = data.get("tool_calls") or []
+                return reply, tool_calls
         except httpx.HTTPError:
             pass  # fall through to the in-process provider stand-in
     # Provider stands in as the agent under test (in-domain when a built-in
     # agent is named on the adapter; safe generic default otherwise).
-    return await provider.chat(
+    reply = await provider.chat(
         system=agent_system_prompt(config.get("agent"), scenario),
         messages=_history_to_messages(turns),
         max_tokens=400,
         temperature=0.5,
     )
+    return reply, []

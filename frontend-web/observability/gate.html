@@ -96,23 +96,20 @@
     <h2>Evaluate <em>a new gate</em></h2>
     <div class="actions"><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">baseline · candidate · thresholds</span></div>
   </div>
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);padding:20px;box-shadow:0 1px 3px var(--shadow);display:grid;grid-template-columns:repeat(3,1fr) auto;gap:16px;align-items:flex-end;">
-    <div class="field">
-      <label>Baseline batch</label>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);padding:18px 20px;box-shadow:0 1px 3px var(--shadow);display:grid;grid-template-columns:1fr 1fr 130px auto;gap:14px;align-items:end;">
+    <div class="field" style="margin:0;">
+      <label>Baseline</label>
       <select class="input" id="gate-baseline"></select>
     </div>
-    <div class="field">
-      <label>Candidate batch</label>
+    <div class="field" style="margin:0;">
+      <label>Candidate</label>
       <select class="input" id="gate-candidate"></select>
     </div>
-    <div class="field">
-      <label>Pass-rate threshold</label>
+    <div class="field" style="margin:0;">
+      <label>Pass-rate min</label>
       <input class="input mono" id="gate-threshold" type="number" min="0" max="1" step="0.05" value="0.80" />
-      <div class="hint">minimum acceptable pass rate</div>
     </div>
-    <div>
-      <button class="btn primary" id="gate-run" style="margin-top:22px;">Evaluate →</button>
-    </div>
+    <button class="btn primary" id="gate-run">Evaluate →</button>
   </div>
 
   <!-- ============= WHAT CHANGED — four-tuple lineage diff ============= -->

@@ -40,13 +40,13 @@ class EvalWorker(BaseWorker):
         judge_refs: list[str] = inputs.get("judge_refs") or ["helpfulness@v1"]
         rubrics = inputs.get("judge_rubrics") or {r: r.split("@")[0] for r in judge_refs}
         mitigations = inputs.get("mitigations") or ["position_swap", "length_normalization"]
-        # Jurors are the *real* model(s) available on the provider chain — no
-        # fabricated multi-vendor panel. With a single configured provider every
-        # dimension is scored once by that model, so the job is judge mode; a
-        # true multi-model jury only appears if the deployment actually has more
-        # than one juror model.
-        juror_models = [provider.model_label]
-        n = len(juror_models)
+        # One real juror per configured provider — no fabricated multi-vendor
+        # panel. With a single configured provider every dimension is scored once,
+        # so the job is judge mode; a true multi-model jury only appears when the
+        # deployment actually wires more than one juror model. The juror's model
+        # label is resolved *per verdict* below from the model that actually served
+        # the score (the chain may drop to echo when the primary is rate-limited).
+        n = 1
         jury = inputs.get("mode") in ("panel", "jury") and n > 1
         mode = "jury" if jury else "judge"
 
@@ -93,11 +93,11 @@ class EvalWorker(BaseWorker):
                 base = await provider.score(rubric=dim, prompt=prompt, response=transcript)
                 score = round(base["score"], 3)
                 verdict_label = "pass" if base["passed"] else "fail"
-                # One juror per real model on the chain (see juror_models above).
-                jurors = [
-                    {"id": ref, "model": m, "score": score, "verdict": verdict_label}
-                    for m in juror_models
-                ]
+                # Attribute the verdict to the model that ACTUALLY served this score.
+                # On a fallback chain that is the link which answered (echo when the
+                # primary was rate-limited), not the statically-configured primary.
+                served_model = getattr(provider, "last_served_label", provider.model_label)
+                jurors = [{"id": ref, "model": served_model, "score": score, "verdict": verdict_label}]
                 judge_calls += len(jurors)
                 # Full agreement for aggregation (single real juror = unanimous);
                 # only surfaced on the verdict in jury mode.

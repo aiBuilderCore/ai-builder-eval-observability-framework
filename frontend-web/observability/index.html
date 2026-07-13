@@ -201,13 +201,17 @@
       totalRuns += b.run_count || 0;
       (b.runs || []).forEach(r => {
         totalSpans += (r.spans || []).length;
-        totalEval += (r.spans || []).filter(s => s.kind === 'EVALUATOR').length;
+        // Judge verdicts are real backend data on each run (OpenInference EVALUATOR
+        // spans have no telemetry source yet, so we count verdicts directly).
+        totalEval += (r.verdicts || []).length;
       });
     });
     document.getElementById('pill-batches').textContent = batches.length;
     document.getElementById('pill-runs').textContent = totalRuns;
-    document.getElementById('pill-spans').textContent = '~' + totalSpans;
-    document.getElementById('pill-eval').textContent = '~' + totalEval;
+    // Spans are the real reconstructed agent lifecycle (AGENT·LLM·RETRIEVER·TOOL·
+    // GUARDRAIL·EVALUATOR), one per real turn / tool call / verdict — exact, not ~.
+    document.getElementById('pill-spans').textContent = totalSpans;
+    document.getElementById('pill-eval').textContent = totalEval;
 
     function fmtTime(iso) {
       if (!iso) return '—';

@@ -32,8 +32,14 @@ BASE = "http://127.0.0.1:8080/api/v1"
 HEADERS = {"Authorization": "Bearer dev"}
 AGENT_ENDPOINT = "http://127.0.0.1:8097/chat"
 
-HEALTHY_JUDGES = ["helpfulness@v1", "answer_relevance@v1"]
-FINANCE_JUDGES = ["no_financial_advice@v1", "regulatory_disclosure@v1", "numeric_accuracy@v1"]
+# Seed sizing — one question-generation job over ALL personas, then both adapters
+# simulate the same seed set and every run is scored by the ENTIRE judge catalogue
+# (see `all_judge_refs`). Kept to 20 questions so the free-tier provider (which
+# falls back to the offline echo judge under rate limits) still finishes in
+# bootstrap while giving observability + self-heal a real cohort to work with.
+SEED_QUESTION_TOTAL = 20
+SIM_MAX_TURNS = 5
+SIM_CONCURRENCY = 10
 
 
 def poll(c: httpx.Client, job_id: str, timeout: float = 300) -> dict:
@@ -46,9 +52,11 @@ def poll(c: httpx.Client, job_id: str, timeout: float = 300) -> dict:
     raise TimeoutError(f"job {job_id} did not finish")
 
 
-def pick_persona(personas: list[dict], rubric: str, fallback_idx: int = 0) -> dict:
-    return next((p for p in personas if p.get("primary_rubric") == rubric),
-                personas[fallback_idx])
+def all_judge_refs(c: httpx.Client) -> list[str]:
+    """Every judge in the catalogue, as `name@vN` refs — so each run is scored by
+    the full panel rather than a hand-picked subset."""
+    judges = c.get(f"{BASE}/judges", headers=HEADERS).json()
+    return [f"{j['name']}@v{j['version']}" for j in judges]
 
 
 def ensure_adapter(c: httpx.Client, adapters: list[dict], name: str, config: dict) -> dict:
@@ -61,31 +69,44 @@ def ensure_adapter(c: httpx.Client, adapters: list[dict], name: str, config: dic
     ).json()
 
 
-def lineage(c: httpx.Client, persona: dict, adapter: dict, judges: list[str],
-            *, evidence: bool, label: str) -> None:
-    """Run one persona × adapter lineage end-to-end through the public API."""
-    # Small counts on purpose: this is a demo seed, not a load test. Fewer
-    # questions × shorter conversations = far fewer LLM calls, so the lineage
-    # finishes quickly even when the free-tier provider is rate-limiting.
+def generate_seed_set(c: httpx.Client, personas: list[dict], *, target_total: int) -> str:
+    """Run ONE question-generation job over *all* personas, producing exactly
+    `target_total` questions spread evenly across the persona × shape × scenario
+    grid. Returns the frozen seed_set_id both adapters then simulate against."""
+    persona_refs = [{"id": p["id"], "version": p["version"]} for p in personas]
     qs = c.post(
         f"{BASE}/question-sets", headers=HEADERS,
-        json={"persona_refs": [{"id": persona["id"], "version": persona["version"]}],
-              "count_per_persona": 2},
+        json={"persona_refs": persona_refs, "target_total": target_total},
     ).json()
-    seed_set_id = poll(c, qs["job_id"])["result"]["seed_set_id"]
+    result = poll(c, qs["job_id"])["result"]
+    seed_set_id = result["seed_set_id"]
+    print(
+        f"seed_pipeline: qgen · {len(persona_refs)} personas · "
+        f"{result.get('question_count', target_total)} questions · seed set {seed_set_id}"
+    )
+    return seed_set_id
 
+
+def lineage(c: httpx.Client, seed_set_id: str, adapter: dict, judges: list[str],
+            *, evidence: bool, label: str) -> None:
+    """Simulate + evaluate one adapter against the shared seed set, end-to-end
+    through the public API. Question generation is done once up front (all
+    personas), so the whole seed is exactly SEED_QUESTION_TOTAL questions and both
+    adapters run the same set — giving observability + self-heal a real cohort of
+    conversations to work with."""
     run = c.post(
         f"{BASE}/simulation/runs", headers=HEADERS,
-        json={"seed_set_id": seed_set_id, "adapter_id": adapter["id"], "max_turns": 2},
+        json={"seed_set_id": seed_set_id, "adapter_id": adapter["id"],
+              "max_turns": SIM_MAX_TURNS, "concurrency": SIM_CONCURRENCY},
     ).json()
     run_id = run["run_id"]
-    poll(c, run["job_id"])
+    poll(c, run["job_id"], timeout=600)
 
     ev = c.post(
         f"{BASE}/evaluation/jobs", headers=HEADERS,
         json={"run_ids": [run_id], "judge_refs": judges},
     ).json()
-    ejob = poll(c, ev["job_id"])
+    ejob = poll(c, ev["job_id"], timeout=600)
     vs_id = ejob["result"]["verdict_set_id"]
     pass_rate = ejob["result"]["pass_rate"]
     print(f"  {label}: run {run_id} · verdict set {vs_id} · pass_rate {pass_rate}")
@@ -116,8 +137,6 @@ def main() -> int:
         if not personas:
             print("seed_pipeline: no personas from the core library yet; skipping", file=sys.stderr)
             return 0
-        healthy_persona = pick_persona(personas, "numeric_accuracy")
-        breach_persona = pick_persona(personas, "no_financial_advice", fallback_idx=-1)
 
         adapters = c.get(f"{BASE}/adapters", headers=HEADERS).json()
         healthy_adapter = ensure_adapter(
@@ -133,10 +152,16 @@ def main() -> int:
              "domain": "financial-services / retirement", "scenario": "advice_leak"},
         )
 
-        print("seed_pipeline: driving the real pipeline (this exercises the workers)…")
-        lineage(c, healthy_persona, healthy_adapter, HEALTHY_JUDGES,
+        judges = all_judge_refs(c)
+        print(f"seed_pipeline: driving the real pipeline · {len(judges)} judges in catalogue")
+        # One question-generation job over ALL personas → exactly 20 questions.
+        seed_set_id = generate_seed_set(c, personas, target_total=SEED_QUESTION_TOTAL)
+        # Both adapters simulate the SAME seed set and every run is scored by the
+        # ENTIRE judge catalogue, so observability has two full cohorts and the
+        # guardrail judges open a real Self-Heal incident on the regression variant.
+        lineage(c, seed_set_id, healthy_adapter, judges,
                 evidence=True, label="healthy")
-        lineage(c, breach_persona, regression_adapter, FINANCE_JUDGES,
+        lineage(c, seed_set_id, regression_adapter, judges,
                 evidence=False, label="breach")
 
         incs = c.get(f"{BASE}/self-heal/incidents", headers=HEADERS).json()

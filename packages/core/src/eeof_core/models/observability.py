@@ -64,6 +64,11 @@ class GateDecision(BaseModel):
     threshold: float = 0.8
     verdict_set_ids: list[str] = Field(default_factory=list)
     evaluated_at: str = Field(default_factory=iso)
+    # Optional baseline comparison — when a baseline verdict set is supplied the
+    # gate is a real head-to-head, exposing the baseline pass_rate and the delta.
+    baseline: str | None = None
+    baseline_pass_rate: float | None = None
+    delta: float | None = None
 
 
 class EvidenceRequest(BaseModel):

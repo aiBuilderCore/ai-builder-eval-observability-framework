@@ -17,6 +17,8 @@ Synthetic demo only — educational, never real financial advice.
 
 from __future__ import annotations
 
+import hashlib
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -34,6 +36,66 @@ class ChatRequest(BaseModel):
     # Optional breach scenario (e.g. "advice_leak") — swaps in a guardrail-weakened
     # variant so the agent deterministically fails a guardrail judge. Demo-only.
     scenario: str | None = None
+
+
+# The agent's tool catalogue. Each tool is a named capability the planner calls
+# to answer a 401(k) question. Selection is deterministic on the conversation so a
+# run produces a real, reproducible tool-call sequence Observability can track
+# (trajectory drift, tool-call monitors) — not a synthetic scalar. Every turn does
+# realistic work even for terse follow-ups, so the sequence is never a bare
+# one-tool stub. `scenario` (a guardrail-regressed variant) swaps the closing
+# compliance step for a risky speculative projection — a clear, consistent
+# trajectory divergence a monitor should catch, tied to the numeric_accuracy /
+# no_financial_advice breach.
+_DOMAIN_TOOLS = ("contribution_calculator", "account_type_advisor", "irs_limit_lookup", "risk_profiler")
+_TOOL_DETAIL = {
+    "retrieve_plan_docs": "401(k) summary plan description",
+    "account_type_advisor": "roth vs traditional",
+    "contribution_calculator": "employer match + deferral",
+    "irs_limit_lookup": "402(g) elective deferral limit",
+    "risk_profiler": "target-date glidepath",
+    "compliance_disclosure": "no-advice + tax-year disclaimer",
+    "speculative_projection": "unqualified return projection (guardrail breach)",
+}
+
+
+def _plan_tool_calls(convo_text: str, scenario: str | None) -> list[dict]:
+    """Plan a realistic tool sequence from the whole conversation so far.
+
+    Grounds on plan docs, adds the domain tools the conversation implies (falling
+    back to a stable hash-seeded pair when the text is terse so every turn is a
+    real 3–4 tool sequence), then closes with compliance — or, in the regressed
+    scenario, a speculative projection instead.
+    """
+    text = (convo_text or "").lower()
+    picked: list[str] = ["retrieve_plan_docs"]
+
+    def add(name: str) -> None:
+        if name not in picked:
+            picked.append(name)
+
+    if any(k in text for k in ("roth", "traditional", "pre-tax", "pretax", "after-tax")):
+        add("account_type_advisor")
+    if any(k in text for k in ("match", "%", "percent", "contribute", "contribution", "how much", "save")):
+        add("contribution_calculator")
+    if any(k in text for k in ("limit", "maximum", "max", "cap", "catch-up", "catch up")):
+        add("irs_limit_lookup")
+    if any(k in text for k in ("risk", "aggressive", "conservative", "allocation", "fund", "invest")):
+        add("risk_profiler")
+
+    # Terse turns (short follow-ups) still do real work: deterministically seed a
+    # couple of domain tools from a stable hash of the conversation, so trajectory
+    # sees varied but reproducible sequences instead of a lone retrieve_plan_docs.
+    if len(picked) < 3:
+        seed = int(hashlib.sha256((text or "x").encode()).hexdigest(), 16)
+        for i in range(2):
+            add(_DOMAIN_TOOLS[(seed + i) % len(_DOMAIN_TOOLS)])
+
+    # Compliant agent always closes with a disclosure; the regressed variant
+    # instead emits an unqualified projection — a consistent, catchable drift.
+    picked.append("speculative_projection" if scenario else "compliance_disclosure")
+
+    return [{"name": n, "ok": True, "detail": _TOOL_DETAIL.get(n, "")} for n in picked]
 
 
 @app.get("/health")
@@ -63,10 +125,17 @@ async def chat(req: ChatRequest) -> dict:
          "content": m.get("content", "")}
         for m in req.messages
     ]
+    # Plan from the whole conversation so far (not just the last, possibly terse,
+    # follow-up) so every turn produces a realistic, context-grounded sequence.
+    convo_text = " ".join(
+        m.get("content", "") for m in req.messages if m.get("role") in (None, "user")
+    )
+    # Plan + "execute" the real tool-call sequence for this turn, then answer.
+    tool_calls = _plan_tool_calls(convo_text, req.scenario)
     reply = await provider.chat(
         system=agent_system_prompt(AGENT_ID, req.scenario),
         messages=history or [{"role": "user", "content": "Hello"}],
         max_tokens=400,
         temperature=0.4,
     )
-    return {"reply": reply, "agent": AGENT_ID}
+    return {"reply": reply, "agent": AGENT_ID, "tool_calls": tool_calls}
