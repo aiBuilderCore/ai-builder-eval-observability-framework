@@ -8,8 +8,46 @@ genuinely novel adversarial prompts through the same call.
 
 from __future__ import annotations
 
+import re
+
 from eeof_core.providers import ModelProvider
 from eeof_core.providers.echo import EchoProvider
+
+_TOKEN = re.compile(r"[a-z0-9']+")
+
+
+def _tokens(text: str) -> set[str]:
+    return set(_TOKEN.findall((text or "").lower()))
+
+
+def novelty_score(prompts: list[str]) -> float:
+    """Lexical novelty of a seed set (AutoBencher-style, embedding-free).
+
+    Returns ``1 − mean pairwise Jaccard similarity`` over the prompt token sets:
+    ~1.0 when prompts are highly varied, low when the generator produced near
+    duplicates. Deterministic, so echo-provider runs are reproducible. Real,
+    derived-from-the-questions metric — never a constant.
+    """
+    texts = [p for p in prompts if p and p.strip()]
+    if len(texts) < 2:
+        return 1.0 if texts else 0.0
+    sets = [_tokens(t) for t in texts]
+    sim_total, pairs = 0.0, 0
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            union = sets[i] | sets[j]
+            sim_total += (len(sets[i] & sets[j]) / len(union)) if union else 0.0
+            pairs += 1
+    mean_sim = sim_total / pairs if pairs else 0.0
+    return round(max(0.0, min(1.0, 1.0 - mean_sim)), 4)
+
+
+def diversity_coverage(covered_cells: set, total_cells: int) -> float:
+    """Fraction of rainbow-teaming archive cells (shape × scenario) actually
+    filled by the kept questions — 1.0 means every selected cell was exercised."""
+    if total_cells <= 0:
+        return 0.0
+    return round(max(0.0, min(1.0, len(covered_cells) / total_cells)), 4)
 
 # Framed as sanctioned QA/red-team test authoring — this is a defensive AI-safety
 # evaluation harness, not a jailbreak. The earlier "write an adversarial message"

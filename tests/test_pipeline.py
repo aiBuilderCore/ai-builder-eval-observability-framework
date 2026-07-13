@@ -73,6 +73,16 @@ async def test_full_pipeline():
     # verdicts are queryable by run via the GSI
     by_run = await get_table().query_gsi(f"RUN#{run_id}", "VERDICT#")
     assert len(by_run) == 3
+    # Live-streaming wiring: the verdict-set row is written (so the UI can fetch
+    # it by id mid-run) and the progress rides verdict_set_id + running pass/fail
+    # so the KPI strip and verdict list paint before completion.
+    vs_row = await get_table().get(keys.verdictset_pk(TENANT), keys.verdictset_sk(vs_id))
+    assert vs_row is not None
+    detail = eval_job.progress.detail
+    assert detail["verdict_set_id"] == vs_id
+    assert detail["pass_count"] + detail["fail_count"] == 3
+    # Audit trail dots out the phases, not just queued→ready.
+    assert "aggregating" in [e["state"] for e in eval_job.events]
 
     # 4. Evidence pack + deploy gate
     obs_job = _job("observability.evidence", "obs", {
@@ -108,6 +118,36 @@ async def test_qgen_covers_full_scenario_grid():
 
 
 @pytest.mark.asyncio
+async def test_qgen_filtered_questions_excluded_from_shipped_set():
+    """The ~10% quality trim must EXCLUDE filtered questions from the shipped set:
+    only kept questions are written to the table, question_count reflects the kept
+    count, and every archive cell still has a survivor (coverage preserved)."""
+    persona = {
+        "id": "persona_olivia", "version": "1.0.0", "name": "Onboarding Olivia",
+        "role": "ops lead", "tone": "casual", "tech_savviness": "novice",
+        "goals": ["ship fast"], "edge_cases": ["asks vague questions"],
+        "primary_rubric": "helpfulness",
+    }
+    shapes = ["ambiguate", "adversify"]
+    scenarios = ["short.chat.easy", "medium.ticket.medium"]
+    # 2 shapes × 2 scenarios × 2 = 8 generated; ~10% trim drops 1 -> 7 shipped.
+    job = _job("qgen.generate", "qgen", {
+        "persona_snapshots": [persona], "count_per_cell": 2,
+        "shapes": shapes, "scenarios": scenarios,
+    })
+    result = await QGenWorker().handle(job)
+    rows = await get_table().query(keys.question_pk(result["seed_set_id"]), "QUESTION#")
+    # Shipped set is trimmed and consistent: table rows == question_count < generated.
+    assert result["question_count"] == len(rows)
+    assert len(rows) == 7  # 8 generated, 1 filtered out
+    # Filtered questions never leak into the table — every stored row is kept.
+    assert all(r["data"]["kept"] for r in rows)
+    # Coverage preserved: all four (shape × scenario) cells still have a survivor.
+    assert {(r["data"]["shape"], r["data"]["scenario"]) for r in rows} == {
+        (sh, sc) for sh in shapes for sc in scenarios}
+
+
+@pytest.mark.asyncio
 async def test_qgen_target_total_is_exact():
     """An explicit target_total is honored precisely (no ceil overshoot), spread
     evenly across the grid rather than uniform-per-cell rounding."""
@@ -134,6 +174,85 @@ async def test_qgen_target_total_is_exact():
     per_cell = Counter((r["data"]["shape"], r["data"]["scenario"]) for r in rows)
     assert len(per_cell) == 6  # every cell used
     assert max(per_cell.values()) - min(per_cell.values()) <= 1
+
+
+@pytest.mark.asyncio
+async def test_qgen_target_distributes_across_all_personas():
+    """A target smaller than the full grid must still touch EVERY selected persona
+    (regression: the old first-`rem`-cells split piled the target onto the leading
+    personas and left the trailing ones empty)."""
+    personas = [
+        {"id": f"persona_{i}", "version": "1.0.0", "name": f"P{i}",
+         "role": "ops", "tone": "casual", "tech_savviness": "novice",
+         "goals": ["ship fast"], "edge_cases": ["asks vague questions"],
+         "primary_rubric": "helpfulness"}
+        for i in range(5)
+    ]
+    # 5 personas × 2 shapes × 2 scenarios = 20 cells; target 8 < 20 cells.
+    job = _job("qgen.generate", "qgen", {
+        "persona_snapshots": personas, "count_per_cell": 99, "target_total": 8,
+        "shapes": ["ambiguate", "adversify"],
+        "scenarios": ["short.chat.easy", "medium.ticket.medium"],
+    })
+    result = await QGenWorker().handle(job)
+    assert result["question_count"] == 8
+    rows = await get_table().query(keys.question_pk(result["seed_set_id"]), "QUESTION#")
+    from collections import Counter
+    per_persona = Counter(r["data"]["persona"]["id"] for r in rows)
+    # Every selected persona is represented, and no two differ by more than one.
+    assert set(per_persona) == {p["id"] for p in personas}
+    assert max(per_persona.values()) - min(per_persona.values()) <= 1
+    # Rotation spreads the target across cells, not just each persona's first cell:
+    # all four (shape × scenario) archive cells are exercised, not a single column.
+    cells = {(r["data"]["shape"], r["data"]["scenario"]) for r in rows}
+    assert len(cells) == 4
+
+
+@pytest.mark.asyncio
+async def test_qgen_reports_real_novelty_and_coverage():
+    """Novelty and coverage are computed from the shipped questions, in range, and
+    not the old hardcoded 0.72 / 0.83 constants. Full grid -> coverage 1.0."""
+    persona = {
+        "id": "persona_ava", "version": "1.0.0", "name": "Ava",
+        "role": "ops", "tone": "casual", "tech_savviness": "novice",
+        "goals": ["ship fast"], "edge_cases": ["asks vague questions"],
+        "primary_rubric": "helpfulness",
+    }
+    # 2 shapes × 3 scenarios = 6 cells, 2 per cell = 12 questions. The ~10% filter
+    # trims one question but leaves every cell with at least one survivor.
+    job = _job("qgen.generate", "qgen", {
+        "persona_snapshots": [persona], "count_per_cell": 2,
+        "shapes": ["ambiguate", "adversify"],
+        "scenarios": ["short.chat.easy", "medium.ticket.medium", "long.email.hard"],
+    })
+    result = await QGenWorker().handle(job)
+    assert 0.0 <= result["novelty_score"] <= 1.0
+    assert 0.0 <= result["diversity_coverage"] <= 1.0
+    # Every (shape × scenario) archive cell still has a kept question -> full coverage.
+    assert result["diversity_coverage"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_qgen_records_phase_transitions_in_audit_trail():
+    """The worker logs each phase to the audit trail so the timeline dots out the
+    real run (running → evolving → filtering → ready_for_review), not just a jump
+    from queued to ready. Regression: phases used to push status without events."""
+    persona = {
+        "id": "persona_olivia", "version": "1.0.0", "name": "Onboarding Olivia",
+        "role": "ops lead", "tone": "casual", "tech_savviness": "novice",
+        "goals": ["ship fast"], "edge_cases": ["asks vague questions"],
+        "primary_rubric": "helpfulness",
+    }
+    job = _job("qgen.generate", "qgen", {
+        "persona_snapshots": [persona], "count_per_cell": 2,
+        "shapes": ["ambiguate", "adversify"], "scenarios": ["short.chat.easy"],
+    })
+    await QGenWorker().handle(job)
+    states = [e["state"] for e in job.events]
+    for expected in ("running", "evolving", "filtering", "ready_for_review"):
+        assert expected in states, f"{expected} missing from audit trail {states}"
+    # Deduped: the many running-phase pushes collapse to a single trail entry.
+    assert states.count("running") == 1
 
 
 @pytest.mark.asyncio

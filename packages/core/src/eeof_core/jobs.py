@@ -62,6 +62,9 @@ async def push_status(job: Job) -> None:
         "progress": job.progress.model_dump(),
         "result": job.result,
         "error": job.error,
+        # Include the audit trail so a live WS frame carries the timeline, not just
+        # the current phase — the detail page dots out transitions as they happen.
+        "events": list(job.events),
     }
     await bus.kv_put(KV_BUCKET, job.job_id, snapshot)
     await bus.publish(status_subject(job.stage, job.job_id), snapshot)

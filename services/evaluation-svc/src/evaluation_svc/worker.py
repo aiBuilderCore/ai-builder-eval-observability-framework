@@ -17,6 +17,7 @@ import hashlib
 
 from eeof_core.dataplane import get_blob, get_table, keys
 from eeof_core.ids import new_id
+from eeof_core.jobs import push_status, record_event
 from eeof_core.models import Job, TraceRef, Verdict, VerdictSet
 from eeof_core.models.common import iso
 from eeof_core.providers import get_provider
@@ -61,6 +62,17 @@ class EvalWorker(BaseWorker):
         judge_consensus: dict[str, list[float]] = {}
         judge_calls = 0
         cell = 0
+        pass_running = 0
+
+        # Write the verdict-set row up front (state=running) so the UI can fetch
+        # this set by id and paint verdicts as they stream in — mirrors qgen's
+        # incremental questions. Finalised with real aggregates after scoring.
+        vset = VerdictSet(
+            id=vs_id, tenant=job.tenant, workspace=job.workspace, run_ids=run_ids,
+            judge_refs=judge_refs, aggregation=inputs.get("aggregation", "majority"),
+            mode=mode, state="running",
+        )
+        await self._put_verdictset(job.tenant, vset)
 
         for tref in traces:
             trace = await get_blob().get_json(tref.blob_uri)
@@ -104,6 +116,8 @@ class EvalWorker(BaseWorker):
                     mitigations_applied=mitigations, rubric={"id": dim, "version": 1},
                 )
                 verdicts.append(v)
+                if verdict_label == "pass":
+                    pass_running += 1
                 dim_scores.setdefault(dim, []).append(mean_score)
                 judge_consensus.setdefault(ref, []).append(consensus)
                 gsipk, gsisk = keys.verdict_gsi(tref.run_id, v.id)
@@ -113,7 +127,20 @@ class EvalWorker(BaseWorker):
                     "data": v.model_dump(mode="json"),
                 })
                 if cell % 5 == 0 or cell == total_cells:
-                    await self._progress(job, cell, total_cells, verdicts, judge_calls)
+                    await self._progress(job, cell, total_cells, verdicts,
+                                         judge_calls, vs_id, pass_running)
+
+        # Aggregation phase — dotted on the audit timeline so the trail reads
+        # queued → running → aggregating → ready instead of a bare jump to ready.
+        job.progress.phase = "aggregating"
+        job.progress.detail = {
+            "cells_total": total_cells, "cells_done": cell,
+            "verdicts_emitted": len(verdicts), "judge_call_count": judge_calls,
+            "verdict_set_id": vs_id, "pass_count": pass_running,
+            "fail_count": len(verdicts) - pass_running,
+        }
+        record_event(job, "aggregating")
+        await push_status(job)
 
         pass_count = sum(1 for v in verdicts if v.verdict == "pass")
         pass_rate = round(pass_count / len(verdicts), 4) if verdicts else 0.0
@@ -123,18 +150,13 @@ class EvalWorker(BaseWorker):
             / max(1, sum(len(c) for c in judge_consensus.values())), 3
         )
 
-        vset = VerdictSet(
-            id=vs_id, tenant=job.tenant, workspace=job.workspace, run_ids=run_ids,
-            judge_refs=judge_refs, aggregation=inputs.get("aggregation", "majority"),
-            verdict_count=len(verdicts), pass_rate=pass_rate, pass_count=pass_count,
-            aggregate_scores=aggregate_scores, mode=mode,
-        )
-        gsipk, gsisk = keys.verdictset_gsi(job.tenant, vset.created_at)
-        await get_table().put({
-            "PK": keys.verdictset_pk(job.tenant), "SK": keys.verdictset_sk(vs_id),
-            "GSIPK": gsipk, "GSISK": gsisk, "type": "verdict_set",
-            "data": vset.model_dump(mode="json"),
-        })
+        # Finalise the verdict-set row (same id/created_at, state → shipped).
+        vset.verdict_count = len(verdicts)
+        vset.pass_rate = pass_rate
+        vset.pass_count = pass_count
+        vset.aggregate_scores = aggregate_scores
+        vset.state = "shipped"
+        await self._put_verdictset(job.tenant, vset)
 
         # Judge-calibration records — inter-juror agreement per judge.
         for ref, cons in judge_consensus.items():
@@ -164,15 +186,29 @@ class EvalWorker(BaseWorker):
                     return name
         return "Agent under test"
 
-    async def _progress(self, job, done, total, verdicts, judge_calls):
+    async def _put_verdictset(self, tenant: str, vset: VerdictSet) -> None:
+        """Upsert the verdict-set row (stable GSI keys from created_at) so the
+        early running-state write and the final shipped write land on one record."""
+        gsipk, gsisk = keys.verdictset_gsi(tenant, vset.created_at)
+        await get_table().put({
+            "PK": keys.verdictset_pk(tenant), "SK": keys.verdictset_sk(vset.id),
+            "GSIPK": gsipk, "GSISK": gsisk, "type": "verdict_set",
+            "data": vset.model_dump(mode="json"),
+        })
+
+    async def _progress(self, job, done, total, verdicts, judge_calls, vs_id, pass_count):
         job.progress.done = done
         job.progress.total = total
         job.progress.phase = "running"
+        # verdict_set_id + running pass/fail ride every frame so the job page can
+        # fetch the partial set and paint the KPIs live, mid-run.
         job.progress.detail = {
             "cells_total": total, "cells_done": done,
             "verdicts_emitted": len(verdicts), "judge_call_count": judge_calls,
+            "verdict_set_id": vs_id,
+            "pass_count": pass_count, "fail_count": len(verdicts) - pass_count,
         }
-        from eeof_core.jobs import push_status
+        record_event(job, "running")
         await push_status(job)
 
     async def _save_calibration(self, tenant: str, judge_ref: str, cons: list[float], n: int):

@@ -559,7 +559,9 @@ window.QG = {
       : null;
     return {
       job_id: j.job_id,
-      seed_set_id: r.seed_set_id || null,
+      // Prefer the final result's id; else the in-progress id the worker rides on
+      // each frame, so the viewer can fetch + paint the partial set mid-run.
+      seed_set_id: r.seed_set_id || d.seed_set_id || null,
       created_by: j.submitted_by, created_at: j.submitted_at,
       completed_at: shipped ? (terminalEv?.ts || j.updated_at) : null,
       completed_by: completedLabel,
@@ -575,9 +577,15 @@ window.QG = {
         evolution_passes_applied: d.evolution_passes_applied || 0,
       },
       output: shipped && r.seed_set_id ? {
-        seed_set_id: r.seed_set_id, storage_uri: "",
+        seed_set_id: r.seed_set_id, storage_uri: r.storage_uri || "",
         question_count: r.question_count || 0,
-        novelty_score: 0.72, diversity_coverage: 0.83,
+        // Real, worker-computed metrics (novelty of the kept prompts, share of
+        // archive cells filled). Fall back to the phase detail, then 0 — never a
+        // fabricated constant.
+        novelty_score: r.novelty_score ?? d.novelty_score ?? 0,
+        diversity_coverage: r.diversity_coverage ?? d.diversity_coverage ?? 0,
+        novelty_floor: r.novelty_floor ?? d.novelty_floor ?? (ai.novelty_floor ?? null),
+        meets_novelty_floor: r.meets_novelty_floor ?? d.meets_novelty_floor ?? null,
       } : null,
       // Audit trail: use the backend's real per-transition events (queued →
       // running → ready, each with ts + actor). Only synthesize a lone
@@ -720,6 +728,13 @@ window.QG = {
       // One question per (persona × shape × scenario) cell. The worker iterates
       // the full grid, so every selected scenario is exercised.
       count_per_cell: draft.count_per_cell || 2,
+      // Advanced knobs — frozen into the job envelope so the job-detail view
+      // shows what actually ran (was blank before because these never left the UI).
+      evolution_passes: draft.evolution_passes ?? 1,
+      jailbreak_budget: draft.jailbreak_budget ?? 0,
+      novelty_floor: draft.novelty_floor ?? 0.5,
+      dedup_threshold: draft.dedup_threshold ?? 0.92,
+      language: draft.language ?? "en",
     };
     // Exact total override — the worker distributes it evenly so the produced
     // count matches precisely (no client-side ceil overshoot).

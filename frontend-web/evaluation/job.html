@@ -173,7 +173,7 @@
 
 <script src="../_api.js"></script>
 
-<script src="app.js"></script>
+<script src="app.js?v=evalfix2"></script>
 <script>
   function getQuery(name) {
     return new URLSearchParams(location.search).get(name);
@@ -213,8 +213,9 @@
   function renderKpis(job) {
     const host = document.getElementById("kpis");
     const pct = job.progress.cells_total ? Math.round(100 * job.progress.cells_done / job.progress.cells_total) : 0;
-    const passCount = job.output?.pass_count ?? "—";
-    const failCount = job.output?.fail_count ?? "—";
+    // Paint pass/fail live from the running tallies; fall back to the final output.
+    const passCount = job.output?.pass_count ?? job.progress.pass_count ?? "—";
+    const failCount = job.output?.fail_count ?? job.progress.fail_count ?? "—";
     const consensus = job.progress.consensus_rate ? `${(job.progress.consensus_rate * 100).toFixed(0)}%` : "—";
     host.innerHTML = `
       <div class="kpi">
@@ -278,16 +279,29 @@
     document.getElementById("aggregate-meta").textContent = `${job.output.verdict_count} verdicts`;
     const host = document.getElementById("aggregate");
     host.innerHTML = "";
+    // Per-dimension pass rate from the actual verdicts — not the overall rate
+    // repeated on every tile.
+    const verdicts = EV.getVerdictSet(job.verdict_set_id) || [];
+    const isJury = job.inputs.mode === "jury";
     Object.entries(job.output.aggregate_scores).forEach(([dim, score]) => {
       const cls = classOfScore(score);
       const tile = document.createElement("div");
       tile.className = "aggregate-tile";
-      const passRate = job.output.pass_count / Math.max(1, job.output.verdict_count);
+      const dimVerdicts = verdicts.filter(v => v.dimension === dim);
+      const dimPass = dimVerdicts.filter(v => v.verdict === "pass").length;
+      const passRate = dimVerdicts.length
+        ? dimPass / dimVerdicts.length
+        : job.output.pass_count / Math.max(1, job.output.verdict_count);
+      // Jury consensus is only meaningful for a real multi-juror panel; in single
+      // judge mode there is no jury, so show the verdict count instead.
+      const meta = isJury && job.progress.consensus_rate
+        ? `jury <b>${(job.progress.consensus_rate * 100).toFixed(0)}%</b>`
+        : `${dimVerdicts.length} verdict${dimVerdicts.length === 1 ? "" : "s"}`;
       tile.innerHTML = `
         <div class="dim-label">${dim}</div>
         <div class="dim-value">${score.toFixed(2)}</div>
         <div class="score-gauge ${cls}"><span class="bar"><i style="width:${Math.round(score*100)}%"></i></span></div>
-        <div class="dim-meta"><b>${(passRate*100).toFixed(0)}%</b> pass · jury <b>${job.progress.consensus_rate ? (job.progress.consensus_rate*100).toFixed(0) + "%" : "—"}</b></div>
+        <div class="dim-meta"><b>${(passRate*100).toFixed(0)}%</b> pass · ${meta}</div>
       `;
       host.appendChild(tile);
     });

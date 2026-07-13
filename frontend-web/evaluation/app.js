@@ -816,7 +816,10 @@ window.EV = {
     const terminalEvent = (j.events || []).slice().reverse()
       .find((e) => ["ready", "shipped", "failed"].includes(e.state));
     return {
-      job_id: j.job_id, verdict_set_id: r.verdict_set_id || null,
+      job_id: j.job_id,
+      // Prefer the final result's id; else the in-progress id the worker rides on
+      // each frame, so the viewer can fetch + paint verdicts as they stream.
+      verdict_set_id: r.verdict_set_id || d.verdict_set_id || null,
       created_by: j.submitted_by, created_at: j.submitted_at,
       completed_at: (j.state === "ready" || j.state === "shipped") ? j.updated_at : null,
       completed_by: (j.state === "ready" || j.state === "shipped") ? (terminalEvent?.by || "worker") : null,
@@ -829,6 +832,9 @@ window.EV = {
         verdicts_emitted: d.verdicts_emitted || r.verdict_count || 0,
         judge_call_count: d.judge_call_count || r.judge_call_count || 0,
         consensus_rate: r.consensus_rate || 0,
+        // Running pass/fail tallies so the KPI strip paints live, pre-completion.
+        pass_count: d.pass_count,
+        fail_count: d.fail_count,
       },
       // Prefer the real backend audit trail (Job.events); fall back to a
       // synthesised timeline for older records that predate event logging.

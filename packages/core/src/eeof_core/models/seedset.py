@@ -75,3 +75,8 @@ class SeedSet(BaseModel):
     created_at: str = Field(default_factory=iso)
     state: str = "shipped"
     storage_uri: str = ""  # blob pointer to the full question payload
+    # Quality metrics derived from the shipped questions (never constants):
+    # lexical novelty of the prompts, and the share of selected (shape × scenario)
+    # archive cells actually filled.
+    novelty_score: float = 0.0
+    diversity_coverage: float = 0.0

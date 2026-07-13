@@ -129,6 +129,14 @@ class QuestionSetRequest(BaseModel):
     # Optional exact total — overrides count_per_cell; the worker distributes it
     # evenly across the grid so the generated count matches precisely.
     target_total: int | None = None
+    # Generation knobs surfaced in the create wizard's "Advanced knobs". Frozen
+    # into the job envelope so the job-detail view can show exactly what was run
+    # (and the worker can honor them) rather than rendering blanks.
+    evolution_passes: int = 1
+    jailbreak_budget: int = 0
+    novelty_floor: float = 0.5
+    dedup_threshold: float = 0.92
+    language: str = "en"
 
     @property
     def per_cell(self) -> int:
@@ -157,6 +165,11 @@ async def create_question_set(
         "shapes": req.shapes,
         "count_per_cell": req.per_cell,
         "target_total": req.target_total,
+        "evolution_passes": req.evolution_passes,
+        "jailbreak_budget": req.jailbreak_budget,
+        "novelty_floor": req.novelty_floor,
+        "dedup_threshold": req.dedup_threshold,
+        "language": req.language,
     }
     return await submit_job(
         p, kind="qgen.generate", stage="qgen", inputs=inputs, idempotency_key=idempotency_key
