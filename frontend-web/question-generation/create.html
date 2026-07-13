@@ -252,7 +252,7 @@
 
 <script src="../_api.js"></script>
 
-<script src="app.js"></script>
+<script src="app.js?v=qgfix6"></script>
 <script>
   // ---------- State ----------
   // Rubrics are derived per-persona via QG.rubricsForPersonas() — no
@@ -744,6 +744,12 @@
         rubrics: QG.rubricsForPersonas(draft.personas),
         count_per_cell: draft.knobs.count_per_cell || 2,
         target_total: inputs.target_total || null,
+        // Freeze the advanced knobs alongside the grid so the job detail reflects them.
+        evolution_passes: draft.knobs.evolution_passes,
+        jailbreak_budget: draft.knobs.jailbreak_budget,
+        novelty_floor: draft.knobs.novelty_floor,
+        dedup_threshold: draft.knobs.dedup_threshold,
+        language: draft.knobs.language,
       }).then((jobId) => {
         QG.toast(`Submitted ${jobId}`, "Question Generation");
         setTimeout(() => location.href = `./job.html?id=${encodeURIComponent(jobId)}`, 250);

@@ -128,7 +128,7 @@
 
 <script src="../_api.js"></script>
 
-<script src="app.js"></script>
+<script src="app.js?v=qgfix6"></script>
 <script>
   const params = new URLSearchParams(location.search);
   const jobId = params.get("id");
@@ -237,6 +237,7 @@
 
     // ----- Inputs panel -----
     document.getElementById("input-hash").textContent = job.config_hash.slice(0, 30) + "…";
+    const idsc = "color:var(--text-faint);display:block;margin-top:2px;line-height:1.35;";
     document.getElementById("inputs-kv").innerHTML = `
       <dt>persona_ids</dt>
       <dd>${persona.map(p => {
@@ -248,10 +249,10 @@
       <dd>${rubricObjs.length === 0 ? "—" : rubricObjs.map(rr => `<code>${rr.id}</code> <small style="color:var(--text-faint);">v${rr.version}</small>`).join(" · ")}${isMixedRubric ? ' <small style="color:var(--accent);">· mixed-rubric set · per-question scoring</small>' : ""}</dd>
       <dt>prompt_shapes</dt>
       <dd>${strats.map(s => `<code>${s.id}</code> · ${s.name} <small style="color:var(--text-faint);">v${s.version}</small>`).join("<br>") || "—"}${job.inputs.shapes_overridden ? ' <small style="color:var(--accent);">· override</small>' : (job.inputs.prompt_shapes ? ' <small style="color:var(--text-faint);">· inferred from personas</small>' : '')}</dd>
-      <dt>count_per_cell</dt>          <dd><code>${job.inputs.count_per_cell ?? "—"}</code></dd>
-      <dt>evolution_passes</dt>        <dd><code>${job.inputs.evolution_passes ?? "—"}</code></dd>
-      <dt>jailbreak_budget</dt>        <dd><code>${job.inputs.jailbreak_budget ?? "—"}</code></dd>
-      <dt>novelty_floor</dt>           <dd><code>${job.inputs.novelty_floor ?? "—"}</code></dd>
+      <dt>count_per_cell</dt>          <dd><code>${job.inputs.count_per_cell ?? "—"}</code><small style="${idsc}">Questions authored per (persona × shape × scenario) cell.</small></dd>
+      <dt>evolution_passes</dt>        <dd><code>${job.inputs.evolution_passes ?? "—"}</code><small style="${idsc}">Rainbow-teaming mutation rounds toward the failure surface.</small></dd>
+      <dt>jailbreak_budget</dt>        <dd><code>${job.inputs.jailbreak_budget ?? "—"}</code><small style="${idsc}">Max adversarial jailbreak attempts allowed per prompt.</small></dd>
+      <dt>novelty_floor</dt>           <dd><code>${job.inputs.novelty_floor ?? "—"}</code><small style="${idsc}">Min acceptable novelty — the set is flagged if it scores below.</small></dd>
       <dt>language</dt>                <dd><code>${job.inputs.language ?? "en"}</code></dd>
     `;
 
@@ -260,12 +261,19 @@
     if (job.output) {
       op.style.display = "";
       document.getElementById("output-meta").innerHTML = `<a href="./seed-set.html?id=${encodeURIComponent(job.output.seed_set_id)}" style="color:var(--accent);">view in viewer →</a>`;
+      const floor = job.output.novelty_floor ?? job.inputs.novelty_floor;
+      const hasFloor = floor !== undefined && floor !== null;
+      const meets = job.output.meets_novelty_floor;
+      const floorNote = hasFloor
+        ? ` · floor ${Number(floor).toFixed(2)} ${meets === false ? "✗ below" : "✓ met"}`
+        : "";
+      const dsc = "color:var(--text-faint);display:block;margin-top:2px;line-height:1.35;";
       document.getElementById("output-kv").innerHTML = `
         <dt>seed_set_id</dt>          <dd><code>${job.output.seed_set_id}</code></dd>
         <dt>question_count</dt>       <dd><code>${job.output.question_count}</code></dd>
-        <dt>novelty_score</dt>        <dd><code>${(job.output.novelty_score).toFixed(2)}</code> <small style="color:var(--text-faint);">(AutoBencher-style; floor = ${job.inputs.novelty_floor})</small></dd>
-        <dt>diversity_coverage</dt>   <dd><code>${(job.output.diversity_coverage * 100).toFixed(0)}%</code> <small style="color:var(--text-faint);">(Rainbow-Teaming archive cells filled)</small></dd>
-        <dt>storage_uri</dt>          <dd><code>${job.output.storage_uri}</code></dd>
+        <dt>novelty_score</dt>        <dd><code>${(job.output.novelty_score).toFixed(2)}</code><small style="${dsc}">Lexical variety of the kept prompts — 1 minus their mean pairwise overlap. Higher = less repetition${floorNote}.</small></dd>
+        <dt>diversity_coverage</dt>   <dd><code>${(job.output.diversity_coverage * 100).toFixed(0)}%</code><small style="${dsc}">Share of the selected shape × scenario cells that shipped a question. 100% = every cell exercised.</small></dd>
+        <dt>storage_uri</dt>          <dd><code>${job.output.storage_uri || "—"}</code><small style="${dsc}">Blob pointer to the full generated payload (kept + filtered) held for audit.</small></dd>
       `;
     } else {
       op.style.display = "none";
@@ -280,13 +288,16 @@
       fp.style.display = "none";
     }
 
-    // ----- Question table (only if there's a seed set yet) -----
+    // ----- Question table (paints live as the set fills; no need to wait for
+    // completion — the worker writes each question as it's authored) -----
     const qp = document.getElementById("question-panel");
-    if (job.output && job.seed_set_id) {
+    if (job.seed_set_id) {
       const ss = QG.getSeedSet(job.seed_set_id);
       if (ss && ss.length) {
         qp.style.display = "";
-        document.getElementById("qcount-meta").textContent = `${ss.length} shown · ${job.output.question_count} total`;
+        const total = job.output ? job.output.question_count : (job.progress.questions_generated || ss.length);
+        const live = !job.output && isActive ? " · generating…" : "";
+        document.getElementById("qcount-meta").textContent = `${ss.length} shown · ${total} total${live}`;
         document.getElementById("q-list").innerHTML = ss.slice(0, 12).map(q => {
           const p = QG.personaById(q.persona.id);
           const shape = q.prompt_shape ?? q.strategy;
