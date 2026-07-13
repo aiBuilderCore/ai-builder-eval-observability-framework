@@ -100,3 +100,19 @@ async def spend(p: Principal = Depends(principal)) -> dict:
     from eeof_core.rollups import spend_rollup
 
     return await spend_rollup(p.tenant)
+
+
+@app.get("/observability/quality/trend")
+async def quality_trend(window: int = 30, p: Principal = Depends(principal)) -> dict:
+    # Real time-series of pass-rate + per-pillar over successive verdict sets.
+    from eeof_core.rollups import quality_trend_rollup
+
+    return await quality_trend_rollup(p.tenant, window)
+
+
+@app.get("/observability/coverage")
+async def coverage(p: Principal = Depends(principal)) -> dict:
+    # Agent × pillar coverage — every pillar a cell, untested cells explicit.
+    from eeof_core.rollups import coverage_rollup
+
+    return await coverage_rollup(p.tenant)

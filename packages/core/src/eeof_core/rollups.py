@@ -100,6 +100,79 @@ async def quality_rollup(tenant: str) -> dict:
     return {"applications": apps, "pillars": pillars, "platform_mean": platform_mean}
 
 
+async def quality_trend_rollup(tenant: str, window: int = 30) -> dict:
+    """Real time-series of quality over successive verdict sets (chronological).
+
+    Each verdict set is one point in time (its `created_at`); we emit the set's
+    pass_rate and per-pillar mean score so the dashboard can draw a *real* trend
+    line instead of the decorative "last 30d" label it carried before. `window`
+    caps the number of most-recent points returned.
+    """
+    gsipk, _ = keys.verdictset_gsi(tenant, "")
+    vset_rows = await get_table().query_gsi(gsipk)
+    vsets = sorted(vset_rows, key=lambda r: r["data"].get("created_at", ""))
+
+    points: list[dict] = []
+    for row in vsets:
+        vs = row["data"]
+        verdicts = await get_table().query(keys.verdict_pk(vs["id"]), "VERDICT#")
+        by_pillar: dict[str, list[float]] = {}
+        for r in verdicts:
+            by_pillar.setdefault(_pillar_of(r["data"]), []).append(r["data"]["score"])
+        pillars = {
+            name: round(100 * sum(s) / len(s))
+            for name, s in by_pillar.items()
+        }
+        points.append(
+            {
+                "verdict_set_id": vs["id"],
+                "ts": vs.get("created_at"),
+                "pass_rate": round(100 * vs.get("pass_rate", 0)),
+                "verdicts": vs.get("verdict_count", 0),
+                "pillars": pillars,
+            }
+        )
+
+    points = points[-window:]
+    return {"points": points, "count": len(points)}
+
+
+async def coverage_rollup(tenant: str) -> dict:
+    """Agent × pillar test coverage, from real verdicts.
+
+    Surfaces the blind spots the flat pillar bars hid: for every agent, every one
+    of the six quality pillars is a cell — a mean score where verdicts exist, or
+    `null` (never tested) where they don't. Untested no longer looks like passing.
+    """
+    verdicts = await _all_verdicts(tenant)
+    agent_of = await _run_agent_map(tenant)
+
+    # (agent, pillar) -> scores
+    cells: dict[tuple[str, str], list[float]] = {}
+    agents: list[str] = []
+    for v in verdicts:
+        agent = agent_of.get(v["run_id"], "Unknown agent")
+        if agent not in agents:
+            agents.append(agent)
+        cells.setdefault((agent, _pillar_of(v)), []).append(v["score"])
+
+    matrix = []
+    for agent in agents:
+        row = {"agent": agent, "pillars": []}
+        for pillar in QUALITY_PILLARS:
+            scores = cells.get((agent, pillar))
+            row["pillars"].append(
+                {
+                    "pillar": pillar,
+                    "score": round(100 * sum(scores) / len(scores)) if scores else None,
+                    "count": len(scores) if scores else 0,
+                }
+            )
+        matrix.append(row)
+
+    return {"pillars": QUALITY_PILLARS, "agents": matrix}
+
+
 async def spend_rollup(tenant: str) -> dict:
     """Per-stage 24h spend, derived from real record counts + token totals."""
     table = get_table()

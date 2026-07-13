@@ -31,7 +31,7 @@ from eeof_core.models import (
     SeedSet,
 )
 
-from .clients import close_client, proxy
+from .clients import SERVICES, close_client, get_client, proxy
 from .submit import submit_job
 
 
@@ -388,6 +388,58 @@ async def obs_quality(p: Principal = Depends(principal)):
 async def obs_spend(p: Principal = Depends(principal)):
     # Per-stage 24h spend, derived from real token totals + record counts.
     return await proxy("observability", "GET", "/observability/spend", p)
+
+
+@api.get("/observability/quality/trend")
+async def obs_quality_trend(window: int = 30, p: Principal = Depends(principal)):
+    # Real time-series: pass-rate + per-pillar over successive verdict sets.
+    return await proxy(
+        "observability", "GET", "/observability/quality/trend", p,
+        params={"window": window},
+    )
+
+
+@api.get("/observability/coverage")
+async def obs_coverage(p: Principal = Depends(principal)):
+    # Persona × pillar test coverage, derived from real runs + verdicts.
+    return await proxy("observability", "GET", "/observability/coverage", p)
+
+
+@api.get("/system/health")
+async def system_health(p: Principal = Depends(principal)):
+    """Real platform health: the edge (this process is up), a live fan-out to
+    every capability service's /health, the active data-plane mode, and the
+    effective model-provider chain. Replaces the dashboard's hardcoded health
+    rows so a degraded provider or a down service is reported truthfully."""
+    from eeof_core.config import settings
+    from eeof_core.providers import describe_chain
+
+    client = get_client()
+
+    async def probe(name: str, base: str) -> dict:
+        try:
+            r = await client.get(f"{base}/health", timeout=3)
+            return {"name": name, "up": r.status_code == 200}
+        except Exception:
+            return {"name": name, "up": False}
+
+    import asyncio
+
+    # De-dup by base URL (judge-registry is folded into evaluation-svc).
+    seen: dict[str, str] = {}
+    for name, base in SERVICES.items():
+        seen.setdefault(base, name)
+    services = await asyncio.gather(*(probe(n, b) for b, n in seen.items()))
+    services.sort(key=lambda s: s["name"])
+
+    return {
+        "edge": {"up": True},
+        "services": services,
+        "services_up": sum(1 for s in services if s["up"]),
+        "services_total": len(services),
+        "data_plane": {"mode": settings.app_env, "kind": "in-memory" if settings.app_env == "local" else "scylladb+nats+minio"},
+        "provider": describe_chain(),
+    }
 
 
 # ----------------------------------------------------------------------------

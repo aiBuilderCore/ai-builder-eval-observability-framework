@@ -27,7 +27,7 @@
 <main class="wrap">
 
   <section class="page-head">
-    <p class="eyebrow"><span class="dot"></span> Control Center · pre-release · acme-corp</p>
+    <p class="eyebrow"><span class="dot"></span> Control Center · pre-release · <span data-eyebrow-tenant>acme-corp</span></p>
     <h1>Verity</h1>
     <p class="subtitle">
       Verity checks that your AI agents are safe and reliable before they go live. It creates realistic test
@@ -42,16 +42,31 @@
       <span class="scope-note__sep">·</span>
       <span data-ws-scope>visible to you only</span>
     </p>
-    <div class="aibc-kpis">
-      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num">87%</span><span class="aibc-stat__label">eval pass rate</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">6</span><span class="aibc-stat__label">personas</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">14</span><span class="aibc-stat__label">question sets</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">38</span><span class="aibc-stat__label">sim runs</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">1,240</span><span class="aibc-stat__label">verdicts</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">15</span><span class="aibc-stat__label">judges</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">9</span><span class="aibc-stat__label">batches watched</span></div>
-      <div class="aibc-stat"><span class="aibc-stat__num">4</span><span class="aibc-stat__label">open flags</span></div>
+    <!-- Platform signals — deliberately distinct from the per-stage counts on the
+         pipeline cards below (personas / sets / runs / judges / verdicts / batches).
+         These are the top-line health signals the pipeline cards don't carry. -->
+    <div class="aibc-kpis" id="kpiStrip">
+      <div class="aibc-stat aibc-stat--accent"><span class="aibc-stat__num" id="kpiQuality">—</span><span class="aibc-stat__label">overall quality</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpiPass">—</span><span class="aibc-stat__label">eval pass rate</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpiGate">—</span><span class="aibc-stat__label">deploy gate</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpiOpen">—</span><span class="aibc-stat__label">open items</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpiWeakest">—</span><span class="aibc-stat__label">weakest pillar</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpiProvider">—</span><span class="aibc-stat__label">model provider</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpiSpend">—</span><span class="aibc-stat__label">est. spend</span></div>
+      <div class="aibc-stat"><span class="aibc-stat__num" id="kpiHealed">—</span><span class="aibc-stat__label">auto-healed · 24h</span></div>
     </div>
+  </section>
+
+  <!-- ── Release hero — the go/no-go the whole platform exists to make ─────── -->
+  <!-- Repainted by dashboard.js from /observability/quality + /observability/gate.
+       Severity-led: turns red when an agent is below the deploy gate. -->
+  <section class="hero hero--ok" id="heroBanner" hidden>
+    <span class="hero__badge" id="heroBadge">—</span>
+    <span class="hero__body">
+      <p class="hero__title" id="heroTitle">Evaluating release readiness…</p>
+      <p class="hero__meta" id="heroMeta"></p>
+    </span>
+    <a class="hero__go" id="heroGo" href="observability/gate.html">Open gate →</a>
   </section>
 
   <!-- ── Pipeline flow — the four-tuple lineage, left → right ────────────── -->
@@ -183,7 +198,7 @@
        the offline fallback. -->
   <div class="sec-head" style="margin-top: clamp(1.75rem, 4vw, 2.75rem);">
     <h2 class="sec-head__title">Quality at a glance</h2>
-    <span class="sec-head__hint">overall score per agent · six quality pillars · last 30d</span>
+    <span class="sec-head__hint">overall score per agent · six quality pillars · all evaluations to date</span>
   </div>
 
   <div class="grid-2">
@@ -191,7 +206,7 @@
     <div class="card">
       <div class="card__head">
         <h2 class="card__title">Application quality</h2>
-        <span class="card__link" id="qualityAppsMeta">overall score · /100</span>
+        <span class="card__link spark" id="qualityTrend" title="pass-rate across successive evaluations"></span>
       </div>
       <div class="spend" id="qualityApps">
         <div class="spend__row"><span class="spend__name">Support Agent</span><span class="spend__track"><span class="spend__fill" style="width:94%;background:var(--ok)"></span></span><span class="spend__val"><b style="color:var(--ok)">94</b></span></div>
@@ -206,7 +221,7 @@
     <div class="card">
       <div class="card__head">
         <h2 class="card__title">Quality by pillar</h2>
-        <span class="card__link">Δ vs fleet avg</span>
+        <span class="card__link">Δ vs pillar avg</span>
       </div>
       <div class="spend" id="qualityPillars">
         <div class="spend__row"><span class="spend__name">Safety</span><span class="spend__track"><span class="spend__fill" style="width:89%"></span></span><span class="spend__val">89 <em style="color:var(--err);font-style:normal">▼2</em></span></div>
@@ -216,6 +231,36 @@
         <div class="spend__row"><span class="spend__name">Transparency</span><span class="spend__track"><span class="spend__fill" style="width:96%"></span></span><span class="spend__val">96 <em style="color:var(--ok);font-style:normal">▲1</em></span></div>
         <div class="spend__row"><span class="spend__name">Fairness</span><span class="spend__track"><span class="spend__fill" style="width:94%"></span></span><span class="spend__val">94 <em style="color:var(--text-faint);font-style:normal">—</em></span></div>
         <div class="spend__total"><span>weakest pillar · needs attention</span><b style="color:var(--warn)" id="qualityWeakest">Safety</b></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Trust & coverage — judge calibration + what has been tested ─────── -->
+  <div class="sec-head" style="margin-top: clamp(1.75rem, 4vw, 2.75rem);">
+    <h2 class="sec-head__title">Trust &amp; coverage</h2>
+    <span class="sec-head__hint">do we trust the judges · what have we actually tested</span>
+  </div>
+
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title">Judge calibration</h2>
+        <span class="card__link" id="calibMeta">κ vs human baseline</span>
+      </div>
+      <div class="spend" id="calibBody">
+        <p style="color:var(--text-muted);font-size:13px;padding:10px 2px;">Loading calibration…</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title">Coverage</h2>
+        <span class="card__link" id="coverageMeta">agent × pillar</span>
+      </div>
+      <div id="coverageBody" style="overflow-x:auto;">
+        <p style="color:var(--text-muted);font-size:13px;padding:10px 2px;">Loading coverage…</p>
       </div>
     </div>
 
@@ -448,8 +493,8 @@
 
       <div class="card">
         <div class="card__head">
-          <h2 class="card__title">Spend by stage · 24h</h2>
-          <span class="card__link">tokens + counts</span>
+          <h2 class="card__title">Spend by stage</h2>
+          <span class="card__link">est · tokens + counts</span>
         </div>
         <!-- Repainted live by dashboard.js from /observability/spend (real token
              totals + verdict/question/persona counts × synthetic unit rates).

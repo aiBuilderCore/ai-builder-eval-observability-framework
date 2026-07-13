@@ -470,3 +470,61 @@ a { color: inherit; }
   .pipeline { grid-template-columns: 1fr; }
   .ltable .hide-sm { display: none; }
 }
+
+/* ── Dashboard enhancement components ──────────────────────────────────────
+   Added for the dashboard-enhancement work: a severity-led gate hero, real
+   sparklines, a coverage heatmap, and a judge-calibration list. All colour
+   comes from the shared --ok/--warn/--err tokens so light + dark track. */
+
+/* Gate / worst-agent hero — the release go/no-go, first thing on the page. */
+.hero {
+  display: flex; align-items: center; gap: 18px;
+  padding: 18px 22px; margin: 20px 0 4px;
+  border: 1px solid var(--border); border-left-width: 4px;
+  border-radius: var(--r-4); background: var(--surface);
+  box-shadow: 0 1px 2px var(--shadow);
+}
+.hero--ok   { border-left-color: var(--ok);   background: linear-gradient(90deg, var(--ok-bg), transparent 60%); }
+.hero--warn { border-left-color: var(--warn); background: linear-gradient(90deg, var(--warn-bg), transparent 60%); }
+.hero--err  { border-left-color: var(--err);  background: linear-gradient(90deg, var(--err-bg), transparent 60%); }
+.hero__badge {
+  flex: none; font-family: var(--font-display); font-weight: 700;
+  font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
+  padding: 6px 12px; border-radius: 999px; color: #fff; white-space: nowrap;
+}
+.hero--ok .hero__badge   { background: var(--ok); }
+.hero--warn .hero__badge { background: var(--warn); }
+.hero--err .hero__badge  { background: var(--err); }
+.hero__body { min-width: 0; flex: 1; }
+.hero__title { font-family: var(--font-display); font-size: 17px; font-weight: 600; margin: 0; color: var(--text); }
+.hero__meta { font-size: 13px; color: var(--text-muted); margin: 3px 0 0; }
+.hero__go { flex: none; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.hero__go:hover { text-decoration: underline; }
+
+/* Sparkline — a tiny inline SVG trend used in card heads. */
+.spark { display: inline-flex; align-items: center; gap: 8px; }
+.spark svg { display: block; overflow: visible; }
+.spark__cap { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* No-data pillar / cell — an explicit "not tested" state, not a silent gap. */
+.spend__row--nodata .spend__name { color: var(--text-faint); }
+.spend__row--nodata .spend__fill { background: repeating-linear-gradient(
+  45deg, var(--border) 0 6px, transparent 6px 12px); }
+.spend__row--nodata .spend__val { color: var(--text-faint); font-size: 11px; }
+
+/* Coverage heatmap — agents (rows) × pillars (cols). */
+.heat { width: 100%; border-collapse: separate; border-spacing: 4px; }
+.heat th { font-size: 10px; font-weight: 600; color: var(--text-faint); text-transform: uppercase;
+  letter-spacing: .04em; text-align: center; padding: 2px; font-family: var(--font-display); }
+.heat th.heat__agenth { text-align: left; }
+.heat td.heat__agent { font-size: 13px; color: var(--text); white-space: nowrap; padding-right: 6px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.heat__cell { text-align: center; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  border-radius: var(--r-2); padding: 8px 4px; min-width: 40px; color: var(--text); }
+.heat__cell--none { color: var(--text-faint); background: repeating-linear-gradient(
+  45deg, var(--surface-soft) 0 5px, transparent 5px 10px); font-weight: 400; }
+
+/* Calibration row — reuses .spend rhythm; κ pill on the right. */
+.kpill { font-family: var(--font-mono); font-size: 11px; padding: 2px 7px; border-radius: 999px; }
+.kpill--ok   { color: var(--ok);   background: var(--ok-bg); }
+.kpill--warn { color: var(--warn); background: var(--warn-bg); }
+.kpill--err  { color: var(--err);  background: var(--err-bg); }

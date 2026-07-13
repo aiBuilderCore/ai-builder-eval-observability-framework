@@ -50,6 +50,30 @@ def _build(kind: str) -> ModelProvider | None:
     raise ValueError(f"unknown model provider: {kind}")
 
 
+def describe_chain() -> dict:
+    """Introspect the effective provider chain without invoking any backend.
+
+    Returns the configured order, each link's credential availability, and the
+    active provider (first link that actually constructs). Read-only — used by
+    the system-health rollup so the dashboard reports the *real* provider posture
+    (e.g. "degraded to echo") instead of a hardcoded claim.
+    """
+    order: list[str] = [settings.model_provider]
+    if settings.model_fallback and settings.model_fallback not in order:
+        order.append(settings.model_fallback)
+    if "echo" not in order:
+        order.append("echo")
+
+    links = [{"provider": kind, "available": _build(kind) is not None} for kind in order]
+    active = next((link["provider"] for link in links if link["available"]), "echo")
+    return {
+        "configured": settings.model_provider,
+        "active": active,
+        "degraded": active != settings.model_provider,
+        "chain": links,
+    }
+
+
 @lru_cache
 def get_provider() -> ModelProvider:
     # Ordered, de-duplicated chain: primary → fallback → echo safety net.
@@ -77,4 +101,4 @@ def get_provider() -> ModelProvider:
     return FallbackProvider(chain)
 
 
-__all__ = ["ModelProvider", "ScoreResult", "EchoProvider", "get_provider"]
+__all__ = ["ModelProvider", "ScoreResult", "EchoProvider", "get_provider", "describe_chain"]
