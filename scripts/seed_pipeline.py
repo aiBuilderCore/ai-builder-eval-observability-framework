@@ -34,10 +34,10 @@ AGENT_ENDPOINT = "http://127.0.0.1:8097/chat"
 
 # Seed sizing — one question-generation job over ALL personas, then both adapters
 # simulate the same seed set and every run is scored by the ENTIRE judge catalogue
-# (see `all_judge_refs`). Kept to 20 questions so the free-tier provider (which
+# (see `all_judge_refs`). Kept to 5 questions so the free-tier provider (which
 # falls back to the offline echo judge under rate limits) still finishes in
 # bootstrap while giving observability + self-heal a real cohort to work with.
-SEED_QUESTION_TOTAL = 20
+SEED_QUESTION_TOTAL = 5
 SIM_MAX_TURNS = 5
 SIM_CONCURRENCY = 10
 
@@ -154,7 +154,7 @@ def main() -> int:
 
         judges = all_judge_refs(c)
         print(f"seed_pipeline: driving the real pipeline · {len(judges)} judges in catalogue")
-        # One question-generation job over ALL personas → exactly 20 questions.
+        # One question-generation job over ALL personas → exactly 5 questions.
         seed_set_id = generate_seed_set(c, personas, target_total=SEED_QUESTION_TOTAL)
         # Both adapters simulate the SAME seed set and every run is scored by the
         # ENTIRE judge catalogue, so observability has two full cohorts and the
