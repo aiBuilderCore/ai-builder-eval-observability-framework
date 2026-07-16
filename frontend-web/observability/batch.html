@@ -162,7 +162,12 @@
     document.title = 'Observability — ' + batch.name;
     document.getElementById('crumb-batch').textContent = batch.batch_id;
     document.getElementById('head-eyebrow').textContent = 'Simulation batch · ' + batch.experiment_id;
-    document.getElementById('head-title').innerHTML = B.escapeHtml(batch.name) + ' <span class="qualifier">— ' + B.escapeHtml(batch.sut) + '</span>';
+    // The mapped batch name already embeds the SUT ("<agent> · run"), so only
+    // append the SUT qualifier when it isn't already present — avoids the
+    // "<agent> · run — <agent>" duplication.
+    const sutQualifier = batch.sut && !String(batch.name).includes(batch.sut)
+      ? ' <span class="qualifier">— ' + B.escapeHtml(batch.sut) + '</span>' : '';
+    document.getElementById('head-title').innerHTML = B.escapeHtml(batch.name) + sutQualifier;
 
     const startedShort = new Date(batch.started_at).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
     const finishedShort = new Date(batch.finished_at).toISOString().slice(11, 16) + 'Z';

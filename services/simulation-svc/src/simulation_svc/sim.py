@@ -155,7 +155,8 @@ async def simulate_conversation(
                     else "Can you walk me through that with a concrete example?"
                 )
         turns.append(Turn(role="user", content=user_text.strip()))
-        # Close the exchange with the agent's reply to the full history so far.
-        agent_text = await agent_reply(adapter_snapshot, turns, provider)
-        turns.append(Turn(role="agent", content=agent_text))
+        # Close the exchange with the agent's reply (and its real tool-call
+        # sequence) to the full history so far.
+        agent_text, tool_calls = await agent_reply(adapter_snapshot, turns, provider)
+        turns.append(Turn(role="agent", content=agent_text, tool_calls=tool_calls))
     return turns

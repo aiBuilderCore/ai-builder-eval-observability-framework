@@ -111,7 +111,7 @@
   <div class="section-head" style="margin-top:40px;">
     <h2>Authored <em>monitors</em></h2>
     <div class="actions">
-      <span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">click any row to acknowledge · state advances every ~30s</span>
+      <span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11px;">click any row to acknowledge · incidents are real breaches from Self-Heal</span>
       <button class="btn subtle" style="font-size:12px;padding:4px 10px;" id="reset-btn">reset state</button>
     </div>
   </div>
@@ -218,7 +218,7 @@
         (open   ? '<span class="pill pill--err"><b>' + open   + '</b> open</span>'   : '') +
         (acknowledged ? '<span class="pill pill--warn"><b>' + acknowledged + '</b> acknowledged</span>' : '') +
         '<span class="pill"><b>' + armed + '</b> armed</span>' +
-        '<span class="pill">OTLP/gRPC · 4317 · OTLP/HTTP · 4318</span>';
+        '<span class="pill">span contract · OpenInference + OTel GenAI</span>';
 
       // overview tiles by kind
       const kinds = ['span', 'score', 'trajectory', 'anomaly'];
@@ -320,6 +320,9 @@
 
     window.ackMonitor = ackMonitor;
     window.resolveInc = resolveInc;
+    // Let the LIVE wiring (app.js) repaint this page as soon as real monitors +
+    // self-heal incidents land, instead of waiting for the 3s tick.
+    window.render = render;
 
     document.getElementById('reset-btn').addEventListener('click', () => {
       obs.State.reset();

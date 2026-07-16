@@ -22,6 +22,11 @@ class FallbackProvider(ModelProvider):
             raise ValueError("FallbackProvider needs at least one provider")
         self._chain = chain
         self.name = "fallback(" + " → ".join(p.name for p in chain) + ")"
+        # model_label of the link that served the most recent call. Provenance
+        # code reads this so a score is attributed to the model that produced it
+        # (possibly the echo safety net when the primary was rate-limited), not
+        # the statically-configured effective primary.
+        self.last_served_label = self.model_label
 
     @property
     def model_label(self) -> str:
@@ -43,12 +48,14 @@ class FallbackProvider(ModelProvider):
         last_err: Exception | None = None
         for i, provider in enumerate(self._chain):
             try:
-                return await provider.chat(
+                out = await provider.chat(
                     system=system,
                     messages=messages,
                     max_tokens=max_tokens,
                     temperature=temperature,
                 )
+                self.last_served_label = provider.model_label
+                return out
             except Exception as e:  # noqa: BLE001 — deliberately broad: any failure falls through
                 last_err = e
                 nxt = self._chain[i + 1].name if i + 1 < len(self._chain) else "none"

@@ -877,6 +877,35 @@
   let gateHistoryCache = [];     // real deploy-gate decisions
   let datasetsCache = null;      // null until first hydrate; then a live array
   let vsByRunCache = {};         // run_id -> verdict set (for real evidence packs)
+  let incidentsCache = [];       // real self-heal breach incidents (Live tab)
+
+  // Parse a numeric score out of a self-heal trace meta line ("score 0.56 · …").
+  const parseScore = (meta) => {
+    const m = /score\s+([0-9.]+)/.exec(String(meta || ""));
+    return m ? parseFloat(m[1]) : null;
+  };
+
+  // Map a real self-heal breach incident into the Live-tab incident row shape.
+  // Breaches originate in the self-heal store (Observability opened them from a
+  // gate/judge breach), so this is the same incident the Self-Heal app works.
+  const mapIncident = (inc) => {
+    const scores = (inc.traces || []).map((t) => parseScore(t.meta)).filter((s) => s != null);
+    const worst = scores.length ? Math.min(...scores) : null;
+    const state = inc.status === "resolved" ? "resolved" : "open"; // escalated→open (still active)
+    const severe = (inc.pillars || []).includes("Safety") || /breach|guardrail/i.test(inc.failure || "");
+    return {
+      id: inc.id,
+      monitor_name: `${inc.failure || "incident"} — ${inc.agent || "agent"}`,
+      cohort: `agent=${inc.agent}${(inc.pillars || []).length ? " · pillar=" + inc.pillars.join(", ") : ""}`,
+      breach_value: worst != null ? worst : "—",
+      threshold: "judge",
+      state,
+      trail_class: null, // TRAIL taxonomy has no structured source on self-heal incidents yet
+      severity: severe ? "error" : "warn",
+      implicated_runs: (inc.traces || []).length,
+      fired_at: inc.opened_at,
+    };
+  };
 
   // First-hydrate barrier — read-once detail pages (batch.html, trace.html,
   // calibration.html, gate.html) defer their render until this resolves so they
@@ -924,13 +953,38 @@
       const durationMs = turns.reduce((m, x) => m + (x.latency_ms || 0), 0);
       const tokensTotal = turns.reduce(
         (m, x) => m + ((x.tokens && (x.tokens.in || 0) + (x.tokens.out || 0)) || 0), 0);
+      // Real OpenInference span lifecycle for this run. The AGENT/LLM/RETRIEVER/
+      // TOOL/GUARDRAIL counts come straight from the backend-computed `span_kinds`
+      // on the trace (simulation worker, derived from the agent's real turns +
+      // tool calls); EVALUATOR spans are the real inline judge verdicts. Every span
+      // maps to a real backend event — nothing fabricated. Falls back to
+      // reconstructing from turns for older traces without `span_kinds`.
+      const sk = detail.annotations && detail.annotations.span_kinds;
+      const spans = [];
+      if (sk && typeof sk === "object") {
+        Object.keys(sk).forEach((kind) => {
+          for (let i = 0; i < (sk[kind] || 0); i++) spans.push({ kind, name: kind.toLowerCase() });
+        });
+      } else {
+        spans.push({ kind: "AGENT", name: "conversation" });
+        turns.filter((x) => x.role === "agent").forEach((at) => {
+          spans.push({ kind: "LLM", name: "chat.completion" });
+          (at.tool_calls || []).forEach((c) => {
+            const nm = c.name || "tool";
+            const kind = /^retrieve/.test(nm) ? "RETRIEVER"
+              : /(disclosure|compliance|guardrail)/.test(nm) ? "GUARDRAIL" : "TOOL";
+            spans.push({ kind, name: nm });
+          });
+        });
+      }
+      mapped.forEach((v) => spans.push({ kind: "EVALUATOR", name: v.judge }));
       return {
         run_id: t.id, trace_id: t.id, session_id: detail.session_id_used || t.id,
         persona: { id: persona.id, name: persona.name || persona.id, version: persona.version || 1 },
         question,
         status: mapped.length ? (anyFail ? "fail" : "pass") : "pass",
         duration_ms: durationMs, tokens_total: tokensTotal,
-        verdicts: mapped, turns, spans: [],
+        verdicts: mapped, turns, spans,
       };
     });
   }
@@ -949,7 +1003,12 @@
       ? rows.filter((r) => r.status === "pass").length
       : (vs ? vs.pass_count : 0);
     const runCount = rows.length || b.traces || run.completed || 0;
-    const evalSpans = rows.reduce((m, r) => m + (r.verdicts ? r.verdicts.length : 0), 0);
+    // Complete span-kind histogram across every run: the real agent lifecycle
+    // (AGENT · LLM · RETRIEVER · TOOL · GUARDRAIL · EVALUATOR), not EVALUATOR alone.
+    const kindHist = {};
+    rows.forEach((r) => (r.spans || []).forEach((s) => {
+      kindHist[s.kind] = (kindHist[s.kind] || 0) + 1;
+    }));
     return {
       batch_id: b.run_id, experiment_id: agent, name: `${agent} · run`, sut: agent,
       lineage: {
@@ -963,7 +1022,7 @@
       pass_count: passCount,
       pass_rate: rows.length ? passCount / runCount : (vs ? vs.pass_rate : 0),
       judge_pass_rates: vs ? vs.aggregate_scores || {} : {},
-      kind_histogram: evalSpans ? { EVALUATOR: evalSpans } : {},
+      kind_histogram: kindHist,
       pass_sparkline: rows.map((r) => (r.status === "pass" ? 1 : 0)), runs: rows,
     };
   };
@@ -982,24 +1041,29 @@
   const mapPack = (p) => ({
     id: p.id, template: "evaluation_evidence", template_label: p.title || "Evaluation evidence",
     issued_at: p.issued_at, issued_by: "system", time_range: "—", tenant: p.tenant,
-    monitors: 0, incidents: 0, calibration_records: calibrationCache.length,
+    // Real counts of the control-plane artifacts in scope at issue time, rather
+    // than hardcoded zeros.
+    monitors: monitorsCache.length, incidents: incidentsCache.length,
+    calibration_records: calibrationCache.length,
     simulation_runs: (p.verdict_set_ids || []).length, pages: 1, signed: true,
     candidate: p.candidate, gate: p.gate,
   });
 
   // Real deploy-gate decision for a candidate verdict set → the gate-history row
   // shape the gate page renders. Signals come straight from the backend decision.
-  const mapGate = (g, vs) => ({
+  const mapGate = (g, vs, baseVs) => ({
     id: `gate_${(g.candidate || "").slice(-10) || "live"}`,
     experiment_id: (vs && vs.run_ids && vs.run_ids[0]) || g.candidate || "—",
     verdict: g.decision === "pass" ? "PASS" : g.decision === "fail" ? "BLOCK" : "NO DATA",
-    baseline_batch: null,
+    baseline_batch: g.baseline ? ((baseVs && baseVs.run_ids && baseVs.run_ids[0]) || g.baseline) : null,
     candidate_batch: (vs && vs.run_ids && vs.run_ids[0]) || g.candidate,
     evaluated_at: g.evaluated_at || (vs && vs.created_at) || new Date().toISOString(),
     deltas: [{
-      signal: "pass_rate", baseline: null,
+      signal: "pass_rate",
+      baseline: g.baseline_pass_rate != null ? g.baseline_pass_rate : null,
       candidate: g.pass_rate != null ? g.pass_rate : (vs ? vs.pass_rate : 0),
-      delta: null, threshold_min: g.threshold != null ? g.threshold : 0.8,
+      delta: g.delta != null ? g.delta : null,
+      threshold_min: g.threshold != null ? g.threshold : 0.8,
       threshold_max: null, pass: g.decision === "pass",
     }],
     blocking_signals: g.decision === "pass" ? []
@@ -1008,7 +1072,7 @@
 
   async function hydrate() {
     try {
-      const [mons, packs, cal, batches, runs, vsets, judges] = await Promise.all([
+      const [mons, packs, cal, batches, runs, vsets, judges, incs] = await Promise.all([
         EEOF.get("/observability/monitors").catch(() => null),
         EEOF.get("/observability/evidence").catch(() => null),
         EEOF.get("/observability/calibration").catch(() => null),
@@ -1016,7 +1080,9 @@
         EEOF.get("/simulation/runs").catch(() => null),
         EEOF.get("/verdict-sets").catch(() => null),
         EEOF.get("/judges").catch(() => null),
+        EEOF.get("/self-heal/incidents").catch(() => null),
       ]);
+      if (Array.isArray(incs)) incidentsCache = incs.map(mapIncident);
       if (Array.isArray(judges)) {
         judgesCache = {};
         judges.forEach((j) => {
@@ -1050,11 +1116,28 @@
           };
           if (typeof window.AIBC_OBS_renderBatches === "function") window.AIBC_OBS_renderBatches();
         }
-        // Real deploy-gate history: evaluate the gate for each candidate verdict set.
+        // Real deploy-gate history: evaluate each candidate verdict set against a
+        // real baseline — the previous verdict set for the SAME agent (by the run's
+        // frozen adapter display name), so the gate is a genuine head-to-head, not a
+        // bare threshold check. The first set for an agent has no baseline.
+        const agentOfVs = (v) => {
+          const snap = (runsById[(v.run_ids || [])[0]] || {}).adapter_snapshot || {};
+          return snap.display_name || (snap.config || {}).display_name || snap.name || snap.id || "agent";
+        };
+        const byAgent = {};
+        (vsets || []).forEach((v) => { (byAgent[agentOfVs(v)] = byAgent[agentOfVs(v)] || []).push(v); });
+        Object.values(byAgent).forEach((arr) =>
+          arr.sort((a, b2) => (a.created_at || "").localeCompare(b2.created_at || "")));
+        const baselineOf = {};
+        Object.values(byAgent).forEach((arr) =>
+          arr.forEach((v, i) => { baselineOf[v.id] = i > 0 ? arr[i - 1] : null; }));
+
         const gateRows = await Promise.all(
           (vsets || []).map(async (v) => {
-            const g = await EEOF.get(`/observability/gate/${v.id}`).catch(() => null);
-            return g ? mapGate(g, v) : null;
+            const baseVs = baselineOf[v.id];
+            const path = `/observability/gate/${v.id}` + (baseVs ? `?baseline=${baseVs.id}` : "");
+            const g = await EEOF.get(path).catch(() => null);
+            return g ? mapGate(g, v, baseVs) : null;
           })
         );
         gateHistoryCache = gateRows.filter(Boolean)
@@ -1070,6 +1153,9 @@
   State.monitors = () => monitorsCache;
   State.packs = () => packsCache;
   State.calibration = () => calibrationCache;
+  // Real breach incidents from the self-heal store (replaces the legacy seed list).
+  State.incidents = () => incidentsCache;
+  State.saveIncidents = (v) => { incidentsCache = v || []; };
   // Requesting evidence POSTs a real assembly job (candidate run + its verdict
   // set) rather than fabricating a pack; the list re-hydrates from the backend.
   State.savePacks = (arr) => {
@@ -1091,16 +1177,19 @@
   State.datasets = () => (datasetsCache = datasetsCache || []);
   State.saveDatasets = (v) => { datasetsCache = v || []; };
   // Real judge-calibration tiles: map each backend record into the judge shape
-  // the calibration page renders. Point-in-time κ (no rolling series yet), so the
-  // series is a single real sample rather than a fabricated 30-window trend.
+  // the calibration page renders. The κ series is the real per-judge history the
+  // backend accumulates across evaluation runs (one sample per run), so the trend
+  // fills in as the pipeline runs repeatedly — no fabricated 30-window trend.
+  const KAPPA_TARGET = 0.75, KAPPA_THRESHOLD = 0.65;
   State.judges = () => calibrationCache.map((c) => {
     const nm = judgeName(c.judge_ref);
+    const series = Array.isArray(c.series) && c.series.length ? c.series : [c.kappa];
     return {
       id: nm, name: nm, tenant: "acme", ref: c.judge_ref,
-      kappa_now: c.kappa, kappa_target: 0.75, kappa_threshold: 0.65,
+      kappa_now: c.kappa, kappa_target: KAPPA_TARGET, kappa_threshold: KAPPA_THRESHOLD,
       paired_labels_30d: c.sample_size, window_days: 30,
       agreement: c.agreement, ts: c.ts,
-      drift_alert: c.kappa < 0.65, series: [c.kappa],
+      drift_alert: c.kappa < KAPPA_THRESHOLD, series,
     };
   });
   State.saveMonitors = (arr) => {

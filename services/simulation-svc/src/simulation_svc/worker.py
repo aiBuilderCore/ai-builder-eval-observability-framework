@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 import time
 
 from eeof_core.dataplane import get_blob, get_bus, get_table, keys
@@ -58,6 +59,8 @@ def _enrich_turns(q: Question, turns: list) -> tuple[list[dict], int, int, int]:
             tout += tok_out
             turn["latency_ms"] = latency
             turn["tokens"] = {"in": tok_in, "out": tok_out}
+            # Real tool-call sequence the agent made on this turn (from /chat).
+            turn["tool_calls"] = list(getattr(t, "tool_calls", []) or [])
         else:
             turn["is_seed_prompt"] = i == 0
             if i > 0:
@@ -122,6 +125,29 @@ class SimWorker(BaseWorker):
                 )
             stop = _stop_reason(q, turns)
             turn_dicts, tin, tout, agent_turns = _enrich_turns(q, turns)
+            # Real tool-call telemetry, aggregated from the agent's actual calls
+            # across the conversation (no synthetic scalar). `tool_call_sequence`
+            # is the ordered list of tool names — the signal Observability's
+            # trajectory-drift and tool-call monitors read.
+            tool_seq: list[str] = []
+            tool_failures = 0
+            for t in turns:
+                for c in getattr(t, "tool_calls", []) or []:
+                    tool_seq.append(c.get("name", "?"))
+                    if not c.get("ok", True):
+                        tool_failures += 1
+            # Real OpenInference span-kind counts for the agent lifecycle on this
+            # trace: an AGENT root, one LLM span per agent turn, and each tool call
+            # mapped to RETRIEVER (retrieval), GUARDRAIL (compliance/disclosure) or
+            # TOOL. EVALUATOR spans are added downstream from real judge verdicts.
+            span_kinds = {"AGENT": 1, "LLM": agent_turns, "RETRIEVER": 0, "GUARDRAIL": 0, "TOOL": 0}
+            for name in tool_seq:
+                if name.startswith("retrieve"):
+                    span_kinds["RETRIEVER"] += 1
+                elif re.search(r"disclosure|compliance|guardrail", name):
+                    span_kinds["GUARDRAIL"] += 1
+                else:
+                    span_kinds["TOOL"] += 1
             failed = stop == "adapter_error"
             trace_id = new_id("trace")
             trace_doc = {
@@ -136,9 +162,18 @@ class SimWorker(BaseWorker):
                 "stop_reason": stop,
                 "turns": turn_dicts,
                 "annotations": {
-                    "topic_drift_max": round((_h(q.id) % 40) / 100, 2),
+                    # topic_drift_max has no real embedding source yet; kept as a
+                    # coarse signal (elevated when the conversation actually ended
+                    # in topic drift) rather than a pure hash.
+                    "topic_drift_max": 0.62 if stop == "topic_drift" else 0.12,
                     "longest_assistant_silence_ms": 0,
-                    "tool_calls_made": _h(q.id) % 3, "tool_call_failures": 0,
+                    # REAL — from the agent's actual tool calls this run.
+                    "tool_calls_made": len(tool_seq),
+                    "tool_call_failures": tool_failures,
+                    "tool_call_sequence": tool_seq,
+                    # REAL — backend-computed OpenInference span-kind counts for the
+                    # agent lifecycle (EVALUATOR added downstream from verdicts).
+                    "span_kinds": span_kinds,
                 },
             }
             blob_key = f"traces/{job.tenant}/{run_id}/{trace_id}.json"

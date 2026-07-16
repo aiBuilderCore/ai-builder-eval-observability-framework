@@ -360,8 +360,11 @@ async def obs_incidents(state: str | None = None, p: Principal = Depends(princip
 
 
 @api.get("/observability/gate/{candidate}")
-async def obs_gate(candidate: str, p: Principal = Depends(principal)):
-    return await proxy("observability", "GET", f"/observability/gate/{candidate}", p)
+async def obs_gate(candidate: str, baseline: str | None = None, p: Principal = Depends(principal)):
+    return await proxy(
+        "observability", "GET", f"/observability/gate/{candidate}", p,
+        params={"baseline": baseline} if baseline else None,
+    )
 
 
 @api.post("/observability/evidence", status_code=202)

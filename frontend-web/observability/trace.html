@@ -153,8 +153,21 @@
 
     function boot() {
     const params = new URLSearchParams(location.search);
-    const batchId = params.get('batch');
-    const runId = params.get('run');
+    let batchId = params.get('batch');
+    let runId = params.get('run');
+    const traceId = params.get('id');
+
+    // Resolve ?id=<trace_id | run_id> → its batch + run. Traces link here with
+    // just a trace id (no batch context), so scan the loaded batches for the run
+    // that carries it. Without this the page silently falls back to the newest
+    // batch's first run and renders the wrong trace.
+    if (traceId && (!batchId || !runId)) {
+      const all = B.loadBatches();
+      for (const bt of (all || [])) {
+        const hit = (bt.runs || []).find(r => r.trace_id === traceId || r.run_id === traceId);
+        if (hit) { batchId = bt.batch_id; runId = hit.run_id; break; }
+      }
+    }
 
     let batch = batchId ? B.getBatch(batchId) : null;
     // No batch requested → open the most recent one so nav lands on real content
@@ -246,7 +259,13 @@
     // geometry (no backend source). Render the real transcript in that case;
     // fall back to the span-tree Gantt for any run that does carry spans.
     const turns = run.turns || [];
-    if (!spans.length && turns.length) {
+    // Live runs carry kind-only spans (for the histogram/pills) with no
+    // OpenInference timing geometry. The Gantt needs start_ms/duration_ms, so
+    // only take that path when spans actually have geometry — otherwise render
+    // the real transcript. Without this guard renderSpanTree divides by a NaN
+    // total and emits <rect x="NaN"> for every bar.
+    const hasSpanGeometry = spans.some(s => Number.isFinite(s.start_ms) && Number.isFinite(s.duration_ms));
+    if (!hasSpanGeometry && turns.length) {
       document.getElementById('chart-host').innerHTML =
         '<div style="display:flex;flex-direction:column;gap:10px;">' + turns.map(t => {
           const agent = t.role === 'agent';
@@ -306,7 +325,7 @@
     // ---- root-cause callout ----
     const failingVerdicts = (run.verdicts || []).filter(v => !v.pass);
     if (failingVerdicts.length > 0) {
-      const nonEvalSpans = spans.filter(s => s.kind !== 'EVALUATOR');
+      const nonEvalSpans = spans.filter(s => s.kind !== 'EVALUATOR' && Number.isFinite(s.duration_ms));
       const rootCause = nonEvalSpans.length
         ? nonEvalSpans.reduce((max, s) => s.duration_ms > max.duration_ms ? s : max, nonEvalSpans[0])
         : null;

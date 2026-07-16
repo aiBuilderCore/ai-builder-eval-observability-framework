@@ -85,19 +85,35 @@ async def list_incidents(tenant: str, state: str | None = None) -> list[Incident
 
 
 # --- Deploy gate ---
-async def evaluate_gate(tenant: str, candidate: str, threshold: float = 0.8) -> GateDecision:
-    """`candidate` is a verdict_set_id here; pass iff its pass_rate >= threshold."""
-    row = await get_table().get(keys.verdictset_pk(tenant), keys.verdictset_sk(candidate))
-    if not row:
+async def _verdictset_pass_rate(tenant: str, vs_id: str) -> float | None:
+    row = await get_table().get(keys.verdictset_pk(tenant), keys.verdictset_sk(vs_id))
+    return VerdictSet.model_validate(row["data"]).pass_rate if row else None
+
+
+async def evaluate_gate(
+    tenant: str, candidate: str, threshold: float = 0.8, baseline: str | None = None
+) -> GateDecision:
+    """`candidate` is a verdict_set_id; pass iff its pass_rate >= threshold.
+
+    When `baseline` (another verdict_set_id) is supplied, the decision becomes a
+    real head-to-head: the response carries the baseline pass_rate and the delta
+    (candidate − baseline) so the gate is a comparison, not a bare threshold check.
+    """
+    cand_rate = await _verdictset_pass_rate(tenant, candidate)
+    if cand_rate is None:
         return GateDecision(candidate=candidate, decision="no_data", threshold=threshold)
-    vset = VerdictSet.model_validate(row["data"])
-    decision = "pass" if vset.pass_rate >= threshold else "fail"
+
+    base_rate = await _verdictset_pass_rate(tenant, baseline) if baseline else None
+    decision = "pass" if cand_rate >= threshold else "fail"
     return GateDecision(
         candidate=candidate,
         decision=decision,
-        pass_rate=vset.pass_rate,
+        pass_rate=cand_rate,
         threshold=threshold,
         verdict_set_ids=[candidate],
+        baseline=baseline if base_rate is not None else None,
+        baseline_pass_rate=base_rate,
+        delta=round(cand_rate - base_rate, 4) if base_rate is not None else None,
     )
 
 
@@ -129,12 +145,21 @@ async def list_evidence(tenant: str) -> list[EvidencePack]:
 
 
 async def list_calibration(tenant: str) -> list[dict]:
-    """Latest judge-calibration record per judge (written by evaluation-svc)."""
+    """Latest judge-calibration record per judge, enriched with the real rolling
+    κ series (every prior calibration sample for that judge, oldest→newest, capped
+    to the last 30). Each calibration record is written by evaluation-svc on every
+    scoring run, so the series fills in as the pipeline runs repeatedly."""
     rows = await get_table().query(f"TENANT#{tenant}#CALIBRATION", "CALIBRATION#")
-    latest: dict[str, dict] = {}
+    history: dict[str, list[dict]] = {}
     for r in rows:
         rec = r["data"]
-        cur = latest.get(rec["judge_ref"])
-        if cur is None or rec["ts"] > cur["ts"]:
-            latest[rec["judge_ref"]] = rec
-    return sorted(latest.values(), key=lambda x: x["judge_ref"])
+        history.setdefault(rec["judge_ref"], []).append(rec)
+
+    out: list[dict] = []
+    for judge_ref, recs in history.items():
+        recs.sort(key=lambda x: x["ts"])
+        latest = dict(recs[-1])
+        latest["series"] = [round(float(x.get("kappa", 0.0)), 3) for x in recs][-30:]
+        latest["sample_count"] = len(recs)
+        out.append(latest)
+    return sorted(out, key=lambda x: x["judge_ref"])

@@ -89,16 +89,16 @@
       latency and cost look fine. This is the failure mode that's invisible everywhere else in the market.
     </p>
     <div class="meta-pills">
-      <span class="pill pill--warn"><b>illustrative</b> · no backend telemetry source</span>
-      <span class="pill">span-level tool/plan/delegation traces not yet emitted</span>
+      <span class="pill pill--accent"><b>live</b> · real tool-call sequences from the agent</span>
+      <span class="pill">delegation graph still illustrative (single-agent target)</span>
     </div>
   </section>
 
   <div style="background:rgba(201,122,31,0.10);border:1px solid rgba(201,122,31,0.35);border-radius:var(--r-3);padding:14px 18px;margin:0 0 22px;font-size:13px;line-height:1.6;color:var(--text-muted);">
-    <b style="color:var(--signal-warn);">Illustrative screen.</b> Trajectory drift needs per-span tool-call, planner-step
-    and delegation-edge telemetry, which the pipeline does not emit yet — so the heatmap, distribution diff and
-    delegation graphs below are seed illustrations, not this run's data. The batch pickers are wired to real runs;
-    the drift visualisations light up once span-level telemetry lands.
+    <b style="color:var(--signal-ok);">Tool-call sequence drift, distribution drift and implicated runs below are real</b> —
+    computed from the actual tool calls the agent-under-test made on each trace (captured over the /chat path and
+    stored on the run). Pick a baseline and candidate batch to compare. The <b>sub-agent delegation graph</b> stays
+    illustrative: the built-in 401(k) target is a single agent, so there are no sub-agent delegation edges to emit.
   </div>
 
   <!-- ============= EXPERIMENT PAIR PICKER ============= -->
@@ -125,53 +125,40 @@
   </div>
   <div id="exp-applied" style="margin:-8px 0 14px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);min-height:16px;"></div>
 
-  <!-- ============= TOOL-CALL SEQUENCE DRIFT HEATMAP ============= -->
+  <!-- ============= TOOL-CALL SEQUENCE DRIFT ============= -->
   <div class="section-head">
-    <h2>Tool-call <em>sequence drift</em> · last 24 h</h2>
+    <h2>Tool-call <em>sequence drift</em></h2>
     <div class="actions">
-      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">edit-distance over tool-name alphabet · per-cohort z-score</span>
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">representative sequence · baseline vs candidate</span>
     </div>
   </div>
   <p class="viz-caption">
-    <b>What this tells you:</b> each cell is one <b>persona × hour</b>. A hot cell means the agent's
-    tool-call sequence for that persona diverged sharply from its baseline in that window. Hover to
-    inspect · click a hot cell to jump to a run in the batch runs table.
+    <b>What this tells you:</b> the agent's most common tool-call path in the baseline batch vs the candidate.
+    Steps the candidate <b style="color:var(--signal-err);">added or changed</b> are highlighted red; steps it
+    <b>dropped</b> from the baseline are struck through. The edit distance is how many tool steps differ.
   </p>
-  <div class="heatmap-wrap">
-    <div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">rows: personas · columns: hourly windows (0–23) · colour: z-score</div>
-    <div class="heatmap" id="heatmap"></div>
-    <div class="heatmap-legend">
-      <span>z-score</span>
-      <span class="swatch" style="background:var(--surface-alt);"></span>0
-      <span class="swatch" style="background:var(--drift-1);"></span>1
-      <span class="swatch" style="background:var(--drift-2);"></span>2
-      <span class="swatch" style="background:var(--drift-3);"></span>3
-      <span class="swatch" style="background:var(--drift-4);"></span>4
-      <span class="swatch" style="background:var(--drift-5);"></span>5
-      <span class="swatch" style="background:var(--drift-6);"></span>6+
-      <span style="margin-left:auto;">7 personas · 24 hourly windows · cohort = persona</span>
-    </div>
-  </div>
+  <div id="seq-drift" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;box-shadow:0 1px 3px var(--shadow);"></div>
 
   <!-- ============= PLANNER-STEP DISTRIBUTION DIFF ============= -->
   <div class="section-head" style="margin-top:48px;">
-    <h2>Planner-step <em>distribution drift</em> · billing-agent</h2>
+    <h2>Tool-call <em>distribution drift</em></h2>
     <div class="actions">
-      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">KL divergence vs 7d baseline · breach z &gt; 3.0</span>
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">tool-frequency shift · baseline batch vs candidate batch</span>
     </div>
   </div>
   <p class="viz-caption">
-    <b>What this tells you:</b> the frequency of each planner step (search, retrieve, tool, answer…) in the
-    baseline window vs the last hour. A big shift here — even with the same latency — means the agent is
-    <em>reasoning differently</em>. KL &gt; 0.30 is worth investigating; &gt; 0.40 usually indicates a broken tool.
+    <b>What this tells you:</b> the frequency of each tool the agent invoked in the baseline batch vs the
+    candidate batch. A big shift here — even with the same latency — means the agent is <em>calling different
+    tools</em>. In this demo the guardrail-regression variant skips the <span class="mono">compliance_disclosure</span>
+    tool, which shows up as a real drop in that tool's frequency.
   </p>
   <div class="dist-diff">
     <div>
-      <h3>Baseline · last 7 days <span class="hint">(rolling)</span></h3>
+      <h3>Baseline batch <span class="hint">(reference)</span></h3>
       <div id="dist-baseline"></div>
     </div>
     <div>
-      <h3>Now · last 1 hour <span class="hint">(KL = 0.42 · breach)</span></h3>
+      <h3>Candidate batch <span class="hint">(under test)</span></h3>
       <div id="dist-now"></div>
     </div>
   </div>
@@ -180,26 +167,16 @@
   <div class="section-head" style="margin-top:48px;">
     <h2>Sub-agent <em>delegation graph drift</em></h2>
     <div class="actions">
-      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">graph edit distance · top-k edge churn 38% · breach &gt;30%</span>
+      <span class="pill pill--warn" style="font-size:10.5px;">not applicable — single-agent target</span>
     </div>
   </div>
-  <p class="viz-caption">
-    <b>What this tells you:</b> which sub-agents are calling which other sub-agents.
-    <b style="color:var(--signal-err);">Red</b> edges appear only in the candidate — new delegations.
-    <b style="color:var(--accent);">Purple</b> edges appear in both. Missing edges from the baseline
-    mean the candidate has stopped calling a sub-agent that used to be routine.
-  </p>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;">
-      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px;">Baseline · 7d</div>
-      <div id="graph-baseline"></div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:10px;">3 nodes · 3 edges · planner → researcher (0.55) · planner → writer (0.45) · researcher → critic (0.20)</div>
-    </div>
-    <div style="background:var(--surface);border:2px solid var(--signal-err);border-radius:12px;padding:18px;">
-      <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--signal-err);margin-bottom:8px;">Now · 1h <span style="background:rgba(184,61,43,0.14);padding:1px 6px;border-radius:4px;margin-left:8px;">churn 38%</span></div>
-      <div id="graph-now"></div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:10px;">5 nodes · 6 edges · two new fan-out edges (planner → critic, planner → verifier) · researcher and writer now also delegate downstream</div>
-    </div>
+  <div style="background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:22px 24px;font-size:13px;line-height:1.6;color:var(--text-muted);">
+    <b style="color:var(--text);">No sub-agent delegation to track.</b> The agent-under-test
+    (<span class="mono">retirement-401k</span>) is a single agent — it calls tools, but does not delegate
+    to other agents — so there is no delegation graph and nothing to diff. This view lights up only for a
+    multi-agent target that emits real <span class="mono">agent → agent</span> edges. The
+    <b>tool-call sequence drift</b>, <b>distribution drift</b> and <b>implicated runs</b> above are the real
+    trajectory signals for this target.
   </div>
 
   <!-- ============= IMPLICATED RUNS / SPANS LIST ============= -->
@@ -217,60 +194,13 @@
           <th>Persona</th>
           <th>Prompt</th>
           <th>Tool-call sequence</th>
-          <th>Z</th>
+          <th>Δ edits</th>
           <th>TRAIL</th>
           <th>When</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>
-            <div class="id-strong">sim_01HXC9P0 · q_01HXC9PA</div>
-            <div class="id">14 spans · 8 LLM · 6 tool</div>
-          </td>
-          <td>Adversarial Aaron · v4</td>
-          <td><span class="mono" style="font-size:12px;">support_v3.1.2</span></td>
-          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[search → fetch → search → search → fetch → escalate → search]</span></td>
-          <td><span class="mono" style="font-weight:700;color:var(--signal-err);">5.2</span></td>
-          <td><span class="trail-tag" data-cat="planning">replan_storm</span></td>
-          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">23m ago</td>
-        </tr>
-        <tr>
-          <td>
-            <div class="id-strong">live_01HXCA0F · trace</div>
-            <div class="id">22 spans · 10 LLM · 9 tool · 3 agent</div>
-          </td>
-          <td>Methodical Mei · v4</td>
-          <td><span class="mono" style="font-size:12px;">billing_v2.4</span></td>
-          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[lookup → fetch → fetch → fetch → fetch → fetch → escalate]</span></td>
-          <td><span class="mono" style="font-weight:700;color:var(--signal-err);">4.8</span></td>
-          <td><span class="trail-tag" data-cat="execution">tool_argument_invalid</span></td>
-          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">41m ago</td>
-        </tr>
-        <tr>
-          <td>
-            <div class="id-strong">live_01HXC9TB · trace</div>
-            <div class="id">9 spans · 4 LLM · 4 tool · 1 agent</div>
-          </td>
-          <td>Onboarding Olivia · v3</td>
-          <td><span class="mono" style="font-size:12px;">support_v3.1.2</span></td>
-          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[search → fetch → escalate]</span></td>
-          <td><span class="mono" style="font-weight:700;color:var(--signal-warn);">3.4</span></td>
-          <td><span class="trail-tag" data-cat="execution">retrieval_returned_nothing_used_anyway</span></td>
-          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">1h ago</td>
-        </tr>
-        <tr>
-          <td>
-            <div class="id-strong">live_01HXC9XK · trace</div>
-            <div class="id">17 spans · 7 LLM · 8 tool · 2 agent</div>
-          </td>
-          <td>Compliance Cara · v2</td>
-          <td><span class="mono" style="font-size:12px;">support_v3.1.2</span></td>
-          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[lookup → fetch → search → fetch → escalate → escalate]</span></td>
-          <td><span class="mono" style="font-weight:700;color:var(--signal-err);">4.1</span></td>
-          <td><span class="trail-tag" data-cat="reasoning">unsupported_claim</span></td>
-          <td style="font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">1h ago</td>
-        </tr>
+      <tbody id="implicated-rows">
+        <tr><td colspan="7" style="text-align:center;color:var(--text-faint);font-family:var(--mono);font-size:12px;padding:20px;">loading real traces…</td></tr>
       </tbody>
     </table>
   </div>
@@ -317,7 +247,6 @@
       }
     }
     const R = (window.AIBC_OBS && window.AIBC_OBS.ready) || Promise.resolve();
-    R.then(populatePickers);
 
     function applyExperiment() {
       const baseSel = document.getElementById('pick-baseline');
@@ -335,23 +264,126 @@
       frame.style.borderColor = 'var(--accent)';
       setTimeout(() => { frame.style.borderColor = ''; }, 1400);
     }
-    document.getElementById('exp-apply').addEventListener('click', applyExperiment);
+    // ---- Real trajectory, computed from the agent's actual tool-call sequences ----
+    // Each run's sequence is the ordered list of tool names the agent invoked
+    // across its agent turns (captured over /chat and stored on the trace).
+    const seqOf = (run) => (run.turns || [])
+      .filter((t) => t.role === 'agent')
+      .flatMap((t) => (t.tool_calls || []).map((c) => c.name || '?'));
+    const runsOf = (id) => { const bt = B && B.getBatch(id); return bt ? (bt.runs || []) : []; };
 
-    document.getElementById('heatmap').innerHTML = obs.buildHeatmap();
+    // Edit distance over the tool-name alphabet (Levenshtein on token arrays).
+    function lev(a, b) {
+      const m = a.length, n = b.length;
+      const d = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+      for (let i = 0; i <= m; i++) d[i][0] = i;
+      for (let j = 0; j <= n; j++) d[0][j] = j;
+      for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+        d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+      return d[m][n];
+    }
+    // Baseline reference = the modal (most common) tool sequence in the baseline batch.
+    function modalSeq(runs) {
+      const counts = {}; let best = [], bestN = -1;
+      runs.forEach((r) => { const s = seqOf(r); const k = s.join('→');
+        counts[k] = (counts[k] || 0) + 1; if (counts[k] > bestN) { bestN = counts[k]; best = s; } });
+      return best;
+    }
+    function toolFreq(runs) {
+      const f = {}; let tot = 0;
+      runs.forEach((r) => seqOf(r).forEach((t) => { f[t] = (f[t] || 0) + 1; tot++; }));
+      return { f, tot };
+    }
+    const distColor = (z) => z >= 4 ? 'var(--signal-err)' : z >= 2 ? 'var(--signal-warn)' : 'var(--text-muted)';
 
-    const baseline = [
-      { name: 'lookup',  baseline: 0.30, now: 0.18 },
-      { name: 'search',  baseline: 0.20, now: 0.12 },
-      { name: 'fetch',   baseline: 0.18, now: 0.32 },
-      { name: 'reason',  baseline: 0.14, now: 0.08 },
-      { name: 'escalate',baseline: 0.08, now: 0.16 },
-      { name: 'reply',   baseline: 0.10, now: 0.14 },
-    ];
-    document.getElementById('dist-baseline').innerHTML = obs.buildDistDiff(baseline, 'baseline');
-    document.getElementById('dist-now').innerHTML = obs.buildDistDiff(baseline, 'now');
+    function renderImplicated(baseId, candId) {
+      const ref = modalSeq(runsOf(baseId));
+      const rows = runsOf(candId).map((r) => {
+        const s = seqOf(r);
+        return { r, s, dist: lev(s, ref), fail: r.status === 'fail' };
+      }).sort((a, b) => (b.dist - a.dist) || ((b.fail ? 1 : 0) - (a.fail ? 1 : 0)));
+      const host = document.getElementById('implicated-rows');
+      if (!rows.length) {
+        host.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;padding:20px;">no runs in candidate batch</td></tr>';
+        return;
+      }
+      host.innerHTML = rows.map(({ r, s, dist, fail }) => `
+        <tr>
+          <td><div class="id-strong">${obs.escapeHtml((r.trace_id || '').slice(0, 16))}</div>
+              <div class="id">${s.length} tool calls${fail ? ' · verdict fail' : ''}</div></td>
+          <td>${obs.escapeHtml(r.persona ? r.persona.name : '—')}</td>
+          <td><span class="mono" style="font-size:12px;">${obs.escapeHtml((r.question || '').slice(0, 44))}</span></td>
+          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[${s.map(obs.escapeHtml).join(' → ') || '∅'}]</span></td>
+          <td><span class="mono" style="font-weight:700;color:${distColor(dist)};">${dist}</span></td>
+          <td>${fail ? '<span class="trail-tag" data-cat="execution">verdict_fail</span>' : '<span style="color:var(--text-faint);">—</span>'}</td>
+          <td style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);">${obs.escapeHtml((r.trace_id || '').slice(-6))}</td>
+        </tr>`).join('');
+    }
 
-    document.getElementById('graph-baseline').innerHTML = obs.buildDelegationGraph('baseline');
-    document.getElementById('graph-now').innerHTML = obs.buildDelegationGraph('now');
+    function renderDist(baseId, candId) {
+      const bf = toolFreq(runsOf(baseId)), cf = toolFreq(runsOf(candId));
+      const names = [...new Set([...Object.keys(bf.f), ...Object.keys(cf.f)])].sort();
+      const data = names.map((n) => ({
+        name: n,
+        baseline: bf.tot ? bf.f[n] / bf.tot : 0,
+        now: cf.tot ? (cf.f[n] || 0) / cf.tot : 0,
+      }));
+      if (!data.length) return;
+      document.getElementById('dist-baseline').innerHTML = obs.buildDistDiff(data, 'baseline');
+      document.getElementById('dist-now').innerHTML = obs.buildDistDiff(data, 'now');
+    }
+
+    // Baseline vs candidate representative (modal) tool-call path with a per-step
+    // diff: steps the candidate ADDED/changed are red; steps it DROPPED are struck
+    // through. Compact and readable -- the real drift at a glance.
+    function renderSeqDrift(baseId, candId) {
+      const baseRef = modalSeq(runsOf(baseId));
+      const candRef = modalSeq(runsOf(candId));
+      const baseSet = new Set(baseRef), candSet = new Set(candRef);
+      const dist = lev(baseRef, candRef);
+      const candRuns = runsOf(candId);
+      const diverged = candRuns.filter((r) => lev(seqOf(r), baseRef) > 0).length;
+      const chipBase = 'display:inline-block;padding:4px 10px;border-radius:6px;font-family:var(--font-mono);font-size:12px;white-space:nowrap;';
+      const styleFor = (mode) => mode === 'added'
+        ? chipBase + 'background:rgba(184,61,43,0.14);color:var(--signal-err);border:1px solid rgba(184,61,43,0.45);font-weight:600;'
+        : mode === 'dropped'
+        ? chipBase + 'background:transparent;color:var(--text-faint);border:1px dashed var(--border);text-decoration:line-through;'
+        : chipBase + 'background:var(--surface-alt);color:var(--text-muted);border:1px solid var(--border);';
+      const arrow = '<span style="color:var(--text-faint);font-family:var(--font-mono);padding:0 2px;">&rarr;</span>';
+      const chips = (seq, otherSet, addMode) => seq.length
+        ? seq.map((n) => '<span style="' + styleFor(otherSet.has(n) ? '' : addMode) + '">' + obs.escapeHtml(n) + '</span>').join(arrow)
+        : '<span style="color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">no tool calls</span>';
+      const rowHtml = (tag, tagColor, chipsHtml) =>
+        '<div style="display:flex;align-items:center;gap:14px;padding:8px 0;flex-wrap:wrap;">' +
+          '<span style="flex:0 0 88px;font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.1em;color:' + tagColor + ';font-weight:700;">' + tag + '</span>' +
+          '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">' + chipsHtml + '</div>' +
+        '</div>';
+      const dc = dist >= 3 ? 'var(--signal-err)' : dist >= 1 ? 'var(--signal-warn)' : 'var(--signal-ok)';
+      document.getElementById('seq-drift').innerHTML =
+        rowHtml('BASELINE', 'var(--text-faint)', chips(baseRef, candSet, 'dropped')) +
+        '<div style="height:1px;background:var(--border);margin:4px 0;"></div>' +
+        rowHtml('CANDIDATE', 'var(--signal-err)', chips(candRef, baseSet, 'added')) +
+        '<div style="display:flex;align-items:center;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">' +
+          '<span style="padding:3px 10px;border-radius:6px;background:' + dc + ';color:#fff;font-weight:700;">edit distance ' + dist + '</span>' +
+          '<span>' + diverged + '/' + candRuns.length + ' candidate runs diverge from the baseline path</span>' +
+        '</div>';
+    }
+
+    function renderAll() {
+      const baseId = document.getElementById('pick-baseline').value;
+      const candId = document.getElementById('pick-candidate').value;
+      if (!candId) return;
+      renderImplicated(baseId, candId);
+      renderDist(baseId, candId);
+      renderSeqDrift(baseId, candId);
+    }
+    // Re-render whenever the picker changes or Apply is clicked.
+    document.getElementById('pick-baseline').addEventListener('change', renderAll);
+    document.getElementById('pick-candidate').addEventListener('change', renderAll);
+    document.getElementById('exp-apply').addEventListener('click', () => { applyExperiment(); renderAll(); });
+    R.then(() => { populatePickers(); renderAll(); });
+    // Sub-agent delegation graph is intentionally omitted: the target is a single
+    // agent, so there are no real agent→agent edges to render (see the panel above).
   })();
 </script>
 </body>

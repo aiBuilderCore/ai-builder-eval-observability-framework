@@ -216,7 +216,17 @@
     // Paint pass/fail live from the running tallies; fall back to the final output.
     const passCount = job.output?.pass_count ?? job.progress.pass_count ?? "—";
     const failCount = job.output?.fail_count ?? job.progress.fail_count ?? "—";
+    // Jury consensus is only meaningful for a real multi-juror panel. With a
+    // single provider wired there is no jury, so we hide the card entirely rather
+    // than show a permanent "—" that reads as missing data.
+    const isJury = job.inputs.mode === "jury";
     const consensus = job.progress.consensus_rate ? `${(job.progress.consensus_rate * 100).toFixed(0)}%` : "—";
+    const juryCard = isJury ? `
+      <div class="kpi">
+        <div class="lbl">Jury consensus</div>
+        <div class="val">${consensus}</div>
+        <div class="sub">unanimous panels</div>
+      </div>` : "";
     host.innerHTML = `
       <div class="kpi">
         <div class="lbl">Cells</div>
@@ -226,18 +236,14 @@
       <div class="kpi">
         <div class="lbl">Judge calls</div>
         <div class="val">${job.progress.judge_call_count.toLocaleString()}</div>
-        <div class="sub">${job.inputs.mode === "jury" ? `jury × ${EV.panelById(job.inputs.panel_id)?.cost_multiplier ?? 1}` : "single judge"}</div>
+        <div class="sub">${isJury ? `jury × ${EV.panelById(job.inputs.panel_id)?.cost_multiplier ?? 1}` : "single judge"}</div>
       </div>
       <div class="kpi">
         <div class="lbl">Pass / Fail</div>
         <div class="val">${passCount} / ${failCount}</div>
         <div class="sub">${job.output ? `${job.output.abstain_count} abstain` : "in flight"}</div>
       </div>
-      <div class="kpi">
-        <div class="lbl">Jury consensus</div>
-        <div class="val">${consensus}</div>
-        <div class="sub">unanimous panels</div>
-      </div>
+      ${juryCard}
     `;
   }
 

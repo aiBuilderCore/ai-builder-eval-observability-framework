@@ -64,8 +64,10 @@ async def incidents(state: str | None = None, p: Principal = Depends(principal))
 
 
 @app.get("/observability/gate/{candidate}")
-async def gate(candidate: str, p: Principal = Depends(principal)) -> dict:
-    return (await evaluate_gate(p.tenant, candidate)).model_dump(mode="json")
+async def gate(
+    candidate: str, baseline: str | None = None, p: Principal = Depends(principal)
+) -> dict:
+    return (await evaluate_gate(p.tenant, candidate, baseline=baseline)).model_dump(mode="json")
 
 
 @app.get("/observability/evidence")

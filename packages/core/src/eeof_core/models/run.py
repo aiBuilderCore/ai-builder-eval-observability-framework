@@ -47,6 +47,11 @@ class Turn(BaseModel):
     role: str  # user | agent
     content: str
     ts: str = Field(default_factory=iso)
+    # Real tool calls the agent made on this turn (agent turns only), captured
+    # from the agent-under-test's /chat response. Each entry: {name, ok, detail?}.
+    # This is the genuine tool-call telemetry Observability's trajectory drift and
+    # tool-call monitors read — not a synthesised scalar.
+    tool_calls: list[dict] = Field(default_factory=list)
 
 
 class TraceRef(BaseModel):
