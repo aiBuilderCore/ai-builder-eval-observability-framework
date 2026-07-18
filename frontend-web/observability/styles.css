@@ -982,7 +982,7 @@ footer.foot a:hover { color: var(--accent); }
 
 /* ---------- Span attribute table (under the chart) ---------- */
 .span-attrs {
-  width: 100%; border-collapse: collapse;
+  width: 100%; border-collapse: collapse; table-layout: fixed;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-3); margin-top: 12px;
   font-family: var(--font-mono); font-size: 12px;
@@ -991,9 +991,18 @@ footer.foot a:hover { color: var(--accent); }
   padding: 8px 12px; border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
+.span-attrs td:last-child { white-space: pre-wrap; word-break: break-word; color: var(--text); }
 .span-attrs tr:last-child td { border-bottom: 0; }
-.span-attrs td:first-child { width: 32%; color: var(--text-faint); }
+.span-attrs td:first-child { width: 32%; color: var(--text-faint); word-break: break-word; }
 .span-attrs td code { background: transparent; border: 0; padding: 0; color: var(--text); }
+/* Large captured payloads (verbatim prompt / messages / completion) — scrollable
+   and whitespace-preserving so the full text is readable in place. */
+.span-attrs__pre {
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 240px; overflow: auto;
+  background: var(--surface-alt, var(--surface)); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; line-height: 1.55;
+}
 .span-attrs__empty {
   font-family: var(--font-mono); font-size: 12px;
   color: var(--text-faint); padding: 18px; text-align: center;

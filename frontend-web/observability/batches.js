@@ -527,13 +527,33 @@
   }
 
   // ---- Span attribute tabular renderer --------------------------
+  // Renders every attribute. Large payloads (the captured prompt/messages/
+  // completion on PROMPT/LLM spans) are shown in a scrollable, whitespace-
+  // preserving block — and JSON-ish values are pretty-printed — so the full
+  // verbatim prompt is readable, not collapsed onto one line.
+  function fmtAttrValue(k, v) {
+    let s = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if ((t.startsWith('{') || t.startsWith('[')) &&
+          (k === 'input.value' || k === 'output.value' || k === 'llm.invocation_parameters')) {
+        try { s = JSON.stringify(JSON.parse(v), null, 2); } catch (e) { /* keep raw */ }
+      }
+    }
+    return s;
+  }
   function spanAttrsHtml(span) {
     const entries = Object.entries(span.attrs || {});
     if (!entries.length) return '<p class="span-attrs__empty">No additional attributes.</p>';
     return `<table class="span-attrs">
-      <tbody>${entries.map(([k, v]) => `
-        <tr><td><code>${escapeHtml(k)}</code></td><td>${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</td></tr>
-      `).join('')}</tbody>
+      <tbody>${entries.map(([k, v]) => {
+        const s = fmtAttrValue(k, v);
+        const big = s.length > 100 || /\n/.test(s);
+        const cell = big
+          ? `<div class="span-attrs__pre">${escapeHtml(s)}</div>`
+          : escapeHtml(s);
+        return `<tr><td><code>${escapeHtml(k)}</code></td><td>${cell}</td></tr>`;
+      }).join('')}</tbody>
     </table>`;
   }
 
