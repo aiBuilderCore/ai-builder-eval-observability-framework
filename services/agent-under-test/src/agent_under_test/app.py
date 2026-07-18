@@ -146,10 +146,11 @@ async def chat(req: ChatRequest, request: Request) -> dict:
     prompt_ms = int((time.monotonic() - t_prompt) * 1000)
     tool_calls = _plan_tool_calls(convo_text, req.scenario)
 
+    llm_messages = history or [{"role": "user", "content": "Hello"}]
     t_llm = time.monotonic()
     reply = await provider.chat(
         system=system_prompt,
-        messages=history or [{"role": "user", "content": "Hello"}],
+        messages=llm_messages,
         max_tokens=400,
         temperature=0.4,
     )
@@ -164,6 +165,10 @@ async def chat(req: ChatRequest, request: Request) -> dict:
         model_name=provider.name,
         llm_ms=llm_ms,
         prompt_ms=prompt_ms,
+        system_prompt=system_prompt,
+        messages=llm_messages,
+        temperature=0.4,
+        max_tokens=400,
     )
     return {
         "reply": reply,

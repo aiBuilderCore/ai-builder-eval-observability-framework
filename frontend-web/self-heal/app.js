@@ -239,6 +239,66 @@
     );
   }
 
+  function pickSpan(spans, kind) {
+    for (var i = 0; i < spans.length; i++) if (spans[i].kind === kind) return spans[i];
+    return null;
+  }
+
+  // The last user turn as the model actually saw it — read from the LLM span's
+  // captured input messages, falling back to the transcript.
+  function lastUserMessage(llmAttrs, detail) {
+    var bestIdx = -1;
+    Object.keys(llmAttrs || {}).forEach(function (k) {
+      var m = /^llm\.input_messages\.(\d+)\.message\.role$/.exec(k);
+      if (m && llmAttrs[k] === "user" && +m[1] > bestIdx) bestIdx = +m[1];
+    });
+    if (bestIdx >= 0) return llmAttrs["llm.input_messages." + bestIdx + ".message.content"] || "";
+    var turns = ((detail && detail.turns) || []).filter(function (t) { return t.role === "user"; });
+    return turns.length ? turns[turns.length - 1].text : "";
+  }
+
+  // RCA diagnosis: lazily pull the exemplar flagged trace and surface *exactly*
+  // what the agent ran under — the verbatim system prompt (guardrails in effect),
+  // the user prompt, and the completion — captured on the trace's OpenInference
+  // PROMPT/LLM spans. This is the "understand completely what's going wrong" view:
+  // for a guardrail regression, the weakened system prompt is visible right here.
+  function hydrateDiagnosis(inc) {
+    var host = document.getElementById("sh-diagnosis");
+    if (!host) return;
+    if (!window.EEOF || !inc.traces || !inc.traces.length) return; // seed/offline → stay hidden
+    var tid = inc.traces[0].id;
+    host.hidden = false;
+    host.innerHTML =
+      '<p class="sh-eyebrow" style="margin-top:1.4rem;">RCA · what the agent saw</p>' +
+      '<p class="sh-diagnosis__loading">Loading the flagged trace…</p>';
+    EEOF.get("/simulation/traces/" + encodeURIComponent(tid)).then(function (detail) {
+      var spans = (detail && detail.spans) || [];
+      var prompt = pickSpan(spans, "PROMPT"), llm = pickSpan(spans, "LLM");
+      if (!prompt && !llm) { host.hidden = true; return; }
+      var pa = (prompt && prompt.attrs) || {}, la = (llm && llm.attrs) || {};
+      var system = pa["input.value"] || la["llm.system"] || "";
+      var completion = la["output.value"] || la["llm.output_messages.0.message.content"] || "";
+      var user = lastUserMessage(la, detail);
+      var model = la["gen_ai.request.model"] || "—";
+      var params = la["llm.invocation_parameters"] || "";
+      if (!system && !completion && !user) { host.hidden = true; return; }
+      host.innerHTML =
+        '<p class="sh-eyebrow" style="margin-top:1.4rem;">RCA · what the agent saw ' +
+        '<span class="sh-diagnosis__trace">' + esc(tid) + "</span></p>" +
+        '<div class="sh-diagnosis__grid">' +
+        '  <div class="sh-diag"><span class="sh-diag__k">System prompt in effect · model ' + esc(model) +
+        '</span><pre class="sh-diag__v sh-diag__v--prompt">' + esc(system || "(not captured)") + "</pre></div>" +
+        '  <div class="sh-diag"><span class="sh-diag__k">User prompt</span>' +
+        '<pre class="sh-diag__v">' + esc(user || "(not captured)") + "</pre></div>" +
+        '  <div class="sh-diag"><span class="sh-diag__k">Agent completion</span>' +
+        '<pre class="sh-diag__v">' + esc(completion || "(not captured)") + "</pre></div>" +
+        "</div>" +
+        '<p class="sh-diagnosis__hint">Captured verbatim from the flagged trace’s OpenInference LLM span' +
+        (params ? " (" + esc(params) + ")" : "") +
+        ". Compare the guardrail text above against a passing trace to attribute the breach.</p>";
+    }).catch(function () { host.hidden = true; });
+  }
+
   function openIncident(id) {
     var inc = SH.incidents.filter(function (i) { return i.id === id; })[0];
     if (!inc) return;
@@ -262,6 +322,7 @@
       "  </div>" +
       '  <p class="sh-eyebrow">Closed-loop progress</p>' +
       '  <ul class="tl">' + inc.timeline.map(tlItem).join("") + "</ul>" +
+      '  <div class="sh-diagnosis" id="sh-diagnosis" hidden></div>' +
       fixPanel(inc) +
       '  <p class="sh-eyebrow" style="margin-top:1.4rem;">' +
       (inc.status === "resolved" ? "Remediation action · applied"
@@ -292,6 +353,7 @@
     modal.classList.add("is-open");
     document.body.style.overflow = "hidden";
     if (history.replaceState) history.replaceState(null, "", "#" + inc.id);
+    hydrateDiagnosis(inc);
   }
 
   function closeModal() {

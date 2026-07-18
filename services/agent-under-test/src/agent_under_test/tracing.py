@@ -22,6 +22,7 @@ shares one trace id: the root AGENT span becomes a child of the propagated span.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import secrets
 import time
@@ -36,6 +37,26 @@ GENAI_MODEL = "gen_ai.request.model"
 GENAI_TOK_IN = "gen_ai.usage.input_tokens"
 GENAI_TOK_OUT = "gen_ai.usage.output_tokens"
 GENAI_OP = "gen_ai.operation.name"
+# OpenInference input/output payload conventions — the *verbatim* prompt and
+# completion, so a trace is fully diagnosable (what the agent was told and what it
+# said), not just its shape. This is what Self-Heal reads to explain a breach.
+OI_INPUT = "input.value"
+OI_INPUT_MIME = "input.mime_type"
+OI_OUTPUT = "output.value"
+OI_OUTPUT_MIME = "output.mime_type"
+LLM_SYSTEM = "llm.system"
+LLM_INVOCATION = "llm.invocation_parameters"
+LLM_IN_MSG = "llm.input_messages"
+LLM_OUT_MSG = "llm.output_messages"
+
+# Cap any single captured payload so a trace blob stays bounded. Synthetic demo
+# prompts are short; this only guards pathological inputs.
+_MAX_PAYLOAD = 4000
+
+
+def _clip(s: Any) -> str:
+    text = str(s or "")
+    return text if len(text) <= _MAX_PAYLOAD else text[:_MAX_PAYLOAD] + " …[truncated]"
 
 
 def new_trace_id() -> str:
@@ -140,16 +161,25 @@ def build_turn_spans(
     model_name: str,
     llm_ms: int,
     prompt_ms: int,
+    system_prompt: str = "",
+    messages: list[dict] | None = None,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
 ) -> list[dict[str, Any]]:
     """Assemble the OpenInference span tree for one completed agent turn.
 
     ``llm_ms``/``prompt_ms`` are the *measured* durations of the model call and
     prompt render; tool spans get deterministic sub-durations laid out after the
-    LLM span, so the whole turn reads as a realistic agentic waterfall.
+    LLM span, so the whole turn reads as a realistic agentic waterfall. The full
+    ``system_prompt``, ``messages`` and ``reply`` are captured verbatim on the
+    PROMPT/LLM spans (OpenInference I/O conventions) so the trace is fully
+    diagnosable — the exact instructions the agent ran under and the exact
+    prompt→completion, which is what Self-Heal reads to explain a breach.
     """
     b = _TraceBuilder(trace_id)
     tok_in = _tokens_for(convo_text, floor=60)
     tok_out = _tokens_for(reply)
+    input_messages = [{"role": "system", "content": system_prompt}] + list(messages or [])
 
     cursor = 0
     # Root AGENT span — spans the whole turn; filled with the total at the end.
@@ -167,19 +197,32 @@ def build_turn_spans(
     )
     root_rec = b.spans[-1]
 
+    # PROMPT span carries the *verbatim system prompt* — the guardrails/instructions
+    # in effect for this turn (the exact thing that regresses in the breach scenario).
     b.add(kind="PROMPT", name="system_prompt.render", parent_id=root,
-          start_ms=cursor, duration_ms=max(1, prompt_ms), attrs={})
+          start_ms=cursor, duration_ms=max(1, prompt_ms),
+          attrs={OI_INPUT: _clip(system_prompt), OI_INPUT_MIME: "text/plain",
+                 "prompt.name": "retirement_401k.system"})
     cursor += max(1, prompt_ms)
 
-    b.add(
-        kind="LLM",
-        name="chat.completion",
-        parent_id=root,
-        start_ms=cursor,
-        duration_ms=max(1, llm_ms),
-        attrs={GENAI_MODEL: model_name, GENAI_TOK_IN: tok_in, GENAI_TOK_OUT: tok_out,
-               GENAI_OP: "chat"},
-    )
+    # LLM span carries the full input messages, the completion, and the invocation
+    # parameters, in OpenInference conventions.
+    llm_attrs: dict[str, Any] = {
+        GENAI_MODEL: model_name, GENAI_TOK_IN: tok_in, GENAI_TOK_OUT: tok_out,
+        GENAI_OP: "chat",
+        OI_INPUT: _clip(json.dumps(input_messages, ensure_ascii=False)),
+        OI_INPUT_MIME: "application/json",
+        OI_OUTPUT: _clip(reply), OI_OUTPUT_MIME: "text/plain",
+        LLM_SYSTEM: _clip(system_prompt),
+        LLM_INVOCATION: json.dumps({"temperature": temperature, "max_tokens": max_tokens}),
+    }
+    for i, m in enumerate(input_messages):
+        llm_attrs[f"{LLM_IN_MSG}.{i}.message.role"] = m.get("role", "user")
+        llm_attrs[f"{LLM_IN_MSG}.{i}.message.content"] = _clip(m.get("content", ""))
+    llm_attrs[f"{LLM_OUT_MSG}.0.message.role"] = "assistant"
+    llm_attrs[f"{LLM_OUT_MSG}.0.message.content"] = _clip(reply)
+    b.add(kind="LLM", name="chat.completion", parent_id=root,
+          start_ms=cursor, duration_ms=max(1, llm_ms), attrs=llm_attrs)
     cursor += max(1, llm_ms)
 
     for i, call in enumerate(tool_calls):
