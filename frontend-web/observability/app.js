@@ -953,31 +953,55 @@
       const durationMs = turns.reduce((m, x) => m + (x.latency_ms || 0), 0);
       const tokensTotal = turns.reduce(
         (m, x) => m + ((x.tokens && (x.tokens.in || 0) + (x.tokens.out || 0)) || 0), 0);
-      // Real OpenInference span lifecycle for this run. The AGENT/LLM/RETRIEVER/
-      // TOOL/GUARDRAIL counts come straight from the backend-computed `span_kinds`
-      // on the trace (simulation worker, derived from the agent's real turns +
-      // tool calls); EVALUATOR spans are the real inline judge verdicts. Every span
-      // maps to a real backend event — nothing fabricated. Falls back to
-      // reconstructing from turns for older traces without `span_kinds`.
-      const sk = detail.annotations && detail.annotations.span_kinds;
-      const spans = [];
-      if (sk && typeof sk === "object") {
-        Object.keys(sk).forEach((kind) => {
-          for (let i = 0; i < (sk[kind] || 0); i++) spans.push({ kind, name: kind.toLowerCase() });
-        });
+      // Real OpenInference span tree for this run. Preferred source is the agent's
+      // own emitted spans (`detail.spans`): a timed AGENT→PROMPT/LLM/TOOL/RETRIEVER/
+      // GUARDRAIL waterfall with W3C ids and OTel GenAI semconv attrs, stitched
+      // across turns by the simulation worker. Falls back to the `span_kinds`
+      // histogram, then to reconstruction from turns, for uninstrumented targets
+      // or older traces. EVALUATOR spans are the real inline judge verdicts,
+      // appended after the agent lifecycle. Every span maps to a real backend
+      // event — nothing fabricated.
+      let spans = [];
+      const realSpans = Array.isArray(detail.spans) ? detail.spans : [];
+      if (realSpans.length) {
+        spans = realSpans.map((s) => ({
+          id: s.id, parent_id: s.parent_id != null ? s.parent_id : null,
+          kind: s.kind, name: s.name,
+          start_ms: s.start_ms || 0, duration_ms: s.duration_ms || 0,
+          attrs: s.attrs || {},
+        }));
       } else {
-        spans.push({ kind: "AGENT", name: "conversation" });
-        turns.filter((x) => x.role === "agent").forEach((at) => {
-          spans.push({ kind: "LLM", name: "chat.completion" });
-          (at.tool_calls || []).forEach((c) => {
-            const nm = c.name || "tool";
-            const kind = /^retrieve/.test(nm) ? "RETRIEVER"
-              : /(disclosure|compliance|guardrail)/.test(nm) ? "GUARDRAIL" : "TOOL";
-            spans.push({ kind, name: nm });
+        const sk = detail.annotations && detail.annotations.span_kinds;
+        if (sk && typeof sk === "object") {
+          Object.keys(sk).forEach((kind) => {
+            for (let i = 0; i < (sk[kind] || 0); i++) spans.push({ kind, name: kind.toLowerCase() });
           });
-        });
+        } else {
+          spans.push({ kind: "AGENT", name: "conversation" });
+          turns.filter((x) => x.role === "agent").forEach((at) => {
+            spans.push({ kind: "LLM", name: "chat.completion" });
+            (at.tool_calls || []).forEach((c) => {
+              const nm = c.name || "tool";
+              const kind = /^retrieve/.test(nm) ? "RETRIEVER"
+                : /(disclosure|compliance|guardrail)/.test(nm) ? "GUARDRAIL" : "TOOL";
+              spans.push({ kind, name: nm });
+            });
+          });
+        }
       }
-      mapped.forEach((v) => spans.push({ kind: "EVALUATOR", name: v.judge }));
+      // Inline judge verdicts as EVALUATOR spans — parented to the trace's first
+      // root (the agent run they scored) with a short synthetic duration so they
+      // read on the waterfall, laid just after the agent lifecycle finishes.
+      const rootId = (spans.find((s) => !s.parent_id) || {}).id || null;
+      const evalStart = spans.reduce((m, s) => Math.max(m, (s.start_ms || 0) + (s.duration_ms || 0)), 0);
+      mapped.forEach((v, i) => spans.push({
+        id: `ev_${i}`, parent_id: rootId, kind: "EVALUATOR", name: v.judge,
+        start_ms: evalStart + i * 40, duration_ms: 80,
+        attrs: {
+          "openinference.span.kind": "EVALUATOR",
+          "evaluator.score": v.score, "evaluator.pass": v.pass,
+        },
+      }));
       return {
         run_id: t.id, trace_id: t.id, session_id: detail.session_id_used || t.id,
         persona: { id: persona.id, name: persona.name || persona.id, version: persona.version || 1 },

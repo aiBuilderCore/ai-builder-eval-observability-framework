@@ -18,13 +18,16 @@ Synthetic demo only — educational, never real financial advice.
 from __future__ import annotations
 
 import hashlib
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 
 from eeof_core.models import get_agent
 from eeof_core.models.agent_catalog import agent_system_prompt
 from eeof_core.providers import get_provider
+
+from .tracing import build_turn_spans, new_trace_id, parse_traceparent
 
 AGENT_ID = "retirement-401k"
 
@@ -117,7 +120,7 @@ async def info() -> dict:
 
 
 @app.post("/chat")
-async def chat(req: ChatRequest) -> dict:
+async def chat(req: ChatRequest, request: Request) -> dict:
     provider = get_provider()
     # The final user message is the turn to answer; the rest is context.
     history = [
@@ -130,12 +133,42 @@ async def chat(req: ChatRequest) -> dict:
     convo_text = " ".join(
         m.get("content", "") for m in req.messages if m.get("role") in (None, "user")
     )
-    # Plan + "execute" the real tool-call sequence for this turn, then answer.
+    # Continue the run's trace when the caller propagates W3C `traceparent` (so
+    # every turn of a simulation shares one trace id); start a fresh trace
+    # otherwise. The propagated span becomes the root AGENT span's parent.
+    trace_id, parent_span_id = parse_traceparent(request.headers.get("traceparent"))
+    trace_id = trace_id or new_trace_id()
+
+    # Plan the real tool-call sequence for this turn, measure the prompt render
+    # and the model call, then assemble the OpenInference span tree.
+    t_prompt = time.monotonic()
+    system_prompt = agent_system_prompt(AGENT_ID, req.scenario)
+    prompt_ms = int((time.monotonic() - t_prompt) * 1000)
     tool_calls = _plan_tool_calls(convo_text, req.scenario)
+
+    t_llm = time.monotonic()
     reply = await provider.chat(
-        system=agent_system_prompt(AGENT_ID, req.scenario),
+        system=system_prompt,
         messages=history or [{"role": "user", "content": "Hello"}],
         max_tokens=400,
         temperature=0.4,
     )
-    return {"reply": reply, "agent": AGENT_ID, "tool_calls": tool_calls}
+    llm_ms = int((time.monotonic() - t_llm) * 1000)
+
+    spans = build_turn_spans(
+        trace_id=trace_id,
+        parent_span_id=parent_span_id,
+        convo_text=convo_text,
+        reply=reply,
+        tool_calls=tool_calls,
+        model_name=provider.name,
+        llm_ms=llm_ms,
+        prompt_ms=prompt_ms,
+    )
+    return {
+        "reply": reply,
+        "agent": AGENT_ID,
+        "tool_calls": tool_calls,
+        "trace_id": trace_id,
+        "spans": spans,
+    }

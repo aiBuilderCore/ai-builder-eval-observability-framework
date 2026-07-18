@@ -52,6 +52,12 @@ class Turn(BaseModel):
     # This is the genuine tool-call telemetry Observability's trajectory drift and
     # tool-call monitors read — not a synthesised scalar.
     tool_calls: list[dict] = Field(default_factory=list)
+    # Real OpenInference span tree the agent emitted for this turn (agent turns
+    # only): AGENT root + PROMPT/LLM/TOOL/RETRIEVER/GUARDRAIL children, with W3C
+    # ids and OTel GenAI semconv attributes. `start_ms`/`duration_ms` are relative
+    # to the turn; the simulation worker offsets them onto the conversation
+    # timeline. Empty when the target exposes no instrumented endpoint.
+    spans: list[dict] = Field(default_factory=list)
 
 
 class TraceRef(BaseModel):

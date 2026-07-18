@@ -26,6 +26,8 @@ exchange, since it holds no session for a conversation to build on.
 
 from __future__ import annotations
 
+import secrets
+
 from eeof_core.models import Question, Turn
 
 from .adapters import agent_reply
@@ -114,6 +116,7 @@ async def simulate_conversation(
     provider,
     max_turns: int = 12,
     mode: str = "multi_turn",
+    trace_id: str | None = None,
 ) -> list[Turn]:
     persona = question.persona
     tone = persona.tone or "casual"
@@ -155,8 +158,14 @@ async def simulate_conversation(
                     else "Can you walk me through that with a concrete example?"
                 )
         turns.append(Turn(role="user", content=user_text.strip()))
-        # Close the exchange with the agent's reply (and its real tool-call
-        # sequence) to the full history so far.
-        agent_text, tool_calls = await agent_reply(adapter_snapshot, turns, provider)
-        turns.append(Turn(role="agent", content=agent_text, tool_calls=tool_calls))
+        # Close the exchange with the agent's reply, its real tool-call sequence,
+        # and the OpenInference span tree it emitted. A fresh per-turn parent span
+        # id under the shared run trace id gives W3C trace-context continuity.
+        parent_span_id = secrets.token_hex(8)
+        agent_text, tool_calls, spans = await agent_reply(
+            adapter_snapshot, turns, provider, trace_id, parent_span_id
+        )
+        turns.append(
+            Turn(role="agent", content=agent_text, tool_calls=tool_calls, spans=spans)
+        )
     return turns

@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
+import secrets
 import time
 
 from eeof_core.dataplane import get_blob, get_bus, get_table, keys
@@ -75,6 +76,33 @@ def _enrich_turns(q: Question, turns: list) -> tuple[list[dict], int, int, int]:
     return out, tin, tout, agent_turns
 
 
+def _collect_spans(turns: list) -> tuple[list[dict], dict[str, int]]:
+    """Stitch each agent turn's OpenInference spans onto one conversation timeline.
+
+    The agent emits spans with `start_ms` relative to its own turn (root at 0);
+    here we offset every turn's spans by the cumulative end of the prior turns so
+    the run reads as a single left-to-right waterfall, and count span kinds for
+    the batch histogram. Returns `([], {})` when the target emitted no spans (an
+    uninstrumented endpoint), so the frontend can fall back to reconstruction.
+    """
+    all_spans: list[dict] = []
+    kinds: dict[str, int] = {}
+    offset = 0
+    for t in turns:
+        spans = list(getattr(t, "spans", []) or [])
+        if not spans:
+            continue
+        turn_end = 0
+        for s in spans:
+            span = dict(s)
+            span["start_ms"] = int(span.get("start_ms", 0)) + offset
+            all_spans.append(span)
+            kinds[span.get("kind", "?")] = kinds.get(span.get("kind", "?"), 0) + 1
+            turn_end = max(turn_end, span["start_ms"] + int(span.get("duration_ms", 0)))
+        offset = turn_end + 20  # small inter-turn gap so bars don't abut
+    return all_spans, kinds
+
+
 class SimWorker(BaseWorker):
     subject = "sim.jobs"
     durable = "sim-workers"
@@ -119,9 +147,12 @@ class SimWorker(BaseWorker):
         trace_ids: list[str] = []
 
         async def run_one(q: Question) -> None:
+            # One W3C trace id per conversation, propagated to the agent so every
+            # turn's spans stitch into a single trace.
+            otel_trace_id = secrets.token_hex(16)
             async with sem:
                 turns = await simulate_conversation(
-                    q, adapter_snapshot, provider, max_turns, mode
+                    q, adapter_snapshot, provider, max_turns, mode, otel_trace_id
                 )
             stop = _stop_reason(q, turns)
             turn_dicts, tin, tout, agent_turns = _enrich_turns(q, turns)
@@ -136,22 +167,31 @@ class SimWorker(BaseWorker):
                     tool_seq.append(c.get("name", "?"))
                     if not c.get("ok", True):
                         tool_failures += 1
-            # Real OpenInference span-kind counts for the agent lifecycle on this
-            # trace: an AGENT root, one LLM span per agent turn, and each tool call
-            # mapped to RETRIEVER (retrieval), GUARDRAIL (compliance/disclosure) or
-            # TOOL. EVALUATOR spans are added downstream from real judge verdicts.
-            span_kinds = {"AGENT": 1, "LLM": agent_turns, "RETRIEVER": 0, "GUARDRAIL": 0, "TOOL": 0}
-            for name in tool_seq:
-                if name.startswith("retrieve"):
-                    span_kinds["RETRIEVER"] += 1
-                elif re.search(r"disclosure|compliance|guardrail", name):
-                    span_kinds["GUARDRAIL"] += 1
-                else:
-                    span_kinds["TOOL"] += 1
+            # The real OpenInference span tree the agent emitted this run, stitched
+            # onto one conversation timeline (AGENT root + PROMPT/LLM/TOOL/RETRIEVER/
+            # GUARDRAIL children, W3C ids, GenAI semconv attrs). EVALUATOR spans are
+            # added downstream from real judge verdicts.
+            spans, span_kinds = _collect_spans(turns)
+            if not spans:
+                # Uninstrumented target (no /spans in the reply): fall back to the
+                # backend-reconstructed kind counts derived from the tool sequence.
+                span_kinds = {"AGENT": 1, "LLM": agent_turns, "RETRIEVER": 0, "GUARDRAIL": 0, "TOOL": 0}
+                for name in tool_seq:
+                    if name.startswith("retrieve"):
+                        span_kinds["RETRIEVER"] += 1
+                    elif re.search(r"disclosure|compliance|guardrail", name):
+                        span_kinds["GUARDRAIL"] += 1
+                    else:
+                        span_kinds["TOOL"] += 1
             failed = stop == "adapter_error"
             trace_id = new_id("trace")
             trace_doc = {
                 "trace_id": trace_id, "run_id": run_id, "question_id": q.id,
+                # W3C trace id shared by every agent span on this conversation.
+                "otel_trace_id": otel_trace_id,
+                # The real OpenInference span tree (agent lifecycle) for this run.
+                # EVALUATOR spans are merged in at render time from real verdicts.
+                "spans": spans,
                 "seed_set_id": seed_set_id,
                 "persona": q.persona.model_dump(),
                 "shape": q.shape, "scenario": q.scenario, "rubric": q.rubric,
@@ -197,6 +237,9 @@ class SimWorker(BaseWorker):
                 "persona_id": q.persona.id, "persona_version": q.persona.version,
                 "turns": agent_turns, "tokens": tin + tout, "latency_ms": 0,
                 "stop_reason": stop, "blob_uri": uri, "tenant": job.tenant,
+                # Real span-kind counts so Observability folds them into the
+                # run's batch histogram as the event lands (no blob re-read).
+                "span_kinds": span_kinds,
             })
             async with lock:
                 trace_ids.append(trace_id)
