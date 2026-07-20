@@ -7,8 +7,9 @@ Job inputs (frozen by the orchestrator):
 
 For every trace × judge, a jury (or single judge) scores the agent's response
 against the seed prompt; each verdict carries per-juror scores and a consensus
-rate. A judge-calibration record (inter-juror agreement) is written per judge so
-Observability's calibration view has a real source.
+rate. A judge-calibration record is written per judge — a real, chance-corrected
+Cohen's κ of that judge vs the leave-one-out majority of the rest of the panel on
+the same traces — so Observability's calibration view has a genuine source.
 """
 
 from __future__ import annotations
@@ -26,6 +27,26 @@ from eeof_core.worker import BaseWorker
 
 def _h(s: str) -> int:
     return int(hashlib.sha256(s.encode()).hexdigest(), 16)
+
+
+def _cohen_kappa(pairs: list[tuple[bool, bool]]) -> float | None:
+    """Cohen's κ between two binary raters over paired observations.
+
+    Returns None when there are no pairs. When chance agreement is degenerate
+    (pe == 1 — both raters put every item in the same single category) κ is
+    mathematically undefined, so we report the raw agreement (1.0 if the raters
+    matched on every item, else 0.0) instead of dividing by zero.
+    """
+    n = len(pairs)
+    if n == 0:
+        return None
+    po = sum(1 for a, b in pairs if a == b) / n          # observed agreement
+    pa = sum(1 for a, _ in pairs if a) / n               # rater A "true" rate
+    pb = sum(1 for _, b in pairs if b) / n               # rater B "true" rate
+    pe = pa * pb + (1 - pa) * (1 - pb)                    # chance agreement
+    if pe >= 1.0:
+        return 1.0 if po == 1.0 else 0.0
+    return (po - pe) / (1 - pe)
 
 
 class EvalWorker(BaseWorker):
@@ -158,9 +179,31 @@ class EvalWorker(BaseWorker):
         vset.state = "shipped"
         await self._put_verdictset(job.tenant, vset)
 
-        # Judge-calibration records — inter-juror agreement per judge.
-        for ref, cons in judge_consensus.items():
-            await self._save_calibration(job.tenant, ref, cons, len(verdicts))
+        # Judge-calibration records — a REAL, chance-corrected agreement per judge.
+        # There is no human-gold rater in this system, so κ is computed as each
+        # judge vs the leave-one-out majority verdict of the rest of the panel on
+        # the SAME traces: a genuine inter-rater Cohen's κ over real verdicts — no
+        # fabricated gold labels, no extra model calls. This replaces the earlier
+        # single-juror "consensus" that was hardcoded to 1.0 (so every judge read
+        # κ=1.00 regardless of behaviour).
+        labels_by_trace: dict[str, dict[str, bool]] = {}
+        for v in verdicts:
+            labels_by_trace.setdefault(v.trace_id, {})[v.judge_ref] = v.passed
+        for ref in judge_refs:
+            pairs: list[tuple[bool, bool]] = []
+            for labels in labels_by_trace.values():
+                if ref not in labels:
+                    continue
+                others = [p for jr, p in labels.items() if jr != ref]
+                if not others:
+                    continue
+                panel_majority = sum(1 for p in others if p) >= (len(others) / 2)
+                pairs.append((bool(labels[ref]), panel_majority))
+            kappa = _cohen_kappa(pairs)
+            if kappa is None:
+                continue
+            agreement = round(sum(1 for a, b in pairs if a == b) / len(pairs), 3)
+            await self._save_calibration(job.tenant, ref, round(kappa, 3), agreement, len(pairs))
 
         # Breach → Self-Heal: open an incident for any judge that failed its
         # guardrail on this run. Derived entirely from the real verdicts above.
@@ -211,11 +254,11 @@ class EvalWorker(BaseWorker):
         record_event(job, "running")
         await push_status(job)
 
-    async def _save_calibration(self, tenant: str, judge_ref: str, cons: list[float], n: int):
-        kappa = round(sum(cons) / len(cons), 3) if cons else 0.0
+    async def _save_calibration(self, tenant: str, judge_ref: str, kappa: float,
+                                agreement: float, n: int):
         ts = iso()
         rec = {
-            "judge_ref": judge_ref, "kappa": kappa, "agreement": kappa,
+            "judge_ref": judge_ref, "kappa": kappa, "agreement": agreement,
             "sample_size": n, "ts": ts,
         }
         await get_table().put({

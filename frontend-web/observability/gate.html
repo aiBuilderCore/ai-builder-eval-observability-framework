@@ -212,15 +212,26 @@
         ['target',       'target_version'],
         ['rubric',       'rubric_version'],
       ];
+      // The rubric axis can carry the whole judge catalogue (15+). Dumping it in
+      // both columns makes the diff a wall of text, so collapse to a count (full
+      // list on hover) — the diff still highlights whichever axis actually changed.
+      const shortId = (id) => (id && id.length > 10) ? id.slice(0, 9) + '…' : (id || '');
+      const fmt = (key, val) => {
+        if (key === 'rubric_version') {
+          const judges = String(val || '').split(' + ').map(s => s.trim()).filter(Boolean);
+          if (judges.length > 3) return `<span class="rubric-count" title="${B.escapeHtml(judges.join(', '))}">${judges.length} judges</span>`;
+        }
+        return B.escapeHtml(val);
+      };
       const rows = axes.map(([label, key]) => {
         const b = baseline.lineage[key];
         const c = candidate.lineage[key];
         const same = b === c;
         return `
-          <div style="display:grid;grid-template-columns:130px 1fr 1fr;gap:12px;padding:8px 0;border-bottom:1px dashed var(--border);font-family:var(--font-mono);font-size:12px;">
+          <div style="display:grid;grid-template-columns:130px 1fr 1fr;gap:12px;padding:8px 0;border-bottom:1px dashed var(--border);font-family:var(--font-mono);font-size:12px;align-items:center;">
             <div style="color:var(--text-faint);text-transform:uppercase;letter-spacing:0.08em;font-size:10.5px;">${label}</div>
-            <div style="${same ? 'color:var(--text-muted);' : ''}">${B.escapeHtml(b)}</div>
-            <div style="${same ? 'color:var(--text-muted);' : 'color:var(--signal-warn);font-weight:600;'}">${B.escapeHtml(c)}${same ? '' : ' <span style="color:var(--signal-warn);font-family:var(--font-body);font-weight:500;font-size:11px;">← changed</span>'}</div>
+            <div style="${same ? 'color:var(--text-muted);' : ''}">${fmt(key, b)}</div>
+            <div style="${same ? 'color:var(--text-muted);' : 'color:var(--signal-warn);font-weight:600;'}">${fmt(key, c)}${same ? '' : ' <span style="color:var(--signal-warn);font-family:var(--font-body);font-weight:500;font-size:11px;">← changed</span>'}</div>
           </div>`;
       }).join('');
       host.innerHTML = `
@@ -229,8 +240,8 @@
         </div>
         <div style="display:grid;grid-template-columns:130px 1fr 1fr;gap:12px;padding:6px 0 8px;font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border);">
           <div>Axis</div>
-          <div>Baseline · ${B.escapeHtml(baseline.batch_id)}</div>
-          <div>Candidate · ${B.escapeHtml(candidate.batch_id)}</div>
+          <div title="${B.escapeHtml(baseline.batch_id)}">Baseline · ${B.escapeHtml(shortId(baseline.batch_id))}</div>
+          <div title="${B.escapeHtml(candidate.batch_id)}">Candidate · ${B.escapeHtml(shortId(candidate.batch_id))}</div>
         </div>
         ${rows}
       `;

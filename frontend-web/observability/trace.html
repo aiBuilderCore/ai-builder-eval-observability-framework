@@ -89,6 +89,10 @@
     <h1 id="head-title">Loading trace…</h1>
     <p class="subtitle" id="head-subtitle"></p>
     <div class="meta-pills" id="head-pills"></div>
+    <div class="prompt-callout" id="prompt-callout" hidden>
+      <span class="prompt-callout__label">User prompt</span>
+      <p class="prompt-callout__text" id="prompt-callout-text"></p>
+    </div>
   </section>
 
   <div class="trace-shell">
@@ -230,11 +234,36 @@
     crumbBatch.textContent = batch.batch_id;
     document.getElementById('crumb-run').textContent = run.run_id;
 
-    document.getElementById('head-eyebrow').textContent = 'Trace · ' + run.run_id;
-    document.getElementById('head-title').innerHTML = '“' + B.escapeHtml(run.question) + '”';
-    const personaLabel = run.persona ? B.escapeHtml(run.persona.name) + ' (' + run.persona.id + ' v' + (run.persona.version || 1) + ')' : '—';
+    // trace_id rides in the eyebrow as a mono click-to-copy token (like the sim /
+    // eval ids elsewhere). The h1 stays a clean semantic label — the persona who
+    // drove the run + its verdict — never the full question, which is a whole
+    // paragraph and lives in the bounded prompt callout below.
+    const heb = document.getElementById('head-eyebrow');
+    heb.innerHTML = 'Trace <button class="job-id-eyebrow" type="button" title="Copy trace_id" aria-label="Copy trace_id">' +
+      '<span class="job-id-chip__hash" aria-hidden="true">⌗</span>' + B.escapeHtml(run.trace_id) + '</button>';
+    heb.querySelector('.job-id-eyebrow').addEventListener('click', async (ev) => {
+      try {
+        await navigator.clipboard.writeText(run.trace_id);
+        ev.currentTarget.classList.add('is-copied');
+        setTimeout(() => ev.currentTarget.classList.remove('is-copied'), 1200);
+      } catch { /* clipboard unavailable — no-op */ }
+    });
+
+    const statusWord = { pass: 'passing', fail: 'failing', partial: 'partial' }[run.status] || run.status;
+    const personaName = run.persona ? B.escapeHtml(run.persona.name) : 'Conversation';
+    document.getElementById('head-title').innerHTML =
+      personaName + ' <span class="qualifier">— ' + B.escapeHtml(statusWord) + ' trace</span>';
+
+    // Always surface the verbatim prompt in the bounded callout (the h1 no longer
+    // carries it).
+    if (run.question) {
+      document.getElementById('prompt-callout-text').textContent = run.question;
+      document.getElementById('prompt-callout').hidden = false;
+    }
+
+    const personaMeta = run.persona ? B.escapeHtml(run.persona.id) + ' v' + (run.persona.version || 1) : '—';
     document.getElementById('head-subtitle').innerHTML =
-      'Persona <b>' + personaLabel + '</b> · status <b>' + B.escapeHtml(run.status) + '</b> · ' +
+      'Persona <b>' + personaMeta + '</b> · status <b>' + B.escapeHtml(run.status) + '</b> · ' +
       (run.duration_ms / 1000).toFixed(2) + 's · ' +
       (run.tokens_total ? '~' + run.tokens_total + ' tokens · ' : '') +
       (run.turn ? 'turn ' + run.turn + ' · ' : '') +
@@ -250,7 +279,6 @@
          <span class="pill"><b>${(run.verdicts || []).length}</b> inline verdicts</span>`;
     document.getElementById('head-pills').innerHTML = `
       ${primaryPills}
-      <span class="pill">trace_id <b>${run.trace_id}</b></span>
       <span class="pill">batch_id <b>${batch.batch_id}</b></span>
     `;
 

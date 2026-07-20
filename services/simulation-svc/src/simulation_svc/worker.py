@@ -100,6 +100,30 @@ def _collect_spans(turns: list) -> tuple[list[dict], dict[str, int]]:
             kinds[span.get("kind", "?")] = kinds.get(span.get("kind", "?"), 0) + 1
             turn_end = max(turn_end, span["start_ms"] + int(span.get("duration_ms", 0)))
         offset = turn_end + 20  # small inter-turn gap so bars don't abut
+
+    # A multi-turn conversation emits one AGENT root per turn. Wrap them in a
+    # single synthetic CHAIN "conversation" root so the trace is single-rooted
+    # (conventional OTel — one root per trace) and the turns nest under it. This
+    # also gives trace-level EVALUATOR spans (added at render from real verdicts)
+    # one place to attach, instead of appearing to belong to turn 1. Single-turn
+    # traces keep their lone AGENT root untouched.
+    roots = [s for s in all_spans if not s.get("parent_id")]
+    if len(roots) > 1:
+        total = max((s["start_ms"] + s["duration_ms"] for s in all_spans), default=0)
+        conv_id = secrets.token_hex(8)
+        for r in roots:
+            r["parent_id"] = conv_id
+        all_spans.insert(0, {
+            "id": conv_id, "parent_id": None, "kind": "CHAIN",
+            "name": "retirement_401k.conversation",
+            "start_ms": 0, "duration_ms": max(1, total),
+            "attrs": {
+                "openinference.span.kind": "CHAIN",
+                "gen_ai.operation.name": "chat",
+                "conversation.turn_count": len(roots),
+            },
+        })
+        kinds["CHAIN"] = kinds.get("CHAIN", 0) + 1
     return all_spans, kinds
 
 

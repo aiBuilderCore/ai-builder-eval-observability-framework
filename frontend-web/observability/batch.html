@@ -54,6 +54,14 @@
 
       <div class="batch-summary" id="summary"></div>
 
+      <div class="judge-bars-section" id="judge-bars-section">
+        <div class="section-head">
+          <h2><em>Judge</em> pass rates</h2>
+          <div class="actions"><span style="color:var(--text-faint);">per inline judge · worst first</span></div>
+        </div>
+        <div class="judge-bars" id="judge-bars"></div>
+      </div>
+
       <!-- Decision layer: cohorts + next best action come BEFORE the dense runs table -->
       <div class="cohort-strip" id="cohort-strip" hidden>
         <div class="cohort-strip__head">
@@ -189,26 +197,52 @@
     `;
 
     // ---- summary tiles ----
+    // Four headline KPIs only. The per-judge pass rates used to render as one
+    // tile each (15+ identical boxes) — they now live in the compact, sorted
+    // judge-pass-rate bar list below, which is far more scannable.
     const summary = document.getElementById('summary');
-    const judgeCells = Object.entries(batch.judge_pass_rates || {}).map(([j, r]) =>
-      `<div class="tile">
-        <div class="label">${B.escapeHtml(j)} pass</div>
-        <div class="value">${(r * 100).toFixed(0)}<em>%</em></div>
-        <div class="meta">inline judge verdict</div>
-      </div>`).join('');
+    const passPct = batch.run_count ? (batch.pass_rate * 100).toFixed(0) : '0';
+    const passBand = batch.pass_rate >= 0.85 ? 'ok' : (batch.pass_rate >= 0.65 ? 'warn' : 'err');
     summary.innerHTML = `
       <div class="tile">
         <div class="label">Runs</div>
         <div class="value">${batch.run_count}</div>
-        <div class="meta">${batch.pass_count} / ${batch.run_count} pass</div>
+        <div class="meta">${batch.pass_count} / ${batch.run_count} passed</div>
+      </div>
+      <div class="tile tile--band-${passBand}">
+        <div class="label">Pass rate</div>
+        <div class="value">${passPct}<em>%</em></div>
+        <div class="meta">${batch.pass_count} of ${batch.run_count} runs</div>
       </div>
       <div class="tile">
         <div class="label">Span volume</div>
         <div class="value">${totalSpans}<em>spans</em></div>
-        <div class="meta">${evalSpans} inline judge verdicts</div>
+        <div class="meta">real OpenInference trace tree</div>
       </div>
-      ${judgeCells}
+      <div class="tile">
+        <div class="label">Judge verdicts</div>
+        <div class="value">${evalSpans}</div>
+        <div class="meta">${Object.keys(batch.judge_pass_rates || {}).length} judges · inline EVALUATOR spans</div>
+      </div>
     `;
+
+    // ---- judge pass-rate bars (replaces the 15 per-judge tiles) ----
+    // Sorted worst-first so regressions surface at the top; color-banded by the
+    // same thresholds the runs table uses (err <65% · warn <85% · ok ≥85%).
+    const jbars = document.getElementById('judge-bars');
+    const judgeEntries = Object.entries(batch.judge_pass_rates || {})
+      .sort((a, b) => a[1] - b[1]);
+    if (judgeEntries.length) {
+      const band = (r) => r >= 0.85 ? 'ok' : (r >= 0.65 ? 'warn' : 'err');
+      jbars.innerHTML = judgeEntries.map(([j, r]) => `
+        <div class="jbar" data-band="${band(r)}">
+          <div class="jbar__name">${B.escapeHtml(j)}</div>
+          <div class="jbar__track"><i style="width:${(r * 100).toFixed(1)}%"></i></div>
+          <div class="jbar__pct">${(r * 100).toFixed(0)}<span>%</span></div>
+        </div>`).join('');
+    } else {
+      document.getElementById('judge-bars-section').hidden = true;
+    }
 
     // ---- failure cohort strip ----
     const cohorts = B.groupByFailureCohort(batch.batch_id);
@@ -284,10 +318,32 @@
         }
       }
       rows.innerHTML = runs.map(r => {
-        const verdicts = (r.verdicts || []).map(v => `
-          <span class="verdict-chip" data-pass="${v.pass}">
-            <b>${B.escapeHtml(v.judge)}</b> ${v.score.toFixed(2)}
-          </span>`).join(' ');
+        // A run scores against every judge in the rubric (15+). Rendering one
+        // chip each stacks into a tall wall per row. Show a compact tally plus
+        // only the judges that FAILED (the actionable signal); the full verdict
+        // set is one click away in the trace viewer.
+        const vs = r.verdicts || [];
+        const failed = vs.filter(v => !v.pass);
+        const passedN = vs.length - failed.length;
+        let verdicts;
+        if (!vs.length) {
+          verdicts = '—';
+        } else if (!failed.length) {
+          verdicts = `<span class="verdict-tally verdict-tally--ok">✓ all ${vs.length} judges passed</span>`;
+        } else {
+          // Show the first few failed judges; the rest expand inline on click
+          // (a native title tooltip only surfaces the help-cursor, not the list).
+          const chips = failed.map((v, i) => `
+            <span class="verdict-chip${i >= 4 ? ' is-extra' : ''}" data-pass="false"><b>${B.escapeHtml(v.judge)}</b> ${v.score.toFixed(2)}</span>`).join(' ');
+          const restN = failed.length - 4;
+          const more = restN > 0
+            ? `<button type="button" class="verdict-more" data-rest="${restN}"
+                 onclick="event.stopPropagation(); var w=this.closest('.verdicts'); var x=w.classList.toggle('verdicts--expanded'); this.textContent = x ? 'show less' : ('+' + this.dataset.rest + ' more');">+${restN} more</button>`
+            : '';
+          verdicts = `
+            <div class="verdict-tally verdict-tally--fail">${failed.length} of ${vs.length} judges failed · ${passedN} passed</div>
+            <div class="verdicts">${chips} ${more}</div>`;
+        }
         const turn = r.turn ? ` · turn ${r.turn}` : '';
         const persona = r.persona
           ? `<div>${B.escapeHtml(r.persona.name)}<br/><span style="color:var(--text-faint);">${B.escapeHtml(r.persona.id)} v${r.persona.version || 1}</span></div>`

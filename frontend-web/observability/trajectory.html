@@ -307,17 +307,29 @@
         host.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;padding:20px;">no runs in candidate batch</td></tr>';
         return;
       }
-      host.innerHTML = rows.map(({ r, s, dist, fail }) => `
+      // Tool-call sequences can run 20+ steps. Dumping the whole path per row
+      // turns this table into a wall of arrows, so show a compact head (first
+      // few tools) with an overflow badge; the full ordered path is on hover.
+      const MAXT = 5;
+      host.innerHTML = rows.map(({ r, s, dist, fail }) => {
+        const q = r.question || '';
+        const qShort = obs.escapeHtml(q.slice(0, 44)) + (q.length > 44 ? '…' : '');
+        const head = s.slice(0, MAXT).map(obs.escapeHtml).join(' → ');
+        const overflow = s.length > MAXT ? ` <span class="seq-more">+${s.length - MAXT}</span>` : '';
+        const seqCell = s.length
+          ? `<div class="seq-cell" title="${obs.escapeHtml(s.join(' → '))}"><span class="mono">${head}</span>${overflow}</div>`
+          : '<span class="mono" style="color:var(--text-faint);">∅</span>';
+        return `
         <tr>
           <td><div class="id-strong">${obs.escapeHtml((r.trace_id || '').slice(0, 16))}</div>
               <div class="id">${s.length} tool calls${fail ? ' · verdict fail' : ''}</div></td>
           <td>${obs.escapeHtml(r.persona ? r.persona.name : '—')}</td>
-          <td><span class="mono" style="font-size:12px;">${obs.escapeHtml((r.question || '').slice(0, 44))}</span></td>
-          <td><span class="mono" style="font-size:11.5px;color:var(--text-muted);">[${s.map(obs.escapeHtml).join(' → ') || '∅'}]</span></td>
+          <td><span class="mono" style="font-size:12px;">${qShort}</span></td>
+          <td>${seqCell}</td>
           <td><span class="mono" style="font-weight:700;color:${distColor(dist)};">${dist}</span></td>
           <td>${fail ? '<span class="trail-tag" data-cat="execution">verdict_fail</span>' : '<span style="color:var(--text-faint);">—</span>'}</td>
           <td style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);">${obs.escapeHtml((r.trace_id || '').slice(-6))}</td>
-        </tr>`).join('');
+        </tr>`; }).join('');
     }
 
     function renderDist(baseId, candId) {
@@ -325,7 +337,9 @@
       const names = [...new Set([...Object.keys(bf.f), ...Object.keys(cf.f)])].sort();
       const data = names.map((n) => ({
         name: n,
-        baseline: bf.tot ? bf.f[n] / bf.tot : 0,
+        // Guard tools absent from the baseline (bf.f[n] undefined) — otherwise
+        // undefined/tot renders as NaN%.
+        baseline: bf.tot ? (bf.f[n] || 0) / bf.tot : 0,
         now: cf.tot ? (cf.f[n] || 0) / cf.tot : 0,
       }));
       if (!data.length) return;
