@@ -225,11 +225,14 @@
       document.getElementById('overview-grid').innerHTML = kinds.map(k => {
         const km = monitors.filter(m => m.kind === k);
         const kFiring = km.filter(m => m.state === 'firing' || m.state === 'open').length;
-        const state = kFiring > 0 ? 'err' : 'ok';
+        // Never render a bare "—"; show the real monitor count for this signal
+        // kind and its live status (firing / armed / none yet).
+        const statusLabel = kFiring > 0 ? (kFiring + ' firing')
+          : (km.length ? 'all armed · ok' : 'none yet');
         return `<div class="signal-card" style="cursor:default;">
-          <div class="label">${k.toUpperCase()} · ${km.length} monitors</div>
-          <div class="value">${kFiring > 0 ? kFiring : '—'} <em>${kFiring > 0 ? 'firing' : 'ok'}</em></div>
-          <div class="delta ${kFiring > 0 ? 'up' : 'flat'}">${obs.escapeHtml(KIND_DESCS[k] || k)}</div>
+          <div class="label">${k.toUpperCase()}</div>
+          <div class="value">${km.length} <em>${km.length === 1 ? 'monitor' : 'monitors'}</em></div>
+          <div class="delta ${kFiring > 0 ? 'up' : 'flat'}">${statusLabel} · ${obs.escapeHtml(KIND_DESCS[k] || k)}</div>
         </div>`;
       }).join('');
 
@@ -337,20 +340,69 @@
         <div class="meta">${obs.escapeHtml(KIND_DESCS[k] || '')}</div>
       </div>`).join('');
 
+    let selectedKind = 'score';
+    const KIND_SIGNAL = {
+      span: 'latency_ms', score: 'helpfulness pass_rate',
+      trajectory: 'tool_call_edit_distance', anomaly: 'trail_taxonomy_count',
+    };
     window.selectKind = function(k) {
+      selectedKind = k;
       document.querySelectorAll('#kind-chooser .signal-card').forEach(c => c.style.borderColor = '');
       const el = document.getElementById('kind-' + k);
       if (el) el.style.borderColor = 'var(--accent)';
     };
+    // Pre-select the default so the wizard always has a valid kind.
+    window.selectKind(selectedKind);
+
+    function renderKindChooser() {
+      document.getElementById('kind-chooser').innerHTML = ['span', 'score', 'trajectory', 'anomaly'].map(k => `
+        <div class="signal-card" style="cursor:pointer;" onclick="selectKind('${k}')" id="kind-${k}">
+          <div class="label">${k.toUpperCase()}</div>
+          <div class="value" style="font-size:16px;">${k}</div>
+          <div class="meta">${obs.escapeHtml(KIND_DESCS[k] || '')}</div>
+        </div>`).join('');
+      window.selectKind(selectedKind);
+    }
+
+    function resetWizard() {
+      wizardStep = 0;
+      document.querySelectorAll('.wstep').forEach((s, i) => {
+        s.removeAttribute('data-done');
+        if (i === 0) s.setAttribute('data-active', 'true'); else s.removeAttribute('data-active');
+      });
+      document.getElementById('wizard-panel').querySelector('h2').textContent = WIZARD_TITLES[0];
+      document.getElementById('wizard-panel').querySelector('.lede').textContent = WIZARD_LEDE[0];
+      document.getElementById('wizard-state-lbl').textContent = 'step 1 of 4';
+      document.getElementById('wizard-next').textContent = 'Next →';
+      renderKindChooser();
+    }
+
+    function saveNewMonitor() {
+      const monitors = obs.State.monitors();
+      const stamp = new Date().toISOString().slice(11, 19);
+      const signal = KIND_SIGNAL[selectedKind] || 'helpfulness pass_rate';
+      const newMon = {
+        id: 'mon_' + obs.ulid(''),
+        name: selectedKind + ' · ' + signal.split(' ')[0] + ' · ' + stamp,
+        kind: selectedKind, signal,
+        threshold: selectedKind === 'score' ? 'pass_rate < 0.80' : 'z > 3.0',
+        window: '5m / 1m', cohort: 'tenant × run', severity: 'warn',
+        state: 'armed', fires_30d: 0, routing: ['slack:#eval-alerts'],
+        sparkline: [], trend: 'flat', env: 'staging',
+      };
+      obs.State.saveMonitors([...monitors, newMon]);
+      resetWizard();
+      render();
+    }
 
     document.getElementById('wizard-next').addEventListener('click', () => {
+      // Final step → actually create the monitor (was a no-op before).
+      if (wizardStep >= 3) { saveNewMonitor(); return; }
       const steps = document.querySelectorAll('.wstep');
-      if (wizardStep < steps.length) {
-        steps[wizardStep].removeAttribute('data-active');
-        steps[wizardStep].setAttribute('data-done', 'true');
-      }
+      steps[wizardStep].removeAttribute('data-active');
+      steps[wizardStep].setAttribute('data-done', 'true');
       wizardStep = Math.min(wizardStep + 1, 3);
-      if (wizardStep < steps.length) steps[wizardStep].setAttribute('data-active', 'true');
+      steps[wizardStep].setAttribute('data-active', 'true');
       document.getElementById('wizard-panel').querySelector('h2').textContent = WIZARD_TITLES[wizardStep] || 'Review';
       document.getElementById('wizard-panel').querySelector('.lede').textContent = WIZARD_LEDE[wizardStep] || 'Review your monitor configuration before saving.';
       document.getElementById('wizard-state-lbl').textContent = 'step ' + (wizardStep + 1) + ' of 4';
@@ -358,8 +410,8 @@
         document.getElementById('wizard-next').textContent = 'Save monitor →';
         document.getElementById('kind-chooser').innerHTML =
           '<div style="grid-column:1/-1;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);padding:12px 0;">' +
-          'Routing: <b>slack:#eval-alerts</b> · PagerDuty: <b>eval-oncall</b> · webhook: optional<br/>' +
-          'Evidence pack auto-attach: <b>enabled</b> for trajectory + score monitors</div>';
+          'New <b>' + obs.escapeHtml(selectedKind) + '</b> monitor · routing <b>slack:#eval-alerts</b> · state <b>armed</b><br/>' +
+          'Evidence pack auto-attach: <b>enabled</b> for trajectory + score monitors. Click <b>Save monitor</b> to create it.</div>';
       }
     });
 

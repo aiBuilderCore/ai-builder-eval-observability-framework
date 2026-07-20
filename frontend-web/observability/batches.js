@@ -433,11 +433,18 @@
   }
 
   function fourTupleRows(lineage) {
+    // The rubric can list the whole judge catalogue (15+). Dumping every name
+    // as one "+"-joined string makes the reproducibility rail a gawdy wall of
+    // text, so collapse to a count (full list on hover) past a small handful.
+    const judges = String(lineage.rubric_version || '').split(' + ').map(s => s.trim()).filter(Boolean);
+    const rubricVal = judges.length > 3
+      ? `<span class="rubric-count" title="${escapeHtml(judges.join(', '))}">${judges.length} judges</span>`
+      : escapeHtml(lineage.rubric_version);
     return `
       <li><span class="key">persona_set</span><span class="val">${escapeHtml(lineage.persona_set_version)}</span></li>
       <li><span class="key">qgen_strategy</span><span class="val">${escapeHtml(lineage.question_strategy_version)}</span></li>
       <li><span class="key">target</span><span class="val">${escapeHtml(lineage.target_version)}</span></li>
-      <li><span class="key">rubric</span><span class="val">${escapeHtml(lineage.rubric_version)}</span></li>`;
+      <li><span class="key">rubric</span><span class="val">${rubricVal}</span></li>`;
   }
 
   function lineageRailHtml(batch, run) {

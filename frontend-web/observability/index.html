@@ -109,7 +109,6 @@
         <th class="num">Pass rate</th>
         <th class="num">vs prev</th>
         <th>Started</th>
-        <th>SUT</th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
@@ -232,6 +231,22 @@
     });
     Object.values(byExp).forEach(arr => arr.sort((a, b) => new Date(a.started_at) - new Date(b.started_at)));
 
+    // Rubrics can carry the full judge catalogue (15+ judges). Dumping every
+    // name inline explodes each row into a tall panel, so collapse to a count
+    // chip (full list on hover) once past a small handful; short rubrics still
+    // render inline. The batch-detail lineage rail shows the full breakdown.
+    // Match the Simulation table: long ULID batch/sim ids show as a short head
+    // (sim_01KY0…); the full id stays in the title tooltip.
+    function shortId(id) {
+      if (!id) return '';
+      return id.length <= 10 ? id : `${id.slice(0, 9)}…`;
+    }
+    function rubricCell(rubric) {
+      const judges = String(rubric || '—').split(' + ').map(s => s.trim()).filter(Boolean);
+      if (judges.length <= 3) return `<b>${B.escapeHtml(rubric)}</b>`;
+      return `<b class="rubric-count" title="${B.escapeHtml(judges.join(', '))}">${judges.length} judges</b>`;
+    }
+
     const rows = document.getElementById('rows');
     rows.innerHTML = batches.map(b => {
       const expArr = byExp[b.experiment_id] || [];
@@ -257,14 +272,14 @@
       <tr onclick="if(event.button===0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.target.closest('a')) location.href='${openUrl}'">
         <td>
           <a class="batch-name-link batch-name" href="${openUrl}">${B.escapeHtml(b.name)}</a>
-          <span class="batch-id">${B.escapeHtml(b.batch_id)} · ${B.escapeHtml(b.experiment_id)}</span>
+          <span class="batch-id" title="${B.escapeHtml(b.batch_id)}">${B.escapeHtml(shortId(b.batch_id))}</span>
         </td>
         <td>
           <div class="lineage-mini">
             persona_set · <b>${B.escapeHtml(b.lineage.persona_set_version)}</b><br/>
             qgen · <b>${B.escapeHtml(b.lineage.question_strategy_version)}</b><br/>
             target · <b>${B.escapeHtml(b.lineage.target_version)}</b><br/>
-            rubric · <b>${B.escapeHtml(b.lineage.rubric_version)}</b>
+            rubric · ${rubricCell(b.lineage.rubric_version)}
           </div>
         </td>
         <td class="num"><span class="pass-num">${b.run_count}</span></td>
@@ -275,7 +290,6 @@
         </td>
         <td class="num">${deltaHtml}</td>
         <td><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);">${fmtTime(b.started_at)}</span></td>
-        <td><span style="font-family:var(--font-mono);font-size:12px;color:var(--text);">${B.escapeHtml(b.sut)}</span></td>
       </tr>`;
     }).join('');
     goToFailing();

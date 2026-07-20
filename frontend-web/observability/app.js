@@ -733,9 +733,11 @@
       if (side === 'now' && Math.abs(diff) > 0.07) cls = diff > 0 ? 'err' : 'warn';
       return `
         <div class="dist-bar">
-          <div class="name">${escapeHtml(s.name)}</div>
+          <div class="dist-bar__head">
+            <span class="name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
+            <span class="pct">${(pct * 100).toFixed(1)}%</span>
+          </div>
           <div class="bar-track"><div class="bar-fill ${cls}" style="width:${(pct * 100).toFixed(1)}%"></div></div>
-          <div class="pct">${(pct * 100).toFixed(1)}%</div>
         </div>`;
     }).join('');
   }
@@ -1051,8 +1053,15 @@
     };
   };
 
+  // The backend Monitor has no signal-kind field, so derive it from the name
+  // prefix the authoring wizard writes (span / score / trajectory / anomaly);
+  // judge-rubric monitors default to "score". Lets the overview tiles count real
+  // monitors by kind instead of always showing zero.
+  const MONITOR_KINDS = ["span", "score", "trajectory", "anomaly"];
   const mapMonitor = (m) => ({
-    id: m.id, name: m.name, kind: "quality",
+    id: m.id, name: m.name,
+    kind: MONITOR_KINDS.includes((m.name || "").trim().split(/[ ·]/)[0].toLowerCase())
+      ? (m.name || "").trim().split(/[ ·]/)[0].toLowerCase() : "score",
     signal: `${m.rubric} · ${m.judge_ref}`,
     threshold: `pass_rate < ${m.threshold}`, window: "5m / 1m",
     cohort: "persona × run", severity: "warn",
@@ -1218,13 +1227,16 @@
   });
   State.saveMonitors = (arr) => {
     const known = new Set(monitorsCache.map((m) => m.name));
-    (arr || []).filter((m) => !known.has(m.name)).forEach((m) => {
+    const fresh = (arr || []).filter((m) => !known.has(m.name));
+    // Monitor creation is a sync write on the backend, so POST then re-hydrate to
+    // pull the authoritative row back (mirrors the evidence-pack flow).
+    Promise.all(fresh.map((m) =>
       EEOF.post("/observability/monitors", {
         name: m.name, env: m.env || "staging",
         rubric: (m.signal || "helpfulness").split(" ")[0], threshold: 0.8, sample_rate: 0.1,
-      }).catch(() => {});
-    });
-    monitorsCache = arr;
+      }).catch(() => {})
+    )).then(() => { if (fresh.length) hydrate(); });
+    monitorsCache = arr;  // optimistic paint until hydrate returns
   };
 
   window.AIBC_OBS.liveHydrate = hydrate;

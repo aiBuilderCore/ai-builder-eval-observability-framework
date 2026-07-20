@@ -82,11 +82,12 @@
 
   <section class="page-head">
     <p class="eyebrow"><span class="dot"></span> Per-tenant judge calibration · stage 3 of feedback loop · calibrate</p>
-    <h1>Judge κ vs <em>human gold</em> <span class="qualifier">— bias is task × judge × tenant specific</span></h1>
+    <h1>Judge <em>agreement</em> · Cohen's κ <span class="qualifier">— how far each judge drifts from the panel</span></h1>
     <p class="subtitle">
-      Cohen's κ between judge verdicts and a sliding human-gold sample, computed per tenant on a 30-day rolling window.
-      Without per-tenant calibration, every score the platform emits is suspect — and no leading vendor in May 2026 ships
-      this as a primary product surface.
+      Cohen's κ between each inline judge and the leave-one-out majority of the rest of the judge panel, on the same
+      traces, over a 30-day rolling window. There is no human rater in the loop, so this measures peer agreement:
+      a judge that consistently diverges from the panel is an outlier whose verdicts should be trusted less —
+      or recalibrated.
     </p>
     <div class="meta-pills" id="calib-pills"></div>
   </section>
@@ -101,9 +102,9 @@
   <section class="calib-panel" id="panel-overview">
 
   <p class="viz-caption" style="margin-bottom:14px;">
-    <b>What this shows:</b> how well each inline judge agrees with a human rater on labelled samples,
-    measured as <abbr title="Cohen's κ (kappa) — 0 means chance agreement, 1 means perfect agreement. Target ≥ 0.75.">Cohen's κ</abbr>
-    on a 30-day rolling window. Drops here mean the judge's verdicts should be trusted less.
+    <b>What this shows:</b> how well each inline judge agrees with the rest of the panel (leave-one-out majority)
+    on the same traces, measured as <abbr title="Cohen's κ (kappa) — 0 means chance agreement, 1 means perfect agreement, &lt;0 means worse than chance. Target ≥ 0.75.">Cohen's κ</abbr>
+    on a 30-day rolling window. A low κ means the judge is an outlier — its verdicts should be trusted less.
   </p>
 
   <!-- ============= PRIMARY κ CHART ============= -->
@@ -117,13 +118,8 @@
       </div>
       <div class="now"><span id="kappa-now">—</span> <em>now</em></div>
     </div>
-    <svg class="kappa-svg" id="kappa-chart"></svg>
-    <div style="display:flex;gap:18px;margin-top:14px;font-family:var(--mono);font-size:11.5px;color:var(--text-muted);">
-      <span><span style="display:inline-block;width:12px;height:6px;background:rgba(31,143,94,0.20);vertical-align:middle;margin-right:6px;"></span>target band κ ≥ 0.75</span>
-      <span><span style="display:inline-block;width:12px;height:6px;background:rgba(201,122,31,0.30);vertical-align:middle;margin-right:6px;"></span>warn 0.65 ≤ κ &lt; 0.75</span>
-      <span><span style="display:inline-block;width:12px;height:6px;background:rgba(184,61,43,0.30);vertical-align:middle;margin-right:6px;"></span>breach κ &lt; 0.65</span>
-      <span id="kappa-note" style="margin-left:auto;color:var(--text-faint);"></span>
-    </div>
+    <div class="kappa-gauge" id="kappa-gauge"></div>
+    <div class="kappa-stats" id="kappa-stats"></div>
   </div>
 
   <!-- ============= SECONDARY JUDGE TILES ============= -->
@@ -131,7 +127,7 @@
     <h2>Other <em>judges</em></h2>
     <div class="actions"><span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">click to switch · same chart, new series</span></div>
   </div>
-  <div class="signal-grid" id="judges-grid"></div>
+  <div class="kappa-list" id="judges-grid"></div>
 
   </section>
 
@@ -139,16 +135,16 @@
   <section class="calib-panel" id="panel-queue" hidden>
 
   <p class="viz-caption" style="margin-bottom:14px;">
-    <b>For annotators:</b> label whether the judge's verdict matches your read. Each
-    labeled row adds one paired sample to the κ chart on the Overview tab.
+    <b>For annotators:</b> an optional human-in-the-loop lane — label whether a judge's verdict matches your read.
+    This queue is not yet wired to a persistence endpoint; the Overview κ is computed from panel agreement and
+    needs no human labels.
   </p>
 
   <!-- ============= HUMAN-GOLD REVIEW QUEUE ============= -->
   <div class="section-head" style="margin-top:8px;">
     <h2>Human-gold <em>review queue</em></h2>
     <div class="actions">
-      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">reservoir-sampled · 0.3% rate · faithfulness_v3</span>
-      <a href="#">queue settings →</a>
+      <span style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">human-in-the-loop labelling · not yet wired to a persistence endpoint</span>
     </div>
   </div>
   <div class="review-list" id="review-list"></div>
@@ -171,11 +167,7 @@
 
   <div style="background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-3);padding:14px 18px;margin-bottom:20px;box-shadow:0 1px 3px var(--shadow);">
     <div style="font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);">κ → gate link</div>
-    <div style="font-size:14px;margin-top:6px;line-height:1.55;">
-      <b>faithfulness_v3</b> is at <b style="color:var(--signal-err);">κ=0.59</b> — below the gate's trust floor of κ ≥ 0.65.
-      Any deploy gate that uses <code>faithfulness_v3</code> as a signal will
-      <a href="./gate.html"><b>BLOCK</b> until this judge recalibrates</a>, regardless of pass rate.
-    </div>
+    <div id="alerts-gate-link" style="font-size:14px;margin-top:6px;line-height:1.55;color:var(--text-muted);">—</div>
   </div>
 
   <!-- ============= ALERT CONFIG ============= -->
@@ -238,7 +230,7 @@
     document.getElementById('review-summary').style.display = 'none';
     list.innerHTML =
       '<div style="background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-3);padding:40px;text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">' +
-      'No human-gold review items queued. Paired labels are collected during evaluation; κ above is computed from the real judge-vs-gold sample.' +
+      'Human-in-the-loop review is not wired to a persistence endpoint yet. κ on the Overview tab needs no human labels — it is computed from real panel agreement across the judges.' +
       '</div>';
   }
   function resetReview() { renderReviewList(); }
@@ -249,63 +241,137 @@
     renderReviewList();
     const judges = obs.State.judges();
 
-    // Header pills — one per real calibrated judge.
-    const pillCls = (j) => j.kappa_now < j.kappa_threshold ? 'pill--err'
-      : (j.kappa_now < j.kappa_target ? 'pill--warn' : 'pill--ok');
-    document.getElementById('calib-pills').innerHTML = judges.length
-      ? judges.map(j => `<span class="pill ${pillCls(j)}"><b>${obs.escapeHtml(j.id)}</b> · κ=${j.kappa_now.toFixed(2)}${j.drift_alert ? ' · drifting' : ''}</span>`).join('') +
-        `<span class="pill"><b>${judges.length}</b> judge${judges.length === 1 ? '' : 's'} tracked</span>`
-      : '<span class="pill">no calibration records yet · run an evaluation to populate κ</span>';
+    // Band helpers — κ needs a meaningful sample to be trustworthy; below the
+    // floor the metric is noisy (and collapses to 0 on near-unanimous panels via
+    // the kappa paradox), so a low-sample judge reads "warming up", never a red
+    // breach. Shared by the header summary, the primary card and the list.
+    const SAMPLE_FLOOR = 30;
+    const lowSample = (j) => (j.paired_labels_30d || 0) < SAMPLE_FLOOR;
+    const bandOf = (j) => lowSample(j) ? 'idle'
+      : (j.kappa_now < j.kappa_threshold ? 'err'
+        : (j.kappa_now < j.kappa_target ? 'warn' : 'ok'));
+    const bandColor = { ok: 'var(--signal-ok)', warn: 'var(--signal-warn)', err: 'var(--signal-err)', idle: 'var(--text-muted)' };
+    const statusOf = (j) => bandOf(j) === 'idle' ? 'warming up'
+      : (bandOf(j) === 'err' ? 'breach' : (bandOf(j) === 'warn' ? 'warn' : 'within'));
 
     if (!judges.length) {
+      document.getElementById('calib-pills').innerHTML =
+        '<span class="pill">no calibration records yet · run an evaluation to populate κ</span>';
       document.getElementById('kappa-title').textContent = 'No judge calibrated yet';
       document.getElementById('kappa-now').textContent = '—';
-      document.getElementById('kappa-sub').textContent = 'κ is computed per judge from the human-gold sample during evaluation.';
+      document.getElementById('kappa-sub').textContent = 'κ is computed per judge as the pipeline scores runs.';
       document.getElementById('judges-grid').innerHTML =
         '<div style="grid-column:1/-1;background:var(--surface);border:1px dashed var(--border);border-radius:var(--r-3);padding:40px;text-align:center;color:var(--text-faint);font-family:var(--font-mono);font-size:12px;">no judges tracked</div>';
       return;
     }
 
-    // Primary κ card — the lowest-κ (most at-risk) judge.
-    const primary = judges.slice().sort((a, b) => a.kappa_now - b.kappa_now)[0];
-    const nowColor = primary.kappa_now < primary.kappa_threshold ? 'var(--signal-err)'
-      : (primary.kappa_now < primary.kappa_target ? 'var(--signal-warn)' : 'var(--signal-ok)');
-    document.getElementById('kappa-title').textContent = primary.id + ' · ' + primary.tenant;
-    document.getElementById('kappa-sub').textContent =
-      primary.paired_labels_30d + ' paired label' + (primary.paired_labels_30d === 1 ? '' : 's') +
-      ' · agreement ' + (primary.agreement != null ? (primary.agreement * 100).toFixed(0) + '%' : '—') +
-      ' · target κ ≥ 0.75 · alert on κ < 0.65';
-    const nowEl = document.getElementById('kappa-now');
-    nowEl.textContent = primary.kappa_now.toFixed(2);
-    nowEl.style.color = nowColor;
-    document.getElementById('kappa-note').textContent =
-      primary.series.length < 2 ? 'single sample · no rolling trend yet' : '';
-    obs.renderKappaChart(document.getElementById('kappa-chart'), primary.series, { w: 1100, h: 200 });
+    // Header pills — a concise fleet summary, not one pill per judge (15 pills of
+    // "κ=0.00 · drifting" is noise). Counts by band + the sample state.
+    const counts = { ok: 0, warn: 0, err: 0, idle: 0 };
+    judges.forEach(j => counts[bandOf(j)]++);
+    const summaryPills = [`<span class="pill"><b>${judges.length}</b> judges tracked</span>`];
+    if (counts.err)  summaryPills.push(`<span class="pill pill--err"><b>${counts.err}</b> breach</span>`);
+    if (counts.warn) summaryPills.push(`<span class="pill pill--warn"><b>${counts.warn}</b> warn</span>`);
+    if (counts.ok)   summaryPills.push(`<span class="pill pill--ok"><b>${counts.ok}</b> within target</span>`);
+    if (counts.idle) summaryPills.push(`<span class="pill"><b>${counts.idle}</b> warming up · &lt;${SAMPLE_FLOOR} traces</span>`);
+    document.getElementById('calib-pills').innerHTML = summaryPills.join('');
 
-    // Secondary judge tiles.
+    // Alerts tab — real κ→gate link (was hardcoded to a non-existent judge).
+    (function renderAlertsGate() {
+      const el = document.getElementById('alerts-gate-link');
+      if (!el) return;
+      const floor = judges[0].kappa_threshold;
+      const eligible = judges.filter(j => !lowSample(j));
+      const breaching = eligible.filter(j => j.kappa_now < floor).sort((a, b) => a.kappa_now - b.kappa_now);
+      if (breaching.length) {
+        const w = breaching[0];
+        el.innerHTML = `<b>${obs.escapeHtml(w.id)}</b> is at <b style="color:var(--signal-err);">κ=${w.kappa_now.toFixed(2)}</b> — below the gate's trust floor of κ ≥ ${floor.toFixed(2)}. Any deploy gate that uses <code>${obs.escapeHtml(w.id)}</code> as a signal will <a href="./gate.html"><b>BLOCK</b> until it recalibrates</a>, regardless of pass rate.`;
+      } else if (eligible.length) {
+        el.innerHTML = `All ${eligible.length} judge${eligible.length === 1 ? '' : 's'} with enough labelled traces are at or above the gate's trust floor of κ ≥ ${floor.toFixed(2)} — no calibration block in effect.`;
+      } else {
+        el.innerHTML = `No judge has reached the ${SAMPLE_FLOOR}-trace calibration floor yet, so κ is still warming up and does not gate deploys. This link activates once judges accumulate enough labelled traces.`;
+      }
+    })();
+
+    // Primary κ card — repaints for whichever judge is selected (defaults to the
+    // lowest-κ / most at-risk judge). Wiring the "click to switch" affordance.
+    function stat(label, value, sub, tone) {
+      return `<div class="kstat"><div class="kstat__label">${label}</div>` +
+        `<div class="kstat__value${tone ? ' kstat__value--' + tone : ''}">${value}</div>` +
+        `<div class="kstat__sub">${sub}</div></div>`;
+    }
+    function paintPrimary(j) {
+      const band = bandOf(j);
+      document.getElementById('kappa-title').textContent = j.id;
+      document.getElementById('kappa-sub').textContent = 'Cohen’s κ vs the rest of the judge panel, on the same traces';
+      const nowEl = document.getElementById('kappa-now');
+      nowEl.textContent = j.kappa_now.toFixed(2);
+      nowEl.style.color = bandColor[band];
+
+      // κ gauge — where this judge sits on the 0→1 scale relative to the breach
+      // (0.65) and target (0.75) lines. Self-explanatory position, no empty axes.
+      const kpct = Math.max(0, Math.min(1, j.kappa_now)) * 100;
+      document.getElementById('kappa-gauge').innerHTML =
+        '<div class="gauge__track">' +
+          '<span class="gauge__zone gauge__zone--err"></span>' +
+          '<span class="gauge__zone gauge__zone--warn"></span>' +
+          '<span class="gauge__zone gauge__zone--ok"></span>' +
+          `<span class="gauge__marker" data-band="${band}" style="left:${kpct.toFixed(1)}%">` +
+            `<span class="gauge__flag">${j.kappa_now.toFixed(2)} κ</span></span>` +
+        '</div>' +
+        '<div class="gauge__ticks">' +
+          '<span style="left:0%">0.0</span>' +
+          '<span style="left:65%">0.65<small>breach</small></span>' +
+          '<span style="left:75%">0.75<small>target</small></span>' +
+          '<span style="left:100%">1.0</span>' +
+        '</div>';
+
+      // Stats — the intuitive numbers behind κ.
+      const n = j.paired_labels_30d || 0;
+      const agreePct = j.agreement != null ? Math.round(j.agreement * 100) : null;
+      const diverged = j.agreement != null ? Math.round((1 - j.agreement) * n) : null;
+      const trend = j.series.length >= 2
+        ? ((j.series[j.series.length - 1] - j.series[0]) >= 0 ? '▲ +' : '▼ ') +
+          (j.series[j.series.length - 1] - j.series[0]).toFixed(2)
+        : '—';
+      document.getElementById('kappa-stats').innerHTML =
+        stat('Agreement', agreePct != null ? agreePct + '%' : '—', 'matches panel majority',
+             band === 'idle' ? '' : band) +
+        stat('Diverged', diverged != null ? diverged + ' / ' + n : '—', 'traces judge disagreed') +
+        stat('Sample', band === 'idle' ? n + ' / ' + SAMPLE_FLOOR : String(n),
+             band === 'idle' ? 'traces to calibrate' : 'traces compared') +
+        stat('κ trend', trend, j.series.length >= 2 ? 'first → latest run' : 'single sample yet');
+
+      grid.querySelectorAll('.kappa-row').forEach(r =>
+        r.setAttribute('aria-current', r.getAttribute('data-judge') === j.id ? 'true' : 'false'));
+    }
+
+    // Compact κ bar list (worst first) — one scannable row per judge instead of
+    // 15 near-identical cards. Bar width tracks κ (clamped at 0 for negatives).
     const grid = document.getElementById('judges-grid');
-    grid.innerHTML = judges.map(j => {
-      const cls = j.kappa_now < j.kappa_threshold ? 'spark--err' :
-                  (j.kappa_now < j.kappa_target ? 'spark--warn' : 'spark--ok');
-      const status = j.kappa_now < j.kappa_threshold ? 'breach' :
-                    (j.kappa_now < j.kappa_target ? 'warn' : 'within');
+    const ordered = judges.slice().sort((a, b) => (a.kappa_now - b.kappa_now) || (a.agreement - b.agreement));
+    grid.innerHTML = ordered.map(j => {
+      const band = bandOf(j);
+      const w = Math.max(0, Math.min(1, j.kappa_now)) * 100;
+      const agree = j.agreement != null ? (j.agreement * 100).toFixed(0) + '%' : '—';
       return `
-        <div class="signal-card">
-          <div class="label">${obs.escapeHtml(j.id)} · ${obs.escapeHtml(j.tenant)}</div>
-          <div class="value">${j.kappa_now.toFixed(2)} <em>κ</em></div>
-          <div class="delta ${j.kappa_now < j.kappa_threshold ? 'up' : 'flat'}">
-            ${j.paired_labels_30d} paired · ${j.window_days}d
-          </div>
-          <svg class="spark ${cls}" data-kappa="${j.id}" style="width:100%;height:30px;margin-top:6px;"></svg>
-          <div class="meta">target ≥ ${j.kappa_target.toFixed(2)} · breach &lt; ${j.kappa_threshold.toFixed(2)} · <b>${status}</b></div>
-        </div>`;
+        <button type="button" class="kappa-row" data-judge="${obs.escapeHtml(j.id)}" data-band="${band}">
+          <span class="kappa-row__name">${obs.escapeHtml(j.id)}</span>
+          <span class="kappa-row__track"><i style="width:${w.toFixed(1)}%"></i></span>
+          <span class="kappa-row__val">${j.kappa_now.toFixed(2)}<small>κ</small></span>
+          <span class="kappa-row__agree">${agree}<small>agree</small></span>
+          <span class="kappa-row__meta">${j.paired_labels_30d}t · <b>${statusOf(j)}</b></span>
+        </button>`;
     }).join('');
 
-    grid.querySelectorAll('svg.spark').forEach(svg => {
-      const id = svg.getAttribute('data-kappa');
-      const j = judges.find(x => x.id === id);
-      obs.renderSparkline(svg, j.series, { w: 220, h: 30 });
+    grid.querySelectorAll('.kappa-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const j = judges.find(x => x.id === row.getAttribute('data-judge'));
+        if (j) paintPrimary(j);
+      });
     });
+
+    paintPrimary(ordered[0]);
   }
 
   (function () {
