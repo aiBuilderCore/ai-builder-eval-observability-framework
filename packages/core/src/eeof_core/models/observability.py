@@ -34,6 +34,26 @@ class Incident(BaseModel):
     opened_at: str = Field(default_factory=iso)
 
 
+class Span(BaseModel):
+    """One OpenTelemetry span in an agent trace, in OpenInference shape.
+
+    Emitted by the agent-under-test (real W3C `trace_id`/`span_id`, OpenInference
+    span kinds + OTel GenAI semconv attributes) and carried through simulation
+    into the trace blob. `start_ms`/`duration_ms` are relative to the start of the
+    trace so a run's spans lay out as a waterfall directly. EVALUATOR spans are
+    synthesised downstream from real judge verdicts (they score the trace, so they
+    are not produced by the agent itself).
+    """
+
+    id: str                       # W3C span id (16-hex), unique within the trace
+    parent_id: str | None = None  # parent span id, or None for a root span
+    kind: str                     # AGENT | LLM | TOOL | RETRIEVER | GUARDRAIL | PROMPT | EVALUATOR
+    name: str
+    start_ms: int = 0
+    duration_ms: int = 0
+    attrs: dict[str, Any] = Field(default_factory=dict)
+
+
 class TraceEvent(BaseModel):
     """One finished conversation, streamed on trace.events.<run_id>."""
 
@@ -46,6 +66,10 @@ class TraceEvent(BaseModel):
     tokens: int = 0
     latency_ms: int = 0
     blob_uri: str = ""
+    # Real OpenInference span-kind counts for this trace (AGENT/LLM/TOOL/…), so the
+    # observability ingest can fold them into the batch histogram without loading
+    # every trace blob.
+    span_kinds: dict[str, int] = Field(default_factory=dict)
 
 
 class Batch(BaseModel):
@@ -53,6 +77,10 @@ class Batch(BaseModel):
     tenant: str
     traces: int = 0
     tokens: int = 0
+    # Aggregate OpenInference span-kind counts across every trace in the run,
+    # folded in as trace events land. Powers the batch-detail kind histogram and
+    # the dashboard "spans" pill without a full-table span scan.
+    kind_histogram: dict[str, int] = Field(default_factory=dict)
     first_seen: str = Field(default_factory=iso)
     last_seen: str = Field(default_factory=iso)
 

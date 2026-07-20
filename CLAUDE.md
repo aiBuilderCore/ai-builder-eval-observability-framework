@@ -15,6 +15,10 @@ lockstep.
   fallback) / anthropic / bedrock / echo — all invoked over their API, never
   SDK-coupled in stage code. `get_provider()` builds a **fallback chain**
   (primary → `MODEL_FALLBACK` → echo), dropping any link whose creds are absent.
+- The **agent-under-test emits a real OpenTelemetry / OpenInference span tree**
+  per `/chat` turn (returned in the response envelope; OTLP/HTTP export is
+  env-gated and collector-optional). `opentelemetry-{api,sdk,exporter-otlp-proto-http}`
+  are base deps of that service — always installed, so local mode still boots.
 
 ## Common commands
 - Sync: `uv sync --group dev` (add `--group infra` / `--group llm` for real backends).
@@ -57,6 +61,15 @@ lockstep.
 - Demo seed: `packages/core/.../seed_demo.py` writes one real lineage per demo
   agent on boot (idempotent) so the derived rollups have rows to aggregate;
   `run_all.py` calls it, `scripts/seed_demo.py` is the standalone/infra entry.
+- Agent span tracing: `services/agent-under-test/.../tracing.py` builds a real
+  OpenInference span tree per `/chat` turn (AGENT root → PROMPT/LLM/TOOL/RETRIEVER/
+  GUARDRAIL, W3C `trace_id`/`span_id`, OTel GenAI semconv attrs + the **verbatim
+  system prompt / input messages / completion**). The edge propagates `traceparent`
+  so a run shares one trace id; the simulation worker stitches each turn's spans
+  onto the trace blob (`spans` + `otel_trace_id`) and publishes `span_kinds`;
+  observability's `record_trace_event` folds those into `Batch.kind_histogram`.
+  The `Span` contract lives in `models/observability.py`. Self-Heal reads a flagged
+  trace's PROMPT/LLM spans to show *exactly* what the agent ran under (RCA).
 - A service: `services/<name>/src/<pkg>/` with `app.py` (FastAPI) and, for async
   services, `worker.py` (a `BaseWorker` subclass) bound in the app lifespan.
 
@@ -91,8 +104,12 @@ a `LIVE wiring` adapter appended to its `app.js`, following one recipe:
 4. **Submit** flows branch to `<NS>.submitLive(...)` when `window.EEOF` is set,
    POSTing the real job and navigating to the (live) detail page.
 
-Some analytical screens (span-trees, drift heatmaps, trajectory) have no backend
-source and intentionally keep seed data — see the README table.
+**Span trees are real.** The Observability trace-viewer waterfall, batch kind
+histogram, span-attribute inspector, and the Self-Heal RCA view all read the
+agent's emitted spans from the trace blob (`buildRuns` prefers `detail.spans`,
+appending EVALUATOR spans from real verdicts). Some analytical screens (drift
+heatmaps, multi-window trajectory drift) still have no backend source and
+intentionally keep seed data — see the README table.
 
 ## Hard rules
 - **Synthetic data only** — fabricated tenants (`acme`), personas, costs. Never

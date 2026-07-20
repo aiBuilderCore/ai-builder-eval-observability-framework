@@ -18,6 +18,7 @@ from .observability import (
     Incident,
     Monitor,
     MonitorDraft,
+    Span,
     TraceEvent,
 )
 from .agent_catalog import CORE_AGENTS, agent_system_prompt, get_agent
@@ -101,6 +102,7 @@ __all__ = [
     "SelfHealIncident",
     "SelfHealSummary",
     "TimelineStep",
+    "Span",
     "TraceEvent",
     "TraceRef",
     "Turn",

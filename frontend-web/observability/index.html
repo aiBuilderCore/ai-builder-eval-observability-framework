@@ -201,8 +201,8 @@
       totalRuns += b.run_count || 0;
       (b.runs || []).forEach(r => {
         totalSpans += (r.spans || []).length;
-        // Judge verdicts are real backend data on each run (OpenInference EVALUATOR
-        // spans have no telemetry source yet, so we count verdicts directly).
+        // Judge verdicts are real backend data on each run; they also surface as
+        // the EVALUATOR spans appended to the trace's OpenInference span tree.
         totalEval += (r.verdicts || []).length;
       });
     });

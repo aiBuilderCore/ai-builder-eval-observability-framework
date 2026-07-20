@@ -1,4 +1,4 @@
-[]#!/usr/bin/env bash
+#!/usr/bin/env bash
 #
 # bootstrap.sh — one command to stand up the Enterprise Eval Observability
 # Framework from scratch: create .env, install every dependency (core, all

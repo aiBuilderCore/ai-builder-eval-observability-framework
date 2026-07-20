@@ -154,19 +154,24 @@ falls back to seed data when the edge is unreachable, so the UI never blanks.
 | **Question Generation** | submit → real `qgen` job, phase-level progress, seed-set questions |
 | **Simulation** | adapter onboarding, submit → real run, run detail (tokens/stop-reasons), trace turns |
 | **Evaluation** | submit → real jury scoring, verdict sets with per-juror verdicts, run picker, live **judge catalogue** (sync registry) |
-| **Observability** | monitors, evidence packs, judge-κ calibration (control-plane) |
-| **Self-Heal** | closed-loop remediation queue, policy DSL, candidate-fix + evidence, human-in-the-loop approve → async ship (`/self-heal/*`) |
+| **Observability** | monitors, evidence packs, judge-κ calibration (control-plane), plus **real trace-viewer span trees**, batch **span-kind histograms**, and the span-attribute inspector — read from the agent's emitted OpenInference spans on the trace blob |
+| **Self-Heal** | closed-loop remediation queue, policy DSL, candidate-fix + evidence, human-in-the-loop approve → async ship (`/self-heal/*`); incident **RCA surfaces the flagged trace's system prompt + prompt→completion** from its spans |
 
 The dashboard's quality and spend cards are **derived, not seeded** — they roll
 up from real verdict / batch records (see [Dashboard rollups](#dashboard-rollups)),
 so a fresh boot seeds one realistic lineage per demo agent (`scripts/seed_demo.py`,
 run automatically) to give them something to aggregate.
 
-**Illustrative (no backend source yet):** batch span-trees, OpenInference
-trajectory, drift heatmaps, and the compliance-template detail — these need
-span/drift features beyond the current services and keep seed data. The shared
-client is `frontend-web/_api.js` (REST + one multiplexed WebSocket). Static
-assets are served no-cache in dev so edits show up on reload.
+Batch span-trees are now **real** — the agent-under-test emits an OpenInference
+span tree per `/chat` turn (AGENT/PROMPT/LLM/TOOL/RETRIEVER/GUARDRAIL, W3C ids,
+GenAI semconv attrs including the verbatim prompt/completion), which simulation
+stitches onto the trace blob and observability folds into the batch kind
+histogram. **Illustrative (no backend source yet):** drift heatmaps, multi-window
+trajectory-drift analytics (delegation graph / distribution diff), and the
+compliance-template detail — these need drift features beyond the current
+services and keep seed data. The shared client is `frontend-web/_api.js` (REST +
+one multiplexed WebSocket). Static assets are served no-cache in dev so edits
+show up on reload.
 
 ### Dashboard rollups
 
@@ -203,7 +208,11 @@ the cards aren't empty — see `eeof_core.seed_demo` / `scripts/seed_demo.py`.
 The `agent-under-test` service is the *target being evaluated*, not part of the
 control plane — a demo **401(k) retirement-planning assistant** exposing
 `POST /chat`. simulation-svc onboards it as a REST adapter (seeded from
-`CORE_AGENTS`) so a run drives it turn-by-turn over the wire.
+`CORE_AGENTS`) so a run drives it turn-by-turn over the wire. It also **emits a
+real OpenInference / OTel span tree** for each turn (in the `/chat` response
+envelope; honours a propagated `traceparent`; optional OTLP/HTTP export when a
+collector is configured) — the telemetry the Observability trace viewer and
+Self-Heal RCA read.
 
 ¹ The judge registry is co-hosted in `evaluation-svc` (which owns Judge/Jury per
 the spec's entity map); `8092` is its logical port. Everything else maps 1:1 to

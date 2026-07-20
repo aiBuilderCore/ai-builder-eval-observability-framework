@@ -40,6 +40,11 @@ async def record_trace_event(evt: dict) -> None:
         batch = Batch(run_id=run_id, tenant=tenant)
     batch.traces += 1
     batch.tokens += int(evt.get("tokens", 0))
+    # Fold the trace's OpenInference span-kind counts into the run's histogram so
+    # the batch-detail kind chart + the dashboard "spans" pill read from real
+    # aggregates without re-scanning every trace blob.
+    for kind, n in (evt.get("span_kinds") or {}).items():
+        batch.kind_histogram[kind] = batch.kind_histogram.get(kind, 0) + int(n)
     batch.last_seen = iso()
     await get_table().put(
         {

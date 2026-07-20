@@ -3,7 +3,18 @@ name = "eeof-agent-under-test"
 version = "0.1.0"
 description = "Demo agent-under-test — a 401(k) retirement-planning assistant served over REST."
 requires-python = ">=3.13"
-dependencies = ["eeof-core", "fastapi>=0.115", "uvicorn[standard]>=0.30"]
+dependencies = [
+    "eeof-core",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    # OpenTelemetry — the agent emits a real OpenInference / OTel GenAI span tree
+    # for every /chat turn. The SDK + OTLP exporter are used only when an OTLP
+    # collector is configured (OTEL_EXPORTER_OTLP_ENDPOINT); the in-process span
+    # tree the simulation captures needs no collector, so local mode still boots.
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+]
 
 [tool.uv.sources]
 eeof-core = { workspace = true }

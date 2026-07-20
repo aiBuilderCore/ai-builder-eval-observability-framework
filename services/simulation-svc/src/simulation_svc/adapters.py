@@ -150,19 +150,26 @@ def _history_to_messages(turns: list[Turn]) -> list[dict]:
 
 
 async def agent_reply(
-    adapter_snapshot: dict, turns: list[Turn], provider
-) -> tuple[str, list[dict]]:
-    """Get the target agent's next reply and the tool calls it made.
+    adapter_snapshot: dict,
+    turns: list[Turn],
+    provider,
+    trace_id: str | None = None,
+    parent_span_id: str | None = None,
+) -> tuple[str, list[dict], list[dict]]:
+    """Get the target agent's next reply, the tool calls it made, and its spans.
 
     Calls the real REST endpoint whenever the adapter has one configured (e.g.
     the built-in 401(k) agent), so a run exercises the genuine over-the-wire
-    path and captures the agent's real tool-call sequence. If no endpoint is set,
+    path and captures the agent's real tool-call sequence and OpenInference span
+    tree. When ``trace_id`` is supplied it is propagated as a W3C ``traceparent``
+    header so every turn of the run shares one trace id. If no endpoint is set,
     or the call fails, the model provider stands in as the agent — conditioned on
     the built-in agent's own system prompt when the adapter names one, so the
-    stand-in still behaves in-domain and offline (with no tool calls to report).
+    stand-in still behaves in-domain and offline (with no tools/spans to report).
 
-    Returns ``(reply_text, tool_calls)`` where each tool call is a dict
-    ``{name, ok, detail?}`` straight from the agent.
+    Returns ``(reply_text, tool_calls, spans)`` where each tool call is a dict
+    ``{name, ok, detail?}`` and each span is an OpenInference span dict, both
+    straight from the agent.
     """
     config = adapter_snapshot.get("config", {})
     transport = adapter_snapshot.get("transport", "rest")
@@ -176,15 +183,21 @@ async def agent_reply(
             body: dict = {"messages": _history_to_messages(turns)}
             if scenario:
                 body["scenario"] = scenario
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    endpoint, json=body, headers=config.get("headers", {}),
+            headers = dict(config.get("headers", {}))
+            # W3C trace-context: continue the run's trace so all turns stitch into
+            # one trace id (sampled flag = 01). Parent is a fresh per-turn span id.
+            if trace_id:
+                headers["traceparent"] = (
+                    f"00-{trace_id}-{parent_span_id or '0000000000000000'}-01"
                 )
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(endpoint, json=body, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
                 reply = data.get("reply") or data.get("content") or str(data)
                 tool_calls = data.get("tool_calls") or []
-                return reply, tool_calls
+                spans = data.get("spans") or []
+                return reply, tool_calls, spans
         except httpx.HTTPError:
             pass  # fall through to the in-process provider stand-in
     # Provider stands in as the agent under test (in-domain when a built-in
@@ -195,4 +208,4 @@ async def agent_reply(
         max_tokens=400,
         temperature=0.5,
     )
-    return reply, []
+    return reply, [], []
