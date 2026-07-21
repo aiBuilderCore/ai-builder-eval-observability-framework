@@ -456,6 +456,11 @@ async def heal_registry(p: Principal = Depends(principal)):
     return await proxy("self-heal", "GET", "/self-heal/registry", p)
 
 
+@api.get("/self-heal/playbook")
+async def heal_playbook(p: Principal = Depends(principal)):
+    return await proxy("self-heal", "GET", "/self-heal/playbook", p)
+
+
 @api.get("/self-heal/quality")
 async def heal_quality(p: Principal = Depends(principal)):
     return await proxy("self-heal", "GET", "/self-heal/quality", p)

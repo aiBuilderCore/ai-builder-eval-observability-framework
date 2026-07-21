@@ -99,6 +99,15 @@ async def registry(p: Principal = Depends(principal)) -> list[dict]:
     return [a.model_dump(mode="json") for a in await list_actions(p.tenant)]
 
 
+@app.get("/self-heal/playbook")
+async def playbook(p: Principal = Depends(principal)) -> dict:
+    """Agent-side remediation playbook keyed by judge dimension — the concrete
+    code/prompt-level fix behind each registry action category. Static core config."""
+    from eeof_core.self_heal_playbook import REMEDIATION_PLAYBOOK
+
+    return REMEDIATION_PLAYBOOK
+
+
 @app.get("/self-heal/quality")
 async def quality(p: Principal = Depends(principal)) -> dict:
     return await get_quality(p.tenant)

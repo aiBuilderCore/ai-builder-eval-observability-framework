@@ -163,6 +163,29 @@ async def test_policy_matches_by_structured_scope_and_captures_baseline():
     assert inc.baseline_trace is not None and "pass" in inc.baseline_trace.meta
 
 
+def test_playbook_covers_every_judge_and_is_trace_grounded():
+    """Every built-in judge has an agent-side recommendation, the fallback is
+    sensible, and no entry embeds fabricated code (we only have the trace)."""
+    from eeof_core.models.judge_catalog import CORE_JUDGES
+    from eeof_core.self_heal_playbook import (
+        DEFAULT_RECOMMENDATION,
+        recommendation_for,
+    )
+
+    for j in CORE_JUDGES:
+        rec = recommendation_for(j["name"])
+        assert rec["summary"] and rec["steps"], j["name"]
+        assert rec is not DEFAULT_RECOMMENDATION, f"{j['name']} missing a playbook entry"
+        # A prompt-clause fix requires flags to extract the offending text from the
+        # trace; behaviour dims carry neither. Never both-empty-yet-claiming-a-fix.
+        if rec.get("fix"):
+            assert rec.get("flags"), f"{j['name']} has a prompt fix but no flags to anchor it"
+
+    # Unknown dimension → the generic fallback, still actionable.
+    assert recommendation_for("something_unmapped")["steps"]
+    assert recommendation_for(None) is DEFAULT_RECOMMENDATION
+
+
 @pytest.mark.asyncio
 async def test_median_mttr_is_real_or_dash():
     """MTTR is computed from opened_at→resolved_at, never a fabricated constant:

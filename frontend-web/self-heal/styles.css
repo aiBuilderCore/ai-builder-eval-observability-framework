@@ -318,6 +318,37 @@ html.aibc-chrome .incident__tags .tag {
 /* A4 · the flagged completion is the failure — tint it like a diff's minus row. */
 .sh-diag__v--bad { border-left: 3px solid var(--err); color: var(--text); background: var(--err-bg); }
 
+/* Offending prompt clauses highlighted verbatim in the captured system prompt —
+   the exact incorrect text (from the trace) that produced the breach. */
+mark.sh-flag {
+  background: color-mix(in srgb, var(--err) 20%, transparent); color: inherit;
+  border-radius: 3px; padding: 0 2px; box-shadow: inset 0 -1px 0 var(--err);
+}
+
+/* Recommended agent-side fix — trace-grounded remediation guidance. */
+.sh-rec__surface {
+  margin-left: 0.5rem; font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 0.03em; text-transform: none; color: var(--accent);
+  background: var(--accent-soft); border-radius: 999px; padding: 1px 8px;
+}
+.sh-rec__summary { margin: 0.5rem 0 0; font-size: 12.5px; line-height: 1.5; color: var(--text); }
+.sh-rec__evi {
+  margin: 0.55rem 0 0; font-size: 12px; line-height: 1.5; color: var(--text-muted);
+  padding: 0.5rem 0.7rem; border-radius: var(--r-2); background: var(--warn-bg);
+}
+.sh-rec__evi-k {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--warn); margin-right: 7px;
+}
+.sh-rec__snip { margin-top: 0.6rem; }
+.sh-rec__steps {
+  margin: 0.65rem 0 0; padding-left: 1.1rem;
+  display: flex; flex-direction: column; gap: 0.35rem;
+}
+.sh-rec__steps li { font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+.sh-rec__ref { margin: 0.6rem 0 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
+.sh-rec__ref b { color: var(--text-muted); }
+
 /* A1 · flagged-vs-passing completion contrast reuses the .fixdiff grammar. */
 .sh-diag--diff .fixdiff { margin-top: 0.35rem; white-space: pre-wrap; }
 .sh-diag--diff .fixdiff__row {

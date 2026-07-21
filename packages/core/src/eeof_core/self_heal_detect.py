@@ -236,6 +236,7 @@ async def detect_incidents(
             glyph=glyph,
             agent=agent_name,
             failure=f"{dim} guardrail breach",
+            dimension=dim.split("@")[0],
             pillars=[pillar],
             stage="rca",
             age="just now",

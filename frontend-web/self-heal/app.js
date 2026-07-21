@@ -43,6 +43,23 @@
   SH.incidents = [];
   SH.registry = [];
   SH.policies = [];
+  SH.playbook = {};  // dimension → agent-side remediation recommendation
+
+  // Highlight the offending phrases (from the playbook) inside the real captured
+  // system prompt — showcases the exact incorrect prompt text that caused the breach.
+  function highlightFlags(text, flags) {
+    var safe = esc(text || "");
+    (flags || []).forEach(function (f) {
+      if (!f) return;
+      var ef = esc(f).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      try {
+        safe = safe.replace(new RegExp(ef, "gi"), function (m) {
+          return '<mark class="sh-flag">' + m + "</mark>";
+        });
+      } catch (e) { /* bad pattern → leave text as-is */ }
+    });
+    return safe;
+  }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
   function stageChip(stage) {
@@ -329,6 +346,44 @@
     return view;
   }
 
+  // Recommended agent-side fix — trace-grounded (we have only the trace, not the
+  // agent's code). For prompt-fixable dimensions the "incorrect" side is the exact
+  // offending clause EXTRACTED FROM the trace's PROMPT span, and the recommendation
+  // is a prompt-clause replacement. Behaviour dimensions describe the trace signal
+  // and recommend changes — never fabricated code.
+  function recSection(rec, view, tid) {
+    if (!rec || !rec.summary) return "";
+    var offending = [];
+    (rec.flags || []).forEach(function (f) {
+      var re;
+      try { re = new RegExp(f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); } catch (e) { return; }
+      var m = re.exec(view.system || "");
+      if (m) offending.push(m[0]);
+    });
+    var diff = "";
+    if (offending.length && rec.fix) {
+      diff =
+        '<div class="sh-rec__snip sh-diag--diff">' +
+        '<span class="sh-diag__k">Prompt clause · from trace ' +
+        '<span class="sh-diagnosis__trace">' + esc(tid) + " · PROMPT span</span> → recommended</span>" +
+        '<div class="fixdiff">' +
+        '  <div class="fixdiff__row fixdiff__row--before"><span class="fixdiff__mark">from trace</span>' + esc(offending.join("  …  ")) + "</div>" +
+        '  <div class="fixdiff__row fixdiff__row--after"><span class="fixdiff__mark">recommend</span>' + esc(rec.fix) + "</div>" +
+        "</div></div>";
+    }
+    return (
+      '<p class="sh-eyebrow" style="margin-top:1.4rem;">Recommended fix · agent side' +
+      (rec.surface ? ' <span class="sh-rec__surface">' + esc(rec.surface) + "</span>" : "") + "</p>" +
+      '<p class="sh-rec__summary">' + esc(rec.summary) + "</p>" +
+      (rec.evidence ? '<p class="sh-rec__evi"><span class="sh-rec__evi-k">evidence</span>' + esc(rec.evidence) + "</p>" : "") +
+      diff +
+      '<ol class="sh-rec__steps">' +
+      (rec.steps || []).map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") +
+      "</ol>" +
+      (rec.reference ? '<p class="sh-rec__ref">Satisfies <b>' + esc(rec.reference) + "</b></p>" : "")
+    );
+  }
+
   // RCA diagnosis: lazily pull the exemplar flagged trace and surface *exactly*
   // what the agent ran under — the verbatim system prompt (guardrails in effect),
   // the user prompt, and the completion — captured on the trace's OpenInference
@@ -342,6 +397,8 @@
     var tid = inc.traces[0].id;
     var flaggedMeta = inc.traces[0].meta || "";
     var baseId = inc.baseline_trace && inc.baseline_trace.id;
+    var rec = (SH.playbook && SH.playbook[inc.dimension]) || {};
+    var flags = rec.flags || [];
     host.hidden = false;
     host.innerHTML =
       '<p class="sh-eyebrow" style="margin-top:1.4rem;">RCA · what the agent saw</p>' +
@@ -376,7 +433,7 @@
         "</div>" +
         '<div class="sh-diagnosis__grid">' +
         '  <div class="sh-diag"><span class="sh-diag__k">System prompt in effect · model ' + modelTag +
-        '</span><pre class="sh-diag__v sh-diag__v--prompt">' + esc(view.system || "(not captured)") + "</pre></div>" +
+        '</span><pre class="sh-diag__v sh-diag__v--prompt">' + (view.system ? highlightFlags(view.system, flags) : "(not captured)") + "</pre></div>" +
         '  <div class="sh-diag"><span class="sh-diag__k">User prompt</span>' +
         '<pre class="sh-diag__v">' + esc(view.user || "(not captured)") + "</pre></div>";
 
@@ -402,6 +459,7 @@
         (view.params ? " (" + esc(view.params) + ")" : "") +
         (base ? ". Both rows are real traces from this run: the top failed <b>" + esc(dim) + "</b>, the bottom passed it. The contrast is per-judge — a pass here is not necessarily a better answer overall (other guardrails may still flag it)."
               : ". Compare the guardrail text above against a passing trace to attribute the breach.") + "</p>";
+      html += recSection(rec, view, tid);
       host.innerHTML = html;
     }).catch(function () { host.hidden = true; });
   }
@@ -588,11 +646,13 @@
         EEOF.get("/self-heal/policies"),
         EEOF.get("/self-heal/registry"),
         EEOF.get("/self-heal/summary"),
+        EEOF.get("/self-heal/playbook").catch(function () { return {}; }),
       ]);
       SH.incidents = (res[0] || []).map(mapIncident);
       SH.policies = (res[1] || []).map(mapPolicy);
       SH.registry = (res[2] || []).map(function (a) { return a.name; });
       SH.summary = res[3] || null;
+      SH.playbook = res[4] || {};
       // Don't repaint over an open modal mid-read; refresh the list underneath.
       SH.renderAll();
       // Deep link (/self-heal/#inc_…) — incidents are live-only now, so re-open

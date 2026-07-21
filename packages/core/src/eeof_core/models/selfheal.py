@@ -65,6 +65,7 @@ class SelfHealIncident(BaseModel):
     glyph: str = "chat"          # UI icon key (retriever/prompt/tool/parser/finance/chat)
     agent: str
     failure: str
+    dimension: str | None = None  # breached judge dimension → keys the remediation playbook
     pillars: list[str] = Field(default_factory=list)
     stage: Stage = "gate"
     age: str = ""

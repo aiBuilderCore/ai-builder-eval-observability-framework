@@ -119,6 +119,24 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[?]` needs decision
 
 ---
 
+## Track F — Agent-side remediation recommendation (trace-grounded)
+
+- [x] **F1 · "What to fix on the agent" recommendation.** The modal only showed an
+  abstract registry *category* (e.g. "Guardrail tweak"), not a concrete agent-side
+  fix. Added `eeof_core/self_heal_playbook.py` — a per-judge remediation catalog
+  (surface · summary · trace-evidence · steps · recommended prompt fix · reference),
+  served at `GET /self-heal/playbook` (edge-proxied) and rendered in the RCA panel.
+- [x] **F2 · Evidence & incorrect-prompt highlight come from the TRACE, not code.**
+  Self-Heal has only the trace (OTel/OpenInference spans), never the agent's source.
+  So: the offending clauses are highlighted verbatim **in the real captured system
+  prompt** (`mark.sh-flag`, driven by playbook `flags`), and the recommendation's
+  "incorrect" side is the exact clause **extracted from the trace's PROMPT span**;
+  the fix is a recommended prompt-clause replacement. No fabricated code — behaviour
+  dimensions (numeric_accuracy, tool_call_correctness, …) describe the trace signal
+  (missing tool span, retry loop) and recommend changes, with no diff/highlight.
+  `[?]` extra evidence (e.g. tool-arg deltas) can be surfaced by enriching the OTel
+  spans upstream, then read here — no code access required.
+
 ## Track E — KPIs
 
 - [x] **E1 · Median MTTR is blank / faked.** `store.summary` (`store.py:126`) returns
