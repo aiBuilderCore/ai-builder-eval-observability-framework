@@ -236,7 +236,16 @@ scripts/                  bootstrap flow: run_all · demo · init_infra · onboa
 bootstrap.sh              one-command from-scratch: .env + deps + infra + onboard + run
 tests/                    unit + in-process pipeline
 docker-compose.yml        ScyllaDB (Alternator) + NATS JetStream + MinIO
+executive_pagers/         self-contained executive HTML collateral (see its README)
 ```
+
+## Documentation & versioning
+
+`executive_pagers/` holds Verity's executive-facing HTML pagers (single-file,
+open in a browser). Documentation-only changes ship no runtime change, so land
+them on a **`docs/`** (or `chore/`) branch — the `version-bump` workflow skips
+auto-tagging those, and only `feature/` (minor) / `fix/` (patch) branches move
+the version.
 
 ### Built-in catalogs & the 401k demo agent
 

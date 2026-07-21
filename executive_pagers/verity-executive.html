@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verity — Executive Pager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0C0E12; --ink-2:#12151B; --ink-3:#181C24;
+  --paper:#F3F0E7; --paper-dim:#C3C0B6;
+  --muted:#8B94A1; --muted-2:#616a76;
+  --line:rgba(243,240,231,.10); --line-2:rgba(243,240,231,.18);
+  --signal:#BFF04A; --signal-dim:rgba(191,240,74,.13);
+  --gold:#E7B45C; --gold-dim:rgba(231,180,92,.13);
+  --coral:#FF6E5B; --coral-dim:rgba(255,110,91,.12);
+  --sky:#7EC8E3; --sky-dim:rgba(126,200,227,.13);
+  --serif:"Fraunces",Georgia,serif;
+  --sans:"Geist","Segoe UI",system-ui,sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",monospace;
+  --canvas:var(--ink); --raise:var(--ink-2); --raise-2:var(--ink-3);
+  --fg:var(--paper); --fg-dim:var(--paper-dim);
+}
+:root[data-theme="light"]{
+  --canvas:#F4F1E8; --raise:#FBF9F3; --raise-2:#FFFFFF;
+  --fg:#191B20; --fg-dim:#4C505A; --muted:#6b7480; --muted-2:#98a0ab;
+  --line:rgba(25,27,32,.10); --line-2:rgba(25,27,32,.16);
+  --signal:#5B8C10; --signal-dim:rgba(91,140,16,.11);
+  --gold:#B7791F; --gold-dim:rgba(183,121,31,.11);
+  --coral:#D6482F; --coral-dim:rgba(214,72,47,.09);
+  --sky:#2E7DA6; --sky-dim:rgba(46,125,166,.11); --paper:#191B20;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--canvas);color:var(--fg);font-family:var(--sans);-webkit-font-smoothing:antialiased;
+  transition:background .5s,color .5s;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(900px 620px at 84% -10%,var(--accent-dim,var(--signal-dim)),transparent 60%),radial-gradient(760px 640px at -8% 112%,var(--gold-dim),transparent 62%);opacity:.9}
+body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:60px 60px;-webkit-mask-image:radial-gradient(circle at 60% 30%,#000,transparent 80%);mask-image:radial-gradient(circle at 60% 30%,#000,transparent 80%);opacity:.45}
+
+/* ---------- top bar ---------- */
+.topbar{position:relative;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:.85rem clamp(1.2rem,3.5vw,2.6rem);border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--canvas) 72%,transparent);backdrop-filter:blur(10px);flex:none}
+.brand{display:flex;align-items:center;gap:.75rem}
+.seal{width:38px;height:38px;border-radius:50%;flex:none;border:1.5px solid var(--accent,var(--signal));display:grid;place-items:center;position:relative;box-shadow:0 0 26px var(--accent-dim,var(--signal-dim))}
+.seal::after{content:"";position:absolute;inset:6px;border-radius:50%;border:1px dashed var(--line-2)}
+.seal span{font-family:var(--serif);font-size:1.2rem;color:var(--accent,var(--signal))}
+.brand .bt{font-family:var(--serif);font-size:1.35rem;letter-spacing:-.01em;line-height:1}
+.brand .bs{font-family:var(--mono);font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:.25rem}
+.tabs{display:flex;gap:.35rem;background:var(--raise);border:1px solid var(--line);border-radius:100px;padding:.3rem}
+.tabs button{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  background:none;border:none;cursor:pointer;padding:.5rem .95rem;border-radius:100px;transition:.25s;white-space:nowrap}
+.tabs button.on{background:var(--accent,var(--signal));color:var(--canvas);font-weight:500}
+.right{display:flex;align-items:center;gap:.7rem}
+.themebtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);background:var(--raise);color:var(--fg);cursor:pointer;display:grid;place-items:center;transition:.25s}
+.themebtn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* ---------- page container ---------- */
+.stage{position:relative;z-index:1;flex:1;overflow:hidden}
+.page{position:absolute;inset:0;overflow:auto;padding:clamp(1.3rem,3vw,2.4rem) clamp(1.2rem,3.5vw,2.6rem) 2.4rem;
+  opacity:0;visibility:hidden;transform:translateY(10px);transition:opacity .45s ease,transform .45s ease,visibility .45s}
+.page.on{opacity:1;visibility:visible;transform:none}
+.page.on .fade{animation:fade .6s cubic-bezier(.2,.7,.2,1) backwards}
+.page.on .fade:nth-child(1){animation-delay:.02s}.page.on .fade:nth-child(2){animation-delay:.08s}
+.page.on .fade:nth-child(3){animation-delay:.14s}.page.on .fade:nth-child(4){animation-delay:.20s}
+.page.on .fade:nth-child(5){animation-delay:.26s}.page.on .fade:nth-child(6){animation-delay:.32s}
+@keyframes fade{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.wrap{max-width:1220px;margin:0 auto}
+
+/* ---------- type ---------- */
+.eyebrow{font-family:var(--mono);font-size:.66rem;letter-spacing:.26em;text-transform:uppercase;color:var(--accent,var(--signal));display:flex;align-items:center;gap:.6rem;font-weight:500}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--accent,var(--signal))}
+.hero{display:flex;flex-direction:column;gap:.7rem;margin:.9rem 0 1.4rem}
+.hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(1.9rem,4.4vw,3.4rem);line-height:1;letter-spacing:-.02em;max-width:20ch}
+.hero h1 em{font-style:italic;color:var(--accent,var(--signal))}
+.hero p{font-size:clamp(.98rem,1.5vw,1.18rem);color:var(--fg-dim);max-width:74ch;line-height:1.5;font-weight:300}
+strong{font-weight:600;color:var(--fg)}
+.hi{color:var(--signal);font-weight:500}.hi-gold{color:var(--gold);font-weight:500}.hi-sky{color:var(--sky);font-weight:500}.hi-coral{color:var(--coral);font-weight:500}
+.sect-label{font-family:var(--mono);font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem}
+
+/* ---------- bento grid ---------- */
+.bento{display:grid;grid-template-columns:repeat(12,1fr);gap:.85rem}
+.box{background:linear-gradient(160deg,var(--raise),var(--raise-2));border:1px solid var(--line);border-radius:14px;padding:1.15rem 1.2rem;position:relative;overflow:hidden;transition:border-color .3s,transform .3s}
+.box:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.box::before{content:"";position:absolute;top:0;left:0;width:100%;height:2px;background:var(--accent,var(--signal));opacity:.0;transition:opacity .3s}
+.box:hover::before{opacity:.9}
+.box.gold::before{background:var(--gold)}.box.coral::before{background:var(--coral)}.box.sky::before{background:var(--sky)}
+.box h3{font-family:var(--serif);font-weight:500;font-size:1.12rem;letter-spacing:-.01em;margin-bottom:.5rem}
+.box .cap{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:.55rem}
+.box p{font-size:.86rem;line-height:1.45;color:var(--fg-dim);font-weight:300}
+.span-3{grid-column:span 3}.span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}
+
+/* tight list */
+.tl{display:flex;flex-direction:column;gap:.55rem;margin-top:.2rem}
+.tl li{list-style:none;display:grid;grid-template-columns:auto 1fr;gap:.6rem;align-items:baseline;font-size:.87rem;line-height:1.4;color:var(--fg-dim)}
+.tl li b{color:var(--fg);font-weight:600}
+.tl .mk{font-family:var(--mono);font-size:.7rem;color:var(--coral)}
+.tl.pos .mk{color:var(--signal)}
+
+/* mini steps */
+.msteps{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-top:.3rem}
+.mstep{border:1px solid var(--line);border-radius:10px;padding:.7rem .75rem;background:var(--canvas)}
+.mstep .n{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;color:var(--accent,var(--signal))}
+.mstep h4{font-family:var(--serif);font-weight:500;font-size:.98rem;margin:.25rem 0 .2rem}
+.mstep p{font-size:.76rem;color:var(--muted);line-height:1.35;font-weight:300}
+
+/* pipeline */
+.pipe{display:flex;gap:.45rem;flex-wrap:wrap}
+.stg{flex:1 1 0;min-width:110px;border:1px solid var(--line);border-radius:11px;padding:.75rem .8rem;background:var(--canvas);position:relative;transition:border-color .3s,transform .3s}
+.stg:hover{border-color:var(--accent,var(--signal));transform:translateY(-3px)}
+.stg .sn{font-family:var(--mono);font-size:.6rem;color:var(--accent,var(--signal));letter-spacing:.1em}
+.stg h4{font-family:var(--serif);font-weight:500;font-size:1rem;margin:.3rem 0 .18rem}
+.stg p{font-size:.72rem;color:var(--muted);line-height:1.32;font-weight:300}
+.stg::after{content:"→";position:absolute;right:-.5rem;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:.85rem;z-index:2}
+.stg:last-child::after{display:none}
+.loop{display:flex;align-items:center;gap:.7rem;margin-top:.85rem;font-size:.82rem;color:var(--fg-dim);font-weight:300}
+.loop .cyc{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;color:var(--gold);border:1px solid var(--gold);border-radius:100px;padding:.28rem .7rem;white-space:nowrap}
+
+/* value / benefit statlets */
+.stat{border-left:2px solid var(--accent,var(--signal));padding-left:.9rem}
+.stat .big{font-family:var(--serif);font-size:clamp(1.1rem,1.9vw,1.5rem);line-height:1.05;letter-spacing:-.01em}
+.stat .lbl{color:var(--muted);font-size:.78rem;margin-top:.35rem;line-height:1.38;font-weight:300}
+.stat.gold{border-color:var(--gold)}.stat.coral{border-color:var(--coral)}.stat.sky{border-color:var(--sky)}
+
+/* pillars */
+.pills{display:flex;gap:.4rem;flex-wrap:wrap}
+.pl{font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;padding:.4rem .7rem;border-radius:100px;border:1px solid var(--line-2);color:var(--fg-dim);background:var(--canvas)}
+.pl b{color:var(--signal);font-weight:500}
+
+/* compare strip */
+.cmp{width:100%;border-collapse:collapse;font-size:.82rem}
+.cmp th,.cmp td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--line)}
+.cmp thead th{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.cmp tbody th{font-weight:500;color:var(--fg-dim);width:34%}
+.cmp td{color:var(--muted);text-align:center}
+.cmp .y{color:var(--signal);font-weight:600}
+.cmp tr.us{background:var(--signal-dim)}
+.cmp tr.us th{color:var(--fg);font-weight:700}.cmp tr.us td{color:var(--fg)}
+
+/* feature chips */
+.feat{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}
+.fc{border:1px solid var(--line);border-radius:11px;padding:.8rem .85rem;background:linear-gradient(160deg,var(--raise),var(--raise-2));position:relative;transition:border-color .3s,transform .3s}
+.fc:hover{border-color:var(--accent,var(--sky));transform:translateY(-2px)}
+.fc .fi{font-family:var(--mono);font-size:.6rem;color:var(--muted);letter-spacing:.1em}
+.fc h4{font-family:var(--serif);font-weight:500;font-size:1rem;margin:.28rem 0 .3rem}
+.fc p{font-size:.76rem;color:var(--muted);line-height:1.36;font-weight:300}
+
+/* journey */
+.jrow{display:flex;gap:.45rem;flex-wrap:wrap;counter-reset:j}
+.jc{flex:1 1 0;min-width:130px;border:1px solid var(--line);border-radius:11px;padding:.75rem .8rem;background:var(--canvas);position:relative}
+.jc .js{font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sky)}
+.jc h4{font-family:var(--serif);font-weight:500;font-size:.95rem;margin:.28rem 0 .2rem}
+.jc p{font-size:.73rem;color:var(--muted);line-height:1.32;font-weight:300}
+.jc::after{content:"›";position:absolute;right:-.42rem;top:50%;transform:translateY(-50%);color:var(--muted-2);z-index:2}
+.jc:last-child::after{display:none}
+
+.footline{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:1.3rem;padding-top:1rem;border-top:1px solid var(--line);flex-wrap:wrap}
+.footline .fq{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--fg)}
+.footline .fm{font-family:var(--mono);font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+
+/* accent theming per page */
+#page1{--accent:var(--signal);--accent-dim:var(--signal-dim)}
+#page2{--accent:var(--sky);--accent-dim:var(--sky-dim)}
+
+@media (max-width:960px){
+  .span-3,.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12}
+  .msteps,.feat{grid-template-columns:repeat(2,1fr)}
+  .brand .bs{display:none}
+}
+@media (max-width:620px){
+  .pipe,.jrow{flex-direction:column}.stg::after{content:"↓";right:50%;top:auto;bottom:-.5rem;transform:translateX(50%)}
+  .msteps,.feat{grid-template-columns:1fr}.tabs button{padding:.5rem .7rem}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand" id="brand">
+    <div class="seal"><span>V</span></div>
+    <div><div class="bt">Verity</div><div class="bs" id="brandsub">Executive Brief</div></div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="on" data-p="1" role="tab">Executive Brief</button>
+    <button data-p="2" role="tab">Technical Overview</button>
+  </div>
+  <div class="right">
+    <button class="themebtn" id="theme" title="Toggle light / dark" aria-label="Toggle theme">◑</button>
+  </div>
+</header>
+
+<div class="stage">
+
+  <!-- ============ PAGE 1 · EXECUTIVE BRIEF ============ -->
+  <section class="page on" id="page1" role="tabpanel">
+    <div class="wrap">
+      <div class="eyebrow fade">Executive Brief · AI Agent Assurance</div>
+      <div class="hero fade">
+        <h1>Proof your AI agents are <em>safe to ship.</em></h1>
+        <p>Verity stress-tests every agent, scores it across six trust pillars, issues a clear <strong>go / no-go</strong> deploy verdict, monitors it in production, and closes the loop with human-approved fixes — turning “we think it’s fine” into defensible evidence.</p>
+      </div>
+
+      <div class="bento">
+        <!-- Problem -->
+        <div class="box coral span-4 fade">
+          <div class="cap">The problem</div>
+          <h3>Shipping what you can’t vouch for</h3>
+          <ul class="tl">
+            <li><span class="mk">01</span><span><b>Failures surface in public,</b> not in review — bad advice, hallucinations, leaked data.</span></li>
+            <li><span class="mk">02</span><span><b>Manual QA can’t scale</b> to every agent, version and risk.</span></li>
+            <li><span class="mk">03</span><span><b>No defensible “go / no-go”</b> and no audit trail when it matters.</span></li>
+          </ul>
+        </div>
+        <!-- Solution -->
+        <div class="box span-8 fade">
+          <div class="cap">The solution</div>
+          <h3>One platform that makes trust measurable</h3>
+          <div class="msteps">
+            <div class="mstep"><div class="n">01</div><h4>Stress-test</h4><p>Synthetic users probe the agent at machine scale.</p></div>
+            <div class="mstep"><div class="n">02</div><h4>Score &amp; gate</h4><p>Judges grade every answer into one verdict.</p></div>
+            <div class="mstep"><div class="n">03</div><h4>Monitor</h4><p>Live quality, spend &amp; drift in production.</p></div>
+            <div class="mstep"><div class="n">04</div><h4>Self-heal</h4><p>Root-cause a breach, propose a fix, approve.</p></div>
+          </div>
+        </div>
+
+        <!-- Pipeline -->
+        <div class="box span-8 fade">
+          <div class="cap">How it works · one repeatable pipeline</div>
+          <div class="pipe">
+            <div class="stg"><div class="sn">01</div><h4>Persona</h4><p>Who tests it</p></div>
+            <div class="stg"><div class="sn">02</div><h4>Question</h4><p>Hard scenarios</p></div>
+            <div class="stg"><div class="sn">03</div><h4>Run</h4><p>Drive the agent</p></div>
+            <div class="stg"><div class="sn">04</div><h4>Verdict</h4><p>Jury scores</p></div>
+            <div class="stg"><div class="sn">05</div><h4>Evidence</h4><p>Proof + gate</p></div>
+          </div>
+          <div class="loop"><span class="cyc">↻ CONTINUOUS</span><span>In production, monitoring and self-heal feed fixes back to the start — assurance never stops at launch.</span></div>
+        </div>
+        <!-- Pillars -->
+        <div class="box gold span-4 fade">
+          <div class="cap">One score, six pillars</div>
+          <div class="pills" style="margin-top:.2rem">
+            <span class="pl"><b>●</b> Safety</span><span class="pl"><b>●</b> Privacy</span><span class="pl"><b>●</b> Reliability</span><span class="pl"><b>●</b> Explainability</span><span class="pl"><b>●</b> Transparency</span><span class="pl"><b>●</b> Fairness</span>
+          </div>
+          <p style="margin-top:.7rem">Every run rolls up to a single, defensible trust score — and the weakest pillar is always in view.</p>
+        </div>
+
+        <!-- Business value -->
+        <div class="box span-7 fade">
+          <div class="cap">Business value</div>
+          <div class="bento" style="grid-template-columns:repeat(2,1fr);gap:.9rem">
+            <div class="stat"><div class="big">Ship with confidence</div><div class="lbl">A clear gate replaces gut-feel sign-off — release when the evidence says so.</div></div>
+            <div class="stat coral"><div class="big">Reduce risk</div><div class="lbl">Catch unsafe behaviour before customers do, then continuously in production.</div></div>
+            <div class="stat gold"><div class="big">Stay audit-ready</div><div class="lbl">Every decision ships with an immutable evidence pack for risk &amp; regulators.</div></div>
+            <div class="stat sky"><div class="big">Lower the cost of trust</div><div class="lbl">Automate the manual-review army across every agent and version.</div></div>
+          </div>
+        </div>
+        <!-- Competitive -->
+        <div class="box sky span-5 fade">
+          <div class="cap">Competitive edge · the only closed loop</div>
+          <table class="cmp">
+            <thead><tr><th>Approach</th><th>Eval</th><th>Monitor</th><th>Heal</th><th>Audit</th></tr></thead>
+            <tbody>
+              <tr><th>Manual QA</th><td>~</td><td>—</td><td>—</td><td>~</td></tr>
+              <tr><th>Offline eval tools</th><td class="y">✓</td><td>—</td><td>—</td><td>~</td></tr>
+              <tr><th>Generic observability</th><td>—</td><td class="y">✓</td><td>—</td><td>~</td></tr>
+              <tr class="us"><th>Verity</th><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="footline fade">
+        <span class="fq">Trust, measured.</span>
+        <span class="fm">Verity · Evaluation · Observability · Self-Heal</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGE 2 · TECHNICAL OVERVIEW ============ -->
+  <section class="page" id="page2" role="tabpanel">
+    <div class="wrap">
+      <div class="eyebrow fade">Technical Overview · High-Level</div>
+      <div class="hero fade">
+        <h1>How the platform <em>actually works.</em></h1>
+        <p>A five-stage pipeline behind one secure API edge, with real agent telemetry and a closed remediation loop — the <strong>same code from a laptop to full production</strong>, no rewrite.</p>
+      </div>
+
+      <div class="bento">
+        <!-- Architecture -->
+        <div class="box sky span-12 fade">
+          <div class="cap">Architecture at a glance</div>
+          <div class="pipe">
+            <div class="stg"><div class="sn">EDGE</div><h4>One API</h4><p>Authns the tenant, freezes an immutable job, streams progress. No business logic — can’t drift.</p></div>
+            <div class="stg"><div class="sn">PIPELINE</div><h4>5 services</h4><p>Persona → Question → Run → Verdict → Evidence, each isolated &amp; independently scalable.</p></div>
+            <div class="stg"><div class="sn">TELEMETRY</div><h4>Real spans</h4><p>Agent emits an OpenTelemetry / OpenInference span tree per turn — your APM already speaks it.</p></div>
+            <div class="stg"><div class="sn">VERDICT</div><h4>Gate</h4><p>Calibrated LLM juries → six pillars → one go / no-go gate + an audit-ready evidence pack.</p></div>
+          </div>
+        </div>
+
+        <!-- Features -->
+        <div class="box span-12 fade">
+          <div class="cap">Features · eight surfaces, one lineage</div>
+          <div class="feat">
+            <div class="fc"><div class="fi">A</div><h4>Persona Lab</h4><p>Author &amp; version the synthetic users — adversarial, novice, frustrated.</p></div>
+            <div class="fc"><div class="fi">B</div><h4>Question Gen</h4><p>Auto-generate hard seed sets with live phase progress.</p></div>
+            <div class="fc"><div class="fi">C</div><h4>Simulation</h4><p>Drive the real agent through history-grounded multi-turn runs.</p></div>
+            <div class="fc"><div class="fi">D</div><h4>Evaluation</h4><p>Judge juries score answers &amp; calibrate to a human baseline (κ).</p></div>
+            <div class="fc"><div class="fi">E</div><h4>Observability</h4><p>Span-tree traces, quality &amp; spend rollups, monitors.</p></div>
+            <div class="fc"><div class="fi">F</div><h4>Self-Heal</h4><p>Root-cause analysis, policy DSL, human-approved fixes.</p></div>
+            <div class="fc"><div class="fi">G</div><h4>Deploy Gate</h4><p>One severity-graded verdict per agent version.</p></div>
+            <div class="fc"><div class="fi">H</div><h4>Evidence Packs</h4><p>Immutable, versioned bundles — the audit trail.</p></div>
+          </div>
+        </div>
+
+        <!-- UX journey -->
+        <div class="box span-12 fade">
+          <div class="cap">User experience · one journey, end to end</div>
+          <div class="jrow">
+            <div class="jc"><div class="js">Persona Lab</div><h4>Pick who tests it</h4><p>Choose a persona with a goal &amp; edge-case.</p></div>
+            <div class="jc"><div class="js">QGen · Sim</div><h4>Generate &amp; run</h4><p>Watch questions form and the agent answer live.</p></div>
+            <div class="jc"><div class="js">Evaluation</div><h4>Score with a jury</h4><p>Per-juror verdicts &amp; rationale.</p></div>
+            <div class="jc"><div class="js">Dashboard</div><h4>Read the verdict</h4><p>Severity hero shows go / no-go + weakest pillar.</p></div>
+            <div class="jc"><div class="js">Observability</div><h4>Trace &amp; monitor</h4><p>Open the real span tree behind any answer.</p></div>
+            <div class="jc"><div class="js">Self-Heal</div><h4>Approve the fix</h4><p>Review root cause, approve to ship.</p></div>
+          </div>
+        </div>
+
+        <!-- Technical benefits -->
+        <div class="box span-12 fade">
+          <div class="cap">Technical benefits · engineered to be trusted</div>
+          <div class="bento" style="grid-template-columns:repeat(3,1fr);gap:.9rem">
+            <div class="stat sky"><div class="big">Laptop → production</div><div class="lbl">Zero-infra in one process; one switch points identical code at ScyllaDB, NATS &amp; MinIO.</div></div>
+            <div class="stat"><div class="big">Provider-agnostic</div><div class="lbl">Model fallback chain (GPT-4 → open-weight → offline) — no lock-in, always boots.</div></div>
+            <div class="stat gold"><div class="big">Immutable &amp; versioned</div><div class="lbl">Personas, runs, verdicts &amp; evidence are append-only — replays exactly.</div></div>
+            <div class="stat"><div class="big">Idempotent</div><div class="lbl">Identical inputs return the original result; redelivery is a no-op.</div></div>
+            <div class="stat coral"><div class="big">Tenant-isolated</div><div class="lbl">Tenancy is physical — the top-level partition on every key.</div></div>
+            <div class="stat sky"><div class="big">Standards-native</div><div class="lbl">Real OTel / OpenInference traces plug into the stack you run.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footline fade">
+        <span class="fq">The same code, from proof of concept to production.</span>
+        <span class="fm">Persona · Question · Run · Verdict · Evidence · Heal</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const pages={1:document.getElementById('page1'),2:document.getElementById('page2')};
+  const subs={1:'Executive Brief',2:'Technical Overview'};
+  const tabBtns=[...document.querySelectorAll('.tabs button')];
+  const brandsub=document.getElementById('brandsub');
+  function show(p){
+    for(const k in pages) pages[k].classList.toggle('on',+k===p);
+    tabBtns.forEach(b=>b.classList.toggle('on',+b.dataset.p===p));
+    brandsub.textContent=subs[p];
+    // re-arm stagger
+    pages[p].querySelectorAll('.fade').forEach(el=>{el.style.animation='none';el.offsetHeight;el.style.animation='';});
+  }
+  tabBtns.forEach(b=>b.onclick=()=>show(+b.dataset.p));
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'){show(2);} else if(e.key==='ArrowLeft'){show(1);}
+  });
+  // theme
+  const root=document.documentElement, tb=document.getElementById('theme'), KEY='aibc-theme';
+  const saved=localStorage.getItem(KEY);
+  if(saved) root.setAttribute('data-theme',saved);
+  else if(matchMedia('(prefers-color-scheme: light)').matches) root.setAttribute('data-theme','light');
+  tb.onclick=()=>{const t=root.getAttribute('data-theme')==='light'?'dark':'light';root.setAttribute('data-theme',t);localStorage.setItem(KEY,t);};
+})();
+</script>
+</body>
+</html>
