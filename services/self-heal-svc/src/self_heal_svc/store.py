@@ -8,6 +8,8 @@ in the single table. Seed data is written once per tenant on first access
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from eeof_core.config import settings
 from eeof_core.dataplane import get_table, keys
 from eeof_core.models import (
@@ -19,13 +21,45 @@ from eeof_core.models import (
 
 from .seed import SEED_ACTIONS, SEED_INCIDENTS, SEED_POLICIES
 
-# Median MTTR is a rolling aggregate the worker would maintain; used as a demo
-# figure only when there are actually resolved incidents to attribute it to.
-_MEDIAN_MTTR = "18m"
-
 
 def _status_of(inc: dict) -> str:
     return inc.get("status", "open")
+
+
+def _parse_iso(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _fmt_duration(seconds: float) -> str:
+    """Compact human MTTR label: 45s / 12m / 3h 5m."""
+    secs = int(round(seconds))
+    if secs < 60:
+        return f"{secs}s"
+    mins = secs // 60
+    if mins < 60:
+        return f"{mins}m"
+    return f"{mins // 60}h {mins % 60}m"
+
+
+def _median_mttr(resolved: list[SelfHealIncident]) -> str:
+    """Real median time-to-resolve over closed incidents (opened_at → resolved_at).
+    Returns '—' when nothing has actually resolved — never a fabricated constant."""
+    deltas: list[float] = []
+    for inc in resolved:
+        opened, closed = _parse_iso(inc.opened_at), _parse_iso(inc.resolved_at)
+        if opened and closed and closed >= opened:
+            deltas.append((closed - opened).total_seconds())
+    if not deltas:
+        return "—"
+    deltas.sort()
+    mid = len(deltas) // 2
+    median = deltas[mid] if len(deltas) % 2 else (deltas[mid - 1] + deltas[mid]) / 2
+    return _fmt_duration(median)
 
 
 async def ensure_seeded(tenant: str) -> None:
@@ -107,6 +141,15 @@ async def list_policies(tenant: str) -> list[Policy]:
     return [Policy.model_validate(r["data"]) for r in rows]
 
 
+async def save_policy(tenant: str, policy: Policy) -> None:
+    await get_table().put({
+        "PK": keys.heal_policy_pk(tenant),
+        "SK": keys.heal_policy_sk(policy.name),
+        "type": "heal_policy",
+        "data": policy.model_dump(mode="json"),
+    })
+
+
 async def list_actions(tenant: str) -> list[RemediationAction]:
     await ensure_seeded(tenant)
     rows = await get_table().query(keys.heal_action_pk(tenant), "HEAL_ACTION#")
@@ -133,6 +176,6 @@ async def summary(tenant: str) -> SelfHealSummary:
     return SelfHealSummary(
         open_incidents=open_count,
         auto_resolved_24h=len(resolved),
-        median_mttr=_MEDIAN_MTTR if resolved else "—",
+        median_mttr=_median_mttr(resolved),
         active_policies=len(policies),
     )

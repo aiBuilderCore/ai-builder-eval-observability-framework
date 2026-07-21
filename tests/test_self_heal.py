@@ -41,7 +41,7 @@ async def test_seed_is_idempotent_and_populated():
     await ensure_seeded(TENANT)  # second call must not duplicate
     incs = await list_incidents(TENANT)
     assert len(incs) == 6
-    assert len(await list_policies(TENANT)) == 3
+    assert len(await list_policies(TENANT)) == 4
 
 
 @pytest.mark.asyncio
@@ -49,7 +49,7 @@ async def test_summary_counts_open_incidents():
     s = await summary(TENANT)
     # 6 seeded, one resolved (INC-988) => 5 open.
     assert s.open_incidents == 5
-    assert s.active_policies == 3
+    assert s.active_policies == 4
 
 
 @pytest.mark.asyncio
@@ -132,3 +132,114 @@ async def test_breach_opens_a_real_incident_detect_only():
     assert again == []
     rows2 = await get_table().query(keys.heal_incident_pk(tenant), "HEAL_INCIDENT#")
     assert len(rows2) == 1
+
+
+@pytest.mark.asyncio
+async def test_policy_matches_by_structured_scope_and_captures_baseline():
+    """With policies seeded, a breach is matched to the governing policy by its
+    structured dimensions + agent scope, and a real passing trace is captured as
+    the RCA baseline (mixed pass/fail group)."""
+    from eeof_core.models import VerdictSet
+    from eeof_core.self_heal_detect import detect_incidents
+
+    tenant = "acme-policy"
+    await ensure_seeded(tenant)  # loads the 4 built-in policies
+    vs = VerdictSet(
+        id=new_id("verdict_set"), tenant=tenant, workspace=WS,
+        run_ids=["sim_run1"], judge_refs=["no_financial_advice@v1"],
+    )
+    # 3 fail + 2 pass (0.60 budget < 0.10 → breach); the passes seed the baseline.
+    verdicts = (
+        [_verdict(vs.id, "no_financial_advice", False, 0.40, i) for i in range(3)]
+        + [_verdict(vs.id, "no_financial_advice", True, 0.95, 10 + i) for i in range(2)]
+    )
+    await detect_incidents(tenant, vs, verdicts, "RetireWell (guardrail-regression)")
+    inc = await get_incident(tenant, "inc_" + __import__("hashlib").sha256(
+        f"{vs.id}:no_financial_advice".encode()).hexdigest()[:12])
+    assert inc is not None
+    # finance_guardrail_v1 governs no_financial_advice, scoped to agent ~"retire".
+    assert inc.policy == "finance_guardrail_v1"
+    assert inc.band is None  # regulated agent → always escalate, no auto-ship band
+    assert inc.baseline_trace is not None and "pass" in inc.baseline_trace.meta
+
+
+@pytest.mark.asyncio
+async def test_author_policy_round_trips_and_governs():
+    """A newly authored policy persists with its structured scope and shows up in
+    the list — so the breach detector can match against it."""
+    from eeof_core.models import Policy
+
+    from self_heal_svc.seed import build_policy
+    from self_heal_svc.store import save_policy
+
+    tenant = "acme-newpol"
+    await ensure_seeded(tenant)
+    pol = Policy.model_validate(build_policy(
+        "safety_gate_v9", ["toxicity", "pii_leakage"], "support", None, True, "#trust",
+    ))
+    await save_policy(tenant, pol)
+    saved = [p for p in await list_policies(tenant) if p.name == "safety_gate_v9"]
+    assert saved, "authored policy should be listed"
+    s = saved[0]
+    assert s.dimensions == ["toxicity", "pii_leakage"]
+    assert s.agent == "support" and s.always_ticket and s.band is None
+    assert s.dsl  # rendered DSL present
+
+
+def test_build_policy_escapes_author_input():
+    """Author-supplied text is HTML-escaped before landing in DSL spans (the UI
+    renders DSL as innerHTML) — no injection."""
+    from self_heal_svc.seed import build_policy
+
+    p = build_policy('x"<b>evil</b>', ["toxicity"], "<i>", 0.9, False, "#c<d>")
+    dsl = "\n".join(p["dsl"])
+    assert "<b>" not in dsl and "<i>" not in dsl and "<d>" not in dsl
+    assert "&lt;b&gt;" in dsl  # the raw tag was escaped, not dropped
+
+
+def test_playbook_covers_every_judge_and_is_trace_grounded():
+    """Every built-in judge has an agent-side recommendation, the fallback is
+    sensible, and no entry embeds fabricated code (we only have the trace)."""
+    from eeof_core.models.judge_catalog import CORE_JUDGES
+    from eeof_core.self_heal_playbook import (
+        DEFAULT_RECOMMENDATION,
+        recommendation_for,
+    )
+
+    for j in CORE_JUDGES:
+        rec = recommendation_for(j["name"])
+        assert rec["summary"] and rec["steps"], j["name"]
+        assert rec is not DEFAULT_RECOMMENDATION, f"{j['name']} missing a playbook entry"
+        # A prompt-clause fix requires flags to extract the offending text from the
+        # trace; behaviour dims carry neither. Never both-empty-yet-claiming-a-fix.
+        if rec.get("fix"):
+            assert rec.get("flags"), f"{j['name']} has a prompt fix but no flags to anchor it"
+
+    # Unknown dimension → the generic fallback, still actionable.
+    assert recommendation_for("something_unmapped")["steps"]
+    assert recommendation_for(None) is DEFAULT_RECOMMENDATION
+
+
+@pytest.mark.asyncio
+async def test_median_mttr_is_real_or_dash():
+    """MTTR is computed from opened_at→resolved_at, never a fabricated constant:
+    a clean tenant with no resolved incidents reports '—'."""
+    from datetime import timedelta
+
+    from eeof_core.models import SelfHealIncident
+    from eeof_core.models.common import iso, utcnow
+    from self_heal_svc.store import _median_mttr
+
+    assert _median_mttr([]) == "—"
+    opened = utcnow()
+    incs = [
+        SelfHealIncident(
+            id="i1", agent="a", failure="f", status="resolved",
+            opened_at=iso(opened), resolved_at=iso(opened + timedelta(minutes=12)),
+        ),
+        SelfHealIncident(
+            id="i2", agent="a", failure="f", status="resolved",
+            opened_at=iso(opened), resolved_at=iso(opened + timedelta(minutes=8)),
+        ),
+    ]
+    assert _median_mttr(incs) == "10m"  # median of 8m and 12m

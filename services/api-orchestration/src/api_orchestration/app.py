@@ -26,6 +26,7 @@ from eeof_core.models import (
     MonitorDraft,
     PersonaDraft,
     PersonaRef,
+    PolicyDraft,
     Principal,
     RunRequest,
     SeedSet,
@@ -283,6 +284,7 @@ class EvalSubmit(BaseModel):
     mode: str = "panel"
     aggregation: str = "majority"
     mitigations: list[str] = Field(default_factory=list)
+    policy: str | None = None  # Self-Heal policy to govern this run's incidents
 
 
 @api.post("/evaluation/jobs", status_code=202)
@@ -310,6 +312,7 @@ async def create_eval(
         "judge_refs": refs,
         "judge_rubrics": rubrics,
         "aggregation": req.aggregation,
+        "policy": req.policy,  # frozen into the envelope → governs this run's incidents
     }
     return await submit_job(
         p, kind="evaluation.score", stage="eval", inputs=inputs, idempotency_key=idempotency_key
@@ -449,9 +452,19 @@ async def heal_policies(p: Principal = Depends(principal)):
     return await proxy("self-heal", "GET", "/self-heal/policies", p)
 
 
+@api.post("/self-heal/policies", status_code=201)
+async def heal_create_policy(draft: PolicyDraft, p: Principal = Depends(principal)):
+    return await proxy("self-heal", "POST", "/self-heal/policies", p, json=draft.model_dump())
+
+
 @api.get("/self-heal/registry")
 async def heal_registry(p: Principal = Depends(principal)):
     return await proxy("self-heal", "GET", "/self-heal/registry", p)
+
+
+@api.get("/self-heal/playbook")
+async def heal_playbook(p: Principal = Depends(principal)):
+    return await proxy("self-heal", "GET", "/self-heal/playbook", p)
 
 
 @api.get("/self-heal/quality")

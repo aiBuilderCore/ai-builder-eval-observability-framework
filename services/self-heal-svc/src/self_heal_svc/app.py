@@ -13,15 +13,18 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 
 from eeof_core.context import principal_from_headers
 from eeof_core.dataplane import get_bus
-from eeof_core.models import IncidentActionRequest, Principal
+from eeof_core.models import IncidentActionRequest, Policy, PolicyDraft, Principal
 
+from .seed import build_policy
 from .store import (
+    ensure_seeded,
     get_incident,
     get_quality,
     list_actions,
     list_incidents,
     list_policies,
     save_incident,
+    save_policy,
     summary,
 )
 from .worker import worker
@@ -94,9 +97,42 @@ async def policies(p: Principal = Depends(principal)) -> list[dict]:
     return [pol.model_dump(mode="json") for pol in await list_policies(p.tenant)]
 
 
+@app.post("/self-heal/policies", status_code=201)
+async def create_policy(draft: PolicyDraft, p: Principal = Depends(principal)) -> dict:
+    """Author a new governing policy from structured scope. The service derives the
+    human trigger + rendered DSL; matching stays structured (dimensions + agent)."""
+    name = (draft.name or "").strip()
+    if not name:
+        raise HTTPException(400, "policy name is required")
+    dims = [d.strip() for d in draft.dimensions if d and d.strip()]
+    if not dims:
+        raise HTTPException(400, "select at least one judge for the policy to govern")
+    band = None if draft.always_ticket else draft.band
+    if band is not None and not (0.0 <= band <= 1.0):
+        raise HTTPException(400, "confidence band must be between 0 and 1")
+    await ensure_seeded(p.tenant)
+    if any(pol.name == name for pol in await list_policies(p.tenant)):
+        raise HTTPException(409, f"a policy named '{name}' already exists")
+    policy = Policy.model_validate(build_policy(
+        name, dims, (draft.agent or "").strip() or None, band,
+        bool(draft.always_ticket), (draft.notify or "").strip(),
+    ))
+    await save_policy(p.tenant, policy)
+    return policy.model_dump(mode="json")
+
+
 @app.get("/self-heal/registry")
 async def registry(p: Principal = Depends(principal)) -> list[dict]:
     return [a.model_dump(mode="json") for a in await list_actions(p.tenant)]
+
+
+@app.get("/self-heal/playbook")
+async def playbook(p: Principal = Depends(principal)) -> dict:
+    """Agent-side remediation playbook keyed by judge dimension — the concrete
+    code/prompt-level fix behind each registry action category. Static core config."""
+    from eeof_core.self_heal_playbook import REMEDIATION_PLAYBOOK
+
+    return REMEDIATION_PLAYBOOK
 
 
 @app.get("/self-heal/quality")

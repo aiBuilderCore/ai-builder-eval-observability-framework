@@ -43,6 +43,23 @@
   SH.incidents = [];
   SH.registry = [];
   SH.policies = [];
+  SH.playbook = {};  // dimension → agent-side remediation recommendation
+
+  // Highlight the offending phrases (from the playbook) inside the real captured
+  // system prompt — showcases the exact incorrect prompt text that caused the breach.
+  function highlightFlags(text, flags) {
+    var safe = esc(text || "");
+    (flags || []).forEach(function (f) {
+      if (!f) return;
+      var ef = esc(f).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      try {
+        safe = safe.replace(new RegExp(ef, "gi"), function (m) {
+          return '<mark class="sh-flag">' + m + "</mark>";
+        });
+      } catch (e) { /* bad pattern → leave text as-is */ }
+    });
+    return safe;
+  }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
   function stageChip(stage) {
@@ -50,6 +67,20 @@
   }
   function dispoChip(inc) {
     return '<span class="chip chip--' + inc.dispoClass + '">' + esc(inc.dispo) + "</span>";
+  }
+
+  // C1 · one-line governance summary — which policy governs this incident and what
+  // it will do (auto-ship vs. escalate). Derived from the incident's policy + band.
+  function governanceLine(inc) {
+    if (!inc.policy) {
+      return '<p class="sh-gov sh-gov--none"><span class="sh-gov__k">policy</span>' +
+        "No governing policy — manual triage until one is bound.</p>";
+    }
+    var intent = inc.band == null
+      ? "always escalate for human sign-off"
+      : "auto-ship at confidence ≥ " + inc.band.toFixed(2) + ", else escalate";
+    return '<p class="sh-gov"><span class="sh-gov__k">policy</span>' +
+      "<b>" + esc(inc.policy) + "</b> → " + esc(intent) + "</p>";
   }
 
   function renderKpis() {
@@ -129,15 +160,39 @@
       : '<span class="sh-empty__sub">Loading the remediation registry from the edge…</span>';
   }
 
+  function policyMode(p) {
+    if (p.always_ticket) return { cls: "warn", label: "always escalate" };
+    if (p.band != null) return { cls: "ok", label: "auto-ship ≥ " + p.band.toFixed(2) };
+    return { cls: "idle", label: "escalate" };
+  }
+
   function renderPolicies() {
-    document.getElementById("policies").innerHTML = SH.policies.length
-      ? SH.policies.map(function (p) {
-          return (
-            '<p class="dsl__name">' + esc(p.name) + "</p>" +
-            '<pre class="dsl">' + p.lines.map(function (l) { return l[0]; }).join("\n") + "</pre>"
-          );
-        }).join("")
-      : '<span class="sh-empty__sub">Loading policies from the edge…</span>';
+    if (!SH.policies.length) {
+      document.getElementById("policies").innerHTML =
+        '<span class="sh-empty__sub">Loading policies from the edge…</span>';
+      return;
+    }
+    document.getElementById("policies").innerHTML = SH.policies.map(function (p) {
+      var mode = policyMode(p);
+      var dims = (p.dimensions || []).map(function (d) {
+        return '<span class="pol__judge">' + esc(d) + "</span>";
+      }).join("");
+      var meta = [];
+      meta.push("agent " + (p.agent ? esc(p.agent) + "*" : "any"));
+      if (p.notify) meta.push("notify " + esc(p.notify));
+      return (
+        '<div class="pol">' +
+        '  <div class="pol__head">' +
+        '    <span class="pol__name">' + esc(p.name) + "</span>" +
+        '    <span class="pol__mode pol__mode--' + mode.cls + '">' + esc(mode.label) + "</span>" +
+        "  </div>" +
+        (dims ? '<div class="pol__judges">' + dims + "</div>" : "") +
+        '  <p class="pol__meta">' + meta.join(" · ") + "</p>" +
+        '  <details class="pol__src"><summary>Policy DSL</summary>' +
+        '<pre class="dsl">' + p.lines.map(function (l) { return l[0]; }).join("\n") + "</pre></details>" +
+        "</div>"
+      );
+    }).join("");
   }
 
   // ── Incident modal ─────────────────────────────────────────────────────────
@@ -257,45 +312,155 @@
     return turns.length ? turns[turns.length - 1].text : "";
   }
 
+  // Clean a captured model label for display. The provider layer records the
+  // fallback CHAIN (e.g. "fallback(groq → echo)") on the span; a reviewer wants
+  // the model the agent effectively ran under — the last live link — not the
+  // internal chain string. Flag echo as offline so a generic completion reads honestly.
+  function cleanModel(raw) {
+    if (!raw) return { label: "—", offline: false };
+    var m = String(raw);
+    var inner = /^fallback\((.*)\)$/i.exec(m.trim());
+    if (inner) m = inner[1];
+    var links = m.split(/→|->|,/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var eff = links.length ? links[links.length - 1] : m.trim();
+    var offline = /echo/i.test(eff);
+    return { label: eff, offline: offline };
+  }
+
+  // Pull the system prompt / user turn / completion off a trace's OpenInference
+  // PROMPT+LLM spans — the verbatim record of what the agent ran under.
+  function readAgentView(detail) {
+    var spans = (detail && detail.spans) || [];
+    var prompt = pickSpan(spans, "PROMPT"), llm = pickSpan(spans, "LLM");
+    if (!prompt && !llm) return null;
+    var pa = (prompt && prompt.attrs) || {}, la = (llm && llm.attrs) || {};
+    var view = {
+      system: pa["input.value"] || la["llm.system"] || "",
+      completion: la["output.value"] || la["llm.output_messages.0.message.content"] || "",
+      user: lastUserMessage(la, detail),
+      model: cleanModel(la["gen_ai.request.model"]),
+      params: la["llm.invocation_parameters"] || "",
+      spanKinds: spans.map(function (s) { return s.kind; }),
+    };
+    if (!view.system && !view.completion && !view.user) return null;
+    return view;
+  }
+
+  // Recommended agent-side fix — trace-grounded (we have only the trace, not the
+  // agent's code). For prompt-fixable dimensions the "incorrect" side is the exact
+  // offending clause EXTRACTED FROM the trace's PROMPT span, and the recommendation
+  // is a prompt-clause replacement. Behaviour dimensions describe the trace signal
+  // and recommend changes — never fabricated code.
+  function recSection(rec, view, tid) {
+    if (!rec || !rec.summary) return "";
+    var offending = [];
+    (rec.flags || []).forEach(function (f) {
+      var re;
+      try { re = new RegExp(f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); } catch (e) { return; }
+      var m = re.exec(view.system || "");
+      if (m) offending.push(m[0]);
+    });
+    var diff = "";
+    if (offending.length && rec.fix) {
+      diff =
+        '<div class="sh-rec__snip sh-diag--diff">' +
+        '<span class="sh-diag__k">Prompt clause · from trace ' +
+        '<span class="sh-diagnosis__trace">' + esc(tid) + " · PROMPT span</span> → recommended</span>" +
+        '<div class="fixdiff">' +
+        '  <div class="fixdiff__row fixdiff__row--before"><span class="fixdiff__mark">from trace</span>' + esc(offending.join("  …  ")) + "</div>" +
+        '  <div class="fixdiff__row fixdiff__row--after"><span class="fixdiff__mark">recommend</span>' + esc(rec.fix) + "</div>" +
+        "</div></div>";
+    }
+    return (
+      '<p class="sh-eyebrow" style="margin-top:1.4rem;">Recommended fix · agent side' +
+      (rec.surface ? ' <span class="sh-rec__surface">' + esc(rec.surface) + "</span>" : "") + "</p>" +
+      '<p class="sh-rec__summary">' + esc(rec.summary) + "</p>" +
+      (rec.evidence ? '<p class="sh-rec__evi"><span class="sh-rec__evi-k">evidence</span>' + esc(rec.evidence) + "</p>" : "") +
+      diff +
+      '<ol class="sh-rec__steps">' +
+      (rec.steps || []).map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") +
+      "</ol>" +
+      (rec.reference ? '<p class="sh-rec__ref">Satisfies <b>' + esc(rec.reference) + "</b></p>" : "")
+    );
+  }
+
   // RCA diagnosis: lazily pull the exemplar flagged trace and surface *exactly*
   // what the agent ran under — the verbatim system prompt (guardrails in effect),
   // the user prompt, and the completion — captured on the trace's OpenInference
-  // PROMPT/LLM spans. This is the "understand completely what's going wrong" view:
-  // for a guardrail regression, the weakened system prompt is visible right here.
+  // PROMPT/LLM spans. When the run produced a PASSING trace for the same judge, we
+  // also fetch it and contrast the two completions (A1) — a real good-vs-flagged
+  // diff, not a fabricated baseline. Above it, a one-line attribution (A2).
   function hydrateDiagnosis(inc) {
     var host = document.getElementById("sh-diagnosis");
     if (!host) return;
     if (!window.EEOF || !inc.traces || !inc.traces.length) return; // seed/offline → stay hidden
     var tid = inc.traces[0].id;
+    var flaggedMeta = inc.traces[0].meta || "";
+    var baseId = inc.baseline_trace && inc.baseline_trace.id;
+    var rec = (SH.playbook && SH.playbook[inc.dimension]) || {};
+    var flags = rec.flags || [];
     host.hidden = false;
     host.innerHTML =
       '<p class="sh-eyebrow" style="margin-top:1.4rem;">RCA · what the agent saw</p>' +
       '<p class="sh-diagnosis__loading">Loading the flagged trace…</p>';
-    EEOF.get("/simulation/traces/" + encodeURIComponent(tid)).then(function (detail) {
-      var spans = (detail && detail.spans) || [];
-      var prompt = pickSpan(spans, "PROMPT"), llm = pickSpan(spans, "LLM");
-      if (!prompt && !llm) { host.hidden = true; return; }
-      var pa = (prompt && prompt.attrs) || {}, la = (llm && llm.attrs) || {};
-      var system = pa["input.value"] || la["llm.system"] || "";
-      var completion = la["output.value"] || la["llm.output_messages.0.message.content"] || "";
-      var user = lastUserMessage(la, detail);
-      var model = la["gen_ai.request.model"] || "—";
-      var params = la["llm.invocation_parameters"] || "";
-      if (!system && !completion && !user) { host.hidden = true; return; }
-      host.innerHTML =
+
+    var jobs = [EEOF.get("/simulation/traces/" + encodeURIComponent(tid))];
+    if (baseId) jobs.push(EEOF.get("/simulation/traces/" + encodeURIComponent(baseId)).catch(function () { return null; }));
+
+    Promise.all(jobs).then(function (res) {
+      var view = readAgentView(res[0]);
+      if (!view) { host.hidden = true; return; }
+      var base = res[1] ? readAgentView(res[1]) : null;
+
+      // A2 · attribution headline — cause class (pillar), breached judge, the
+      // failing span the breach was produced on, and the real failing score.
+      var pillar = (inc.pillars && inc.pillars[0]) || "Reliability";
+      var dim = inc.failure.replace(/ guardrail breach$/, "");
+      var failSpan = view.spanKinds.indexOf("LLM") >= 0 ? "LLM span" :
+        (view.spanKinds.indexOf("PROMPT") >= 0 ? "PROMPT span" : "agent span");
+      var scoreM = /score\s+([0-9.]+)/.exec(flaggedMeta);
+      var scoreTxt = scoreM ? "judge score " + scoreM[1] + " (below gate)" : "judge guardrail breached";
+      var modelTag = esc(view.model.label) + (view.model.offline ? ' <em class="sh-diag__off">offline</em>' : "");
+
+      var html =
         '<p class="sh-eyebrow" style="margin-top:1.4rem;">RCA · what the agent saw ' +
         '<span class="sh-diagnosis__trace">' + esc(tid) + "</span></p>" +
-        '<div class="sh-diagnosis__grid">' +
-        '  <div class="sh-diag"><span class="sh-diag__k">System prompt in effect · model ' + esc(model) +
-        '</span><pre class="sh-diag__v sh-diag__v--prompt">' + esc(system || "(not captured)") + "</pre></div>" +
-        '  <div class="sh-diag"><span class="sh-diag__k">User prompt</span>' +
-        '<pre class="sh-diag__v">' + esc(user || "(not captured)") + "</pre></div>" +
-        '  <div class="sh-diag"><span class="sh-diag__k">Agent completion</span>' +
-        '<pre class="sh-diag__v">' + esc(completion || "(not captured)") + "</pre></div>" +
+        '<div class="sh-attr">' +
+        '  <span class="sh-attr__k">cause class</span><span class="sh-attr__v">' + esc(pillar) + "</span>" +
+        '  <span class="sh-attr__k">judge</span><span class="sh-attr__v">' + esc(dim) + "</span>" +
+        '  <span class="sh-attr__k">span</span><span class="sh-attr__v">' + failSpan + "</span>" +
+        '  <span class="sh-attr__k">signal</span><span class="sh-attr__v">' + esc(scoreTxt) + "</span>" +
         "</div>" +
+        '<div class="sh-diagnosis__grid">' +
+        '  <div class="sh-diag"><span class="sh-diag__k">System prompt in effect · model ' + modelTag +
+        '</span><pre class="sh-diag__v sh-diag__v--prompt">' + (view.system ? highlightFlags(view.system, flags) : "(not captured)") + "</pre></div>" +
+        '  <div class="sh-diag"><span class="sh-diag__k">User prompt</span>' +
+        '<pre class="sh-diag__v">' + esc(view.user || "(not captured)") + "</pre></div>";
+
+      // A1 · per-judge completion contrast when a real passing trace exists.
+      // Framed strictly by THIS judge's verdict (failed vs. passed), not good-vs-bad:
+      // passing one judge is not the same as a better answer overall.
+      if (base && base.completion) {
+        html +=
+          '  <div class="sh-diag sh-diag--diff">' +
+          '<span class="sh-diag__k">Completion · this judge — failed vs. passed <span class="sh-diagnosis__trace">' + esc(baseId) + "</span></span>" +
+          '<div class="fixdiff">' +
+          '  <div class="fixdiff__row fixdiff__row--before"><span class="fixdiff__mark">failed</span>' + esc(view.completion || "(not captured)") + "</div>" +
+          '  <div class="fixdiff__row fixdiff__row--after"><span class="fixdiff__mark">passed</span>' + esc(base.completion) + "</div>" +
+          "</div></div>";
+      } else {
+        html +=
+          '  <div class="sh-diag"><span class="sh-diag__k">Agent completion · flagged</span>' +
+          '<pre class="sh-diag__v sh-diag__v--bad">' + esc(view.completion || "(not captured)") + "</pre></div>";
+      }
+
+      html += "</div>" +
         '<p class="sh-diagnosis__hint">Captured verbatim from the flagged trace’s OpenInference LLM span' +
-        (params ? " (" + esc(params) + ")" : "") +
-        ". Compare the guardrail text above against a passing trace to attribute the breach.</p>";
+        (view.params ? " (" + esc(view.params) + ")" : "") +
+        (base ? ". Both rows are real traces from this run: the top failed <b>" + esc(dim) + "</b>, the bottom passed it. The contrast is per-judge — a pass here is not necessarily a better answer overall (other guardrails may still flag it)."
+              : ". Compare the guardrail text above against a passing trace to attribute the breach.") + "</p>";
+      html += recSection(rec, view, tid);
+      host.innerHTML = html;
     }).catch(function () { host.hidden = true; });
   }
 
@@ -314,11 +479,10 @@
       '  <div class="sh-summary">' +
       '    <div class="sh-summary__row"><span class="sh-summary__id">' + esc(inc.id) + "</span>" +
       '      <span class="sh-summary__time">' + esc(inc.age) + "</span></div>" +
-      '    <p class="sh-summary__agent">' + esc(inc.agent) + "</p>" +
-      '    <p class="sh-summary__failure">' + esc(inc.failure) + "</p>" +
       '    <span class="incident__tags">' +
       inc.pillars.map(function (p) { return '<span class="tag">' + esc(p) + "</span>"; }).join("") +
       "    </span>" +
+      governanceLine(inc) +
       "  </div>" +
       '  <p class="sh-eyebrow">Closed-loop progress</p>' +
       '  <ul class="tl">' + inc.timeline.map(tlItem).join("") + "</ul>" +
@@ -349,18 +513,36 @@
       }).join("") +
       "</div>";
     dialog.setAttribute("data-inc", inc.id);
+    lastFocused = document.activeElement;
     modal.hidden = false;
     modal.classList.add("is-open");
     document.body.style.overflow = "hidden";
     if (history.replaceState) history.replaceState(null, "", "#" + inc.id);
     hydrateDiagnosis(inc);
+    // Move focus into the dialog so keyboard/SR users aren't stranded behind the backdrop.
+    var first = dialog.querySelector("[data-close]");
+    if (first) first.focus();
   }
+
+  var lastFocused = null;
 
   function closeModal() {
     modal.classList.remove("is-open");
     modal.hidden = true;
     document.body.style.overflow = "";
     if (history.replaceState) history.replaceState(null, "", location.pathname + location.search);
+    if (lastFocused && lastFocused.focus) lastFocused.focus();
+    lastFocused = null;
+  }
+
+  // Keep Tab focus inside the open dialog.
+  function trapFocus(e) {
+    if (e.key !== "Tab" || !modal.classList.contains("is-open")) return;
+    var f = dialog.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
 
   var ACT_MSG = {
@@ -395,10 +577,111 @@
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
+    else trapFocus(e);
   });
   document.getElementById("new-policy").addEventListener("click", function () {
-    window.alert("New-policy authoring is stubbed in the mock — policies are read-only here.");
+    if (typeof SH.createPolicy === "function") openPolicyForm();
+    else window.alert("New-policy authoring needs the live edge — it's read-only offline.");
   });
+
+  // ── New-policy authoring form ────────────────────────────────────────────────
+  function openPolicyForm() {
+    var dims = Object.keys(SH.playbook || {});
+    if (!dims.length) {
+      dims = [
+        "helpfulness", "faithfulness", "answer_relevance", "hallucination",
+        "refusal_correctness", "coherence_multiturn", "role_adherence",
+        "factual_consistency", "toxicity", "tool_call_correctness",
+        "no_financial_advice", "regulatory_disclosure", "numeric_accuracy",
+        "pii_leakage", "demographic_fairness",
+      ];
+    }
+    var overlay = document.createElement("div");
+    overlay.className = "sh-modal is-open";
+    overlay.id = "policy-modal";
+    overlay.innerHTML =
+      '<div class="sh-modal__dialog sh-modal__dialog--form" role="dialog" aria-modal="true" aria-label="New policy">' +
+      '  <div class="sh-modal__head">' +
+      '    <div class="sh-modal__titles"><h2 class="sh-modal__title">New policy</h2>' +
+      '      <p class="sh-modal__sub">Govern which breaches auto-ship vs. escalate.</p></div>' +
+      '    <button class="sh-modal__x" type="button" data-pclose aria-label="Close">×</button>' +
+      "  </div>" +
+      '  <div class="sh-modal__body">' +
+      '    <form id="pform" novalidate>' +
+      '      <label class="pf__l" for="pf-name">Name</label>' +
+      '      <input class="pf__i" id="pf-name" name="name" autocomplete="off" placeholder="e.g. safety_gate_v1" />' +
+      '      <label class="pf__l">Governed judges</label>' +
+      '      <div class="pf__judges">' +
+      dims.map(function (d) {
+        return '<label class="pf__chk"><input type="checkbox" name="dim" value="' + esc(d) + '"> ' + esc(d) + "</label>";
+      }).join("") +
+      "      </div>" +
+      '      <label class="pf__l" for="pf-agent">Agent scope <span class="pf__opt">optional</span></label>' +
+      '      <input class="pf__i" id="pf-agent" name="agent" autocomplete="off" placeholder="any agent — or a fragment like “retire”" />' +
+      '      <label class="pf__l">Decision</label>' +
+      '      <div class="pf__modes">' +
+      '        <label class="pf__radio"><input type="radio" name="mode" value="escalate" checked> Always escalate <span class="pf__hint">human sign-off</span></label>' +
+      '        <label class="pf__radio"><input type="radio" name="mode" value="ship"> Auto-ship at confidence ≥ <input type="number" name="band" class="pf__num" min="0" max="1" step="0.01" value="0.85" disabled></label>' +
+      "      </div>" +
+      '      <label class="pf__l" for="pf-notify">Notify channel</label>' +
+      '      <input class="pf__i" id="pf-notify" name="notify" autocomplete="off" placeholder="#ai-quality" />' +
+      '      <p class="pf__err" id="pf-err" hidden></p>' +
+      '      <div class="sh-actions">' +
+      '        <button type="submit" class="btn btn--primary">Create policy</button>' +
+      '        <button type="button" class="btn" data-pclose>Cancel</button>' +
+      "      </div>" +
+      "    </form>" +
+      "  </div>" +
+      "</div>";
+    document.body.appendChild(overlay);
+    document.body.style.overflow = "hidden";
+    var form = overlay.querySelector("#pform");
+    var errEl = overlay.querySelector("#pf-err");
+    var bandInput = overlay.querySelector('input[name="band"]');
+    var nameInput = overlay.querySelector("#pf-name");
+    if (nameInput) nameInput.focus();
+
+    function close() {
+      overlay.remove();
+      if (!modal.classList.contains("is-open")) document.body.style.overflow = "";
+    }
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay || e.target.closest("[data-pclose]")) close();
+    });
+    overlay.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+    overlay.querySelectorAll('input[name="mode"]').forEach(function (r) {
+      r.addEventListener("change", function () {
+        bandInput.disabled = overlay.querySelector('input[name="mode"]:checked').value !== "ship";
+      });
+    });
+    function fail(msg) { errEl.textContent = msg; errEl.hidden = false; }
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = form.name.value.trim();
+      var dimsSel = Array.prototype.slice
+        .call(form.querySelectorAll('input[name="dim"]:checked'))
+        .map(function (c) { return c.value; });
+      var mode = form.querySelector('input[name="mode"]:checked').value;
+      if (!name) return fail("Give the policy a name.");
+      if (!dimsSel.length) return fail("Select at least one judge to govern.");
+      var band = null, alwaysTicket = true;
+      if (mode === "ship") {
+        band = parseFloat(form.band.value);
+        alwaysTicket = false;
+        if (isNaN(band) || band < 0 || band > 1) return fail("Confidence band must be between 0 and 1.");
+      }
+      errEl.hidden = true;
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true; btn.textContent = "Creating…";
+      SH.createPolicy({
+        name: name, dimensions: dimsSel, agent: form.agent.value.trim() || null,
+        band: band, always_ticket: alwaysTicket, notify: form.notify.value.trim(),
+      }).then(close).catch(function (err) {
+        btn.disabled = false; btn.textContent = "Create policy";
+        fail((err && err.message) || "Create failed against the edge.");
+      });
+    });
+  }
 
   function renderAll() {
     renderKpis();
@@ -440,7 +723,17 @@
   }
   function mapPolicy(p) {
     // The DSL renderer expects `lines` as [[html]]; the API returns `dsl` as [html].
-    return { name: p.name, lines: (p.dsl || []).map(function (l) { return [l]; }) };
+    // Structured scope (dimensions/agent/band/…) drives the refined policy card.
+    return {
+      name: p.name,
+      lines: (p.dsl || []).map(function (l) { return [l]; }),
+      dimensions: p.dimensions || [],
+      agent: p.agent || null,
+      band: (p.band === undefined ? null : p.band),
+      always_ticket: !!p.always_ticket,
+      notify: p.notify || "",
+      trigger: p.trigger || "",
+    };
   }
 
   var poll = null;
@@ -453,11 +746,13 @@
         EEOF.get("/self-heal/policies"),
         EEOF.get("/self-heal/registry"),
         EEOF.get("/self-heal/summary"),
+        EEOF.get("/self-heal/playbook").catch(function () { return {}; }),
       ]);
       SH.incidents = (res[0] || []).map(mapIncident);
       SH.policies = (res[1] || []).map(mapPolicy);
       SH.registry = (res[2] || []).map(function (a) { return a.name; });
       SH.summary = res[3] || null;
+      SH.playbook = res[4] || {};
       // Don't repaint over an open modal mid-read; refresh the list underneath.
       SH.renderAll();
       // Deep link (/self-heal/#inc_…) — incidents are live-only now, so re-open
@@ -468,6 +763,28 @@
       }
     } catch (e) { /* transient edge blip — keep last good render */ }
   }
+
+  // Author a policy against the live edge, then refresh the list + KPI count.
+  // Surfaces the edge's `detail` message (e.g. duplicate name) to the form.
+  SH.createPolicy = async function (draft) {
+    try {
+      await EEOF.post("/self-heal/policies", draft);
+    } catch (e) {
+      // req() throws "<status> <json>"; the edge proxy nests `detail` inside
+      // `detail`, so drill through until we reach the human string.
+      var msg = (e && e.message) || "create failed";
+      var m = /^\d+\s+(.*)$/.exec(msg);
+      if (m) {
+        try {
+          var d = JSON.parse(m[1]);
+          while (d && typeof d === "object") d = d.detail;
+          msg = (typeof d === "string" && d) || m[1];
+        } catch (_) { msg = m[1]; }
+      }
+      throw new Error(msg);
+    }
+    await hydrate();
+  };
 
   // Human verdict → live endpoint. approve ships async (202 + job); the poll
   // picks up the resolved incident. ticket/reject mutate synchronously.
