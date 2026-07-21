@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verity — Executive Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ VERITY DECK ENGINE — shared aesthetic ============ */
+:root{
+  --ink:#0C0E12; --ink-2:#12151B; --ink-3:#181C24;
+  --paper:#F3F0E7; --paper-dim:#C3C0B6;
+  --muted:#8B94A1; --muted-2:#616a76;
+  --line:rgba(243,240,231,.10); --line-2:rgba(243,240,231,.18);
+  --signal:#BFF04A; --signal-ink:#0C0E12; --signal-dim:rgba(191,240,74,.14);
+  --gold:#E7B45C; --gold-dim:rgba(231,180,92,.14);
+  --coral:#FF6E5B; --coral-dim:rgba(255,110,91,.13);
+  --sky:#7EC8E3;
+  --serif:"Fraunces",Georgia,serif;
+  --sans:"Geist","Segoe UI",system-ui,sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",monospace;
+  --canvas:var(--ink); --raise:var(--ink-2); --raise-2:var(--ink-3);
+  --fg:var(--paper); --fg-dim:var(--paper-dim);
+}
+:root[data-theme="light"]{
+  --canvas:#F4F1E8; --raise:#FBF9F3; --raise-2:#FFFFFF;
+  --fg:#191B20; --fg-dim:#4C505A; --muted:#6b7480; --muted-2:#98a0ab;
+  --line:rgba(25,27,32,.10); --line-2:rgba(25,27,32,.16);
+  --signal:#5B8C10; --signal-ink:#FBF9F3; --signal-dim:rgba(91,140,16,.12);
+  --gold:#B7791F; --gold-dim:rgba(183,121,31,.12);
+  --coral:#D6482F; --coral-dim:rgba(214,72,47,.10);
+  --sky:#2E7DA6; --paper:#191B20;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--canvas); color:var(--fg);
+  font-family:var(--sans); font-weight:400;
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+  transition:background .5s ease,color .5s ease;
+}
+/* atmospheric backdrop */
+body::before{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(900px 600px at 82% -8%,var(--signal-dim),transparent 60%),
+    radial-gradient(760px 620px at -6% 108%,var(--gold-dim),transparent 62%);
+  opacity:.9; transition:opacity .5s;
+}
+body::after{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px; -webkit-mask-image:radial-gradient(circle at 50% 40%,#000,transparent 78%);
+  mask-image:radial-gradient(circle at 50% 40%,#000,transparent 78%); opacity:.5;
+}
+
+/* ---------- slide framework ---------- */
+.deck{position:relative;height:100vh;width:100vw;z-index:1}
+.slide{
+  position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+  padding:clamp(2.2rem,6vw,7rem);opacity:0;visibility:hidden;pointer-events:none;
+  transform:translateY(18px) scale(.994);
+  transition:opacity .6s cubic-bezier(.2,.7,.2,1),transform .6s cubic-bezier(.2,.7,.2,1),visibility .6s;
+}
+.slide.active{opacity:1;visibility:visible;pointer-events:auto;transform:none}
+.slide-inner{width:100%;max-width:1180px;margin:0 auto}
+
+/* staggered reveal */
+.slide.active .rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) backwards}
+.slide.active .rise:nth-child(1){animation-delay:.06s}
+.slide.active .rise:nth-child(2){animation-delay:.14s}
+.slide.active .rise:nth-child(3){animation-delay:.22s}
+.slide.active .rise:nth-child(4){animation-delay:.30s}
+.slide.active .rise:nth-child(5){animation-delay:.38s}
+.slide.active .rise:nth-child(6){animation-delay:.46s}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+
+/* ---------- type ---------- */
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--signal);display:flex;align-items:center;gap:.7rem;margin-bottom:1.5rem;font-weight:500;
+}
+.eyebrow::before{content:"";width:26px;height:1px;background:var(--signal)}
+h1.cover-title{font-family:var(--serif);font-weight:400;font-size:clamp(4rem,13vw,11rem);line-height:.9;letter-spacing:-.03em}
+h2{font-family:var(--serif);font-weight:400;font-size:clamp(2.1rem,5.2vw,4.1rem);line-height:1.02;letter-spacing:-.02em}
+h2 em{font-style:italic;color:var(--signal)}
+.lead{font-size:clamp(1.05rem,1.9vw,1.4rem);line-height:1.5;color:var(--fg-dim);max-width:60ch;font-weight:300}
+.kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+strong{font-weight:600;color:var(--fg)}
+.hi{color:var(--signal);font-weight:500}
+.hi-gold{color:var(--gold);font-weight:500}
+.hi-coral{color:var(--coral);font-weight:500}
+
+/* ---------- cover ---------- */
+.cover{gap:0}
+.cover .brandmark{display:flex;align-items:baseline;gap:1.1rem;margin-bottom:1.4rem}
+.cover .seal{
+  width:clamp(48px,7vw,84px);height:clamp(48px,7vw,84px);border-radius:50%;flex:none;
+  border:1.5px solid var(--signal);display:grid;place-items:center;position:relative;
+  box-shadow:0 0 40px var(--signal-dim);
+}
+.cover .seal::after{content:"";position:absolute;inset:9px;border-radius:50%;border:1px dashed var(--line-2)}
+.cover .seal span{font-family:var(--serif);font-size:clamp(1.4rem,2.6vw,2.4rem);color:var(--signal)}
+.cover-sub{margin-top:2rem;font-family:var(--serif);font-style:italic;font-size:clamp(1.3rem,2.7vw,2rem);color:var(--fg);max-width:24ch;line-height:1.2}
+.cover-desc{margin-top:1.5rem;max-width:52ch;color:var(--fg-dim);font-size:clamp(1rem,1.5vw,1.15rem);line-height:1.5;font-weight:300}
+.cover-meta{margin-top:3rem;display:flex;gap:.6rem;flex-wrap:wrap}
+.pill{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim);
+  border:1px solid var(--line-2);border-radius:100px;padding:.5rem .95rem;background:var(--raise)}
+
+/* ---------- layout helpers ---------- */
+.grid{display:grid;gap:1rem}
+.g-2{grid-template-columns:repeat(2,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-4{grid-template-columns:repeat(4,1fr)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,5vw,5rem);align-items:center}
+.mt-l{margin-top:2.6rem}.mt-m{margin-top:1.6rem}.mt-s{margin-top:.9rem}
+
+/* ---------- cards ---------- */
+.card{
+  background:linear-gradient(160deg,var(--raise),var(--raise-2));border:1px solid var(--line);
+  border-radius:16px;padding:1.5rem 1.5rem 1.55rem;position:relative;overflow:hidden;
+  transition:border-color .3s,transform .3s;
+}
+.card:hover{border-color:var(--line-2);transform:translateY(-3px)}
+.card .idx{font-family:var(--mono);font-size:.72rem;color:var(--muted);letter-spacing:.1em}
+.card h3{font-family:var(--serif);font-weight:500;font-size:1.32rem;margin:.5rem 0 .5rem;letter-spacing:-.01em}
+.card p{color:var(--fg-dim);font-size:.95rem;line-height:1.48;font-weight:300}
+.card .tick{position:absolute;top:0;left:0;width:3px;height:100%;background:var(--signal);opacity:.0;transition:opacity .3s}
+.card:hover .tick{opacity:1}
+.card.gold .tick{background:var(--gold)} .card.coral .tick{background:var(--coral)} .card.sky .tick{background:var(--sky)}
+
+/* problem list */
+.plist{display:flex;flex-direction:column;gap:.15rem;margin-top:1.8rem}
+.prow{display:grid;grid-template-columns:auto 1fr;gap:1.1rem;align-items:baseline;padding:1rem 0;border-top:1px solid var(--line)}
+.prow:last-child{border-bottom:1px solid var(--line)}
+.prow .n{font-family:var(--mono);font-size:.8rem;color:var(--coral)}
+.prow .t{font-size:1.05rem;line-height:1.4}
+.prow .t b{font-weight:600}
+.prow .t span{color:var(--muted);display:block;font-size:.9rem;margin-top:.2rem;font-weight:300}
+
+/* stat block */
+.stat{border-left:2px solid var(--signal);padding-left:1.3rem}
+.stat .big{font-family:var(--serif);font-size:clamp(2.6rem,6vw,4.4rem);line-height:1;letter-spacing:-.02em}
+.stat .lbl{color:var(--muted);font-size:.9rem;margin-top:.5rem;max-width:26ch;line-height:1.4;font-weight:300}
+.stat.gold{border-color:var(--gold)}.stat.coral{border-color:var(--coral)}
+
+/* pipeline */
+.pipe{display:flex;align-items:stretch;gap:.5rem;margin-top:2.4rem;flex-wrap:wrap}
+.stage{
+  flex:1 1 0;min-width:120px;background:var(--raise);border:1px solid var(--line);border-radius:13px;
+  padding:1.15rem 1rem 1.25rem;position:relative;transition:transform .3s,border-color .3s;
+}
+.stage:hover{transform:translateY(-4px);border-color:var(--signal)}
+.stage .sn{font-family:var(--mono);font-size:.7rem;color:var(--signal);letter-spacing:.1em}
+.stage h4{font-family:var(--serif);font-weight:500;font-size:1.12rem;margin:.55rem 0 .35rem}
+.stage p{font-size:.82rem;color:var(--muted);line-height:1.4;font-weight:300}
+.stage::after{content:"→";position:absolute;right:-.55rem;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:1rem;z-index:2}
+.stage:last-child::after{display:none}
+.loopnote{display:flex;align-items:center;gap:.9rem;margin-top:1.5rem;font-size:.95rem;color:var(--fg-dim);font-weight:300}
+.loopnote .cyc{font-family:var(--mono);color:var(--gold);font-size:.75rem;letter-spacing:.15em;border:1px solid var(--gold);border-radius:100px;padding:.35rem .8rem;white-space:nowrap}
+
+/* pillars strip */
+.pillars{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1.6rem}
+.pillars .pw{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;padding:.5rem .85rem;border-radius:100px;
+  border:1px solid var(--line-2);color:var(--fg-dim);background:var(--raise)}
+.pillars .pw b{color:var(--signal);font-weight:500}
+
+/* comparison table */
+.compare{width:100%;border-collapse:collapse;margin-top:1.8rem;font-size:.95rem}
+.compare th,.compare td{text-align:left;padding:.95rem 1rem;border-bottom:1px solid var(--line);vertical-align:top}
+.compare thead th{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.compare tbody th{font-weight:500;color:var(--fg);width:32%}
+.compare td{color:var(--fg-dim);font-weight:300}
+.compare .v{color:var(--signal)}
+.compare tr.verity{background:var(--signal-dim)}
+.compare tr.verity th,.compare tr.verity td{color:var(--fg);font-weight:400}
+.compare tr.verity th{font-weight:600}
+
+/* closing */
+.closing{align-items:flex-start}
+.closing h2{font-size:clamp(2.6rem,7vw,5.5rem)}
+.closing .sig{font-family:var(--mono);font-size:.78rem;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-top:2.4rem}
+
+/* ---------- chrome: nav ---------- */
+.chrome{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+  padding:1rem clamp(1.4rem,4vw,3rem);pointer-events:none}
+.chrome > *{pointer-events:auto}
+.wordmark{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.wordmark .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);box-shadow:0 0 10px var(--signal)}
+.nav{display:flex;align-items:center;gap:.5rem}
+.dots{display:flex;gap:.45rem;margin:0 .6rem}
+.dots button{width:8px;height:8px;border-radius:50%;border:none;background:var(--line-2);cursor:pointer;padding:0;transition:transform .3s,background .3s}
+.dots button.on{background:var(--signal);transform:scale(1.35)}
+.arrow{width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);background:var(--raise);color:var(--fg);
+  cursor:pointer;font-size:1rem;display:grid;place-items:center;transition:.25s}
+.arrow:hover{border-color:var(--signal);color:var(--signal)}
+.arrow:disabled{opacity:.28;cursor:default;border-color:var(--line)}
+.counter{font-family:var(--mono);font-size:.75rem;color:var(--muted);letter-spacing:.12em;min-width:64px;text-align:right}
+.themebtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);background:var(--raise);color:var(--fg);cursor:pointer;display:grid;place-items:center;transition:.25s}
+.themebtn:hover{border-color:var(--gold);color:var(--gold)}
+.topbar{position:fixed;top:0;left:0;right:0;height:2px;background:var(--line);z-index:20}
+.topbar i{display:block;height:100%;background:linear-gradient(90deg,var(--signal),var(--gold));width:0;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+.hint{position:fixed;top:1.1rem;right:clamp(1.4rem,4vw,3rem);z-index:20;font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;color:var(--muted-2);text-transform:uppercase}
+
+@media (max-width:820px){
+  .split{grid-template-columns:1fr;gap:1.6rem}
+  .g-2,.g-3,.g-4{grid-template-columns:1fr}
+  .pipe{flex-direction:column}.stage::after{content:"↓";right:50%;top:auto;bottom:-.55rem;transform:translateX(50%)}
+  .compare tbody th{width:auto}
+  .hint{display:none}
+  .slide{padding:2rem 1.3rem 5rem}
+}
+@media (max-width:560px){.g-4,.g-3{grid-template-columns:1fr}.dots{display:none}}
+</style>
+</head>
+<body>
+<div class="topbar"><i id="bar"></i></div>
+<div class="hint">← → to navigate</div>
+
+<div class="deck" id="deck">
+
+  <!-- 0 · COVER -->
+  <section class="slide active cover">
+    <div class="slide-inner">
+      <div class="brandmark rise">
+        <div class="seal"><span>V</span></div>
+        <h1 class="cover-title">Verity</h1>
+      </div>
+      <div class="eyebrow rise">Enterprise AI Agent Assurance</div>
+      <p class="cover-sub rise">Proof your AI agents are safe to ship.</p>
+      <p class="cover-desc rise">A single platform to stress-test, score, monitor, and self-heal the AI agents your business is putting in front of customers — turning <strong>“we think it’s fine”</strong> into defensible evidence.</p>
+      <div class="cover-meta rise">
+        <span class="pill">Executive Brief</span>
+        <span class="pill">Evaluation · Observability · Self-Heal</span>
+        <span class="pill">Board / Leadership</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 · PROBLEM -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="eyebrow rise">01 — The Problem</div>
+      <div class="split">
+        <div class="rise">
+          <h2>Enterprises are shipping AI agents they <em>can’t vouch for.</em></h2>
+          <p class="lead mt-m">A polished demo says nothing about how an agent behaves on its worst day — with an adversarial user, an edge-case question, or a compliance trap. Today that gap is invisible until a customer finds it.</p>
+        </div>
+        <div class="rise">
+          <div class="plist">
+            <div class="prow"><span class="n">01</span><span class="t"><b>Failures are invisible until they’re public.</b><span>Bad advice, hallucinated facts, leaked data, and off-policy answers surface in production, not in review.</span></span></div>
+            <div class="prow"><span class="n">02</span><span class="t"><b>Manual QA doesn’t scale.</b><span>Humans can’t re-test every agent, every version, against every risk — cost and coverage collapse.</span></span></div>
+            <div class="prow"><span class="n">03</span><span class="t"><b>No defensible “go / no-go.”</b><span>There is no single, trusted answer to “is this agent safe enough to deploy?”</span></span></div>
+            <div class="prow"><span class="n">04</span><span class="t"><b>Regulatory exposure is rising.</b><span>When something goes wrong, there’s no audit trail to show what was tested and why it shipped.</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · SOLUTION -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="eyebrow rise">02 — The Solution</div>
+      <h2 class="rise">Verity turns opinion into <em>evidence.</em></h2>
+      <p class="lead mt-m rise">It automatically stress-tests every agent, scores it across six trust pillars, issues a clear deploy verdict, watches it in production, and closes the loop by proposing fixes when it drifts — all in one control center.</p>
+      <div class="grid g-4 mt-l">
+        <div class="card rise"><span class="tick"></span><div class="idx">STEP 01</div><h3>Stress-test</h3><p>Realistic synthetic users probe the agent with hard, adversarial, and edge-case conversations — at machine scale.</p></div>
+        <div class="card rise gold"><span class="tick"></span><div class="idx">STEP 02</div><h3>Score &amp; gate</h3><p>Expert “judges” grade every answer and produce a single <span class="hi-gold">go / no-go</span> deploy gate.</p></div>
+        <div class="card rise sky"><span class="tick"></span><div class="idx">STEP 03</div><h3>Monitor</h3><p>Live observability tracks quality, spend, and drift the moment the agent is in front of real traffic.</p></div>
+        <div class="card rise coral"><span class="tick"></span><div class="idx">STEP 04</div><h3>Self-heal</h3><p>When quality breaches, Verity finds the root cause and proposes a fix for a human to approve.</p></div>
+      </div>
+      <div class="pillars mt-l rise">
+        <span class="pw"><b>●</b> Safety</span><span class="pw"><b>●</b> Privacy</span><span class="pw"><b>●</b> Reliability</span><span class="pw"><b>●</b> Explainability</span><span class="pw"><b>●</b> Transparency</span><span class="pw"><b>●</b> Fairness</span>
+        <span class="pw" style="border-color:var(--signal);color:var(--fg)">Six trust pillars, one score</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · HOW IT WORKS -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="eyebrow rise">03 — How It Works</div>
+      <div class="rise" style="max-width:64ch">
+        <h2>One pipeline, from question to <em>evidence.</em></h2>
+        <p class="lead mt-s">Every evaluation follows the same five stages — so results are repeatable, comparable, and auditable across agents and versions.</p>
+      </div>
+      <div class="pipe">
+        <div class="stage rise"><div class="sn">01</div><h4>Persona</h4><p>Define who tests the agent — novice, adversarial, frustrated, compliance-bait.</p></div>
+        <div class="stage rise"><div class="sn">02</div><h4>Question</h4><p>Generate hard, on-topic scenarios that push the agent’s limits.</p></div>
+        <div class="stage rise"><div class="sn">03</div><h4>Run</h4><p>Drive the real agent through full multi-turn conversations.</p></div>
+        <div class="stage rise"><div class="sn">04</div><h4>Verdict</h4><p>A jury of judges scores each answer across the six trust pillars.</p></div>
+        <div class="stage rise"><div class="sn">05</div><h4>Evidence</h4><p>Package the proof — scores, transcripts, and the deploy gate.</p></div>
+      </div>
+      <div class="loopnote rise"><span class="cyc">↻ CONTINUOUS LOOP</span><span>In production, <strong>Observability</strong> keeps scoring live traffic and <strong>Self-Heal</strong> feeds fixes back to the start — assurance never stops at launch.</span></div>
+    </div>
+  </section>
+
+  <!-- 4 · BUSINESS VALUE -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="eyebrow rise">04 — Business Value</div>
+      <h2 class="rise">Ship AI faster, with the <em>risk removed.</em></h2>
+      <div class="grid g-4 mt-l">
+        <div class="card rise"><span class="tick"></span><h3>Ship with confidence</h3><p>A clear deploy gate replaces gut-feel sign-off. Teams release when the evidence says it’s safe — not before, not late.</p></div>
+        <div class="card rise coral"><span class="tick"></span><h3>Reduce risk</h3><p>Catch unsafe, off-policy, and hallucinated behaviour <span class="hi-coral">before customers do</span> — and again continuously in production.</p></div>
+        <div class="card rise gold"><span class="tick"></span><h3>Stay audit-ready</h3><p>Every decision ships with an immutable evidence pack — the trail regulators and risk teams ask for.</p></div>
+        <div class="card rise sky"><span class="tick"></span><h3>Lower the cost of trust</h3><p>Automate the manual review army. One platform tests every agent, every version, at a fraction of the cost.</p></div>
+      </div>
+      <div class="grid g-3 mt-l">
+        <div class="stat rise"><div class="big">6</div><div class="lbl">trust pillars scored on every run — safety to fairness</div></div>
+        <div class="stat gold rise"><div class="big">1</div><div class="lbl">defensible go / no-go verdict per agent version</div></div>
+        <div class="stat coral rise"><div class="big">24/7</div><div class="lbl">production monitoring with closed-loop remediation</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · COMPETITIVE LANDSCAPE -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="eyebrow rise">05 — Competitive Landscape</div>
+      <div class="rise" style="max-width:66ch">
+        <h2>The only <em>closed loop.</em></h2>
+        <p class="lead mt-s">Others cover a slice — a test harness, a dashboard, a spreadsheet. Verity is the one system that spans pre-launch evaluation, live observability, and automatic remediation.</p>
+      </div>
+      <table class="compare rise">
+        <thead><tr><th>Approach</th><th>Pre-launch eval</th><th>Live monitoring</th><th>Closed-loop fix</th><th>Audit evidence</th></tr></thead>
+        <tbody>
+          <tr><th>Manual QA &amp; spreadsheets</th><td>Partial</td><td>—</td><td>—</td><td>Ad-hoc</td></tr>
+          <tr><th>Offline eval tools</th><td class="v">Yes</td><td>—</td><td>—</td><td>Limited</td></tr>
+          <tr><th>Generic APM / observability</th><td>—</td><td class="v">Yes</td><td>—</td><td>Logs only</td></tr>
+          <tr class="verity"><th>Verity</th><td class="v">Yes</td><td class="v">Yes</td><td class="v">Yes</td><td class="v">Immutable packs</td></tr>
+        </tbody>
+      </table>
+      <p class="kicker mt-m rise">Purpose-built for agent trust — six pillars, calibrated LLM juries, and provider-agnostic by design.</p>
+    </div>
+  </section>
+
+  <!-- 6 · CLOSING -->
+  <section class="slide closing">
+    <div class="slide-inner">
+      <div class="eyebrow rise">Verity</div>
+      <h2 class="rise">Trust, <em>measured.</em></h2>
+      <p class="lead mt-m rise">Give every AI agent a verdict you can defend — to your customers, your risk team, and your regulator.</p>
+      <div class="sig rise">Enterprise Evaluation · Observability · Self-Heal</div>
+    </div>
+  </section>
+
+</div>
+
+<!-- chrome -->
+<div class="chrome">
+  <div class="wordmark"><span class="dot"></span> Verity — Executive Brief</div>
+  <div class="nav">
+    <button class="arrow" id="prev" aria-label="Previous">‹</button>
+    <div class="dots" id="dots"></div>
+    <button class="arrow" id="next" aria-label="Next">›</button>
+    <span class="counter" id="counter">01 / 07</span>
+    <button class="themebtn" id="theme" aria-label="Toggle theme" title="Toggle light / dark">◑</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const slides=[...document.querySelectorAll('.slide')];
+  const dotsWrap=document.getElementById('dots');
+  const counter=document.getElementById('counter');
+  const bar=document.getElementById('bar');
+  const prev=document.getElementById('prev'), next=document.getElementById('next');
+  let i=0;
+  slides.forEach((_,n)=>{const b=document.createElement('button');b.onclick=()=>go(n);dotsWrap.appendChild(b);});
+  const dots=[...dotsWrap.children];
+  function go(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+    dots.forEach((d,k)=>d.classList.toggle('on',k===i));
+    counter.textContent=String(i+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');
+    bar.style.width=((i)/(slides.length-1)*100)+'%';
+    prev.disabled=i===0; next.disabled=i===slides.length-1;
+  }
+  next.onclick=()=>go(i+1); prev.onclick=()=>go(i-1);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1);}
+    else if(e.key==='Home')go(0); else if(e.key==='End')go(slides.length-1);
+  });
+  let x0=null;
+  addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
+  addEventListener('touchend',e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>55)go(i+(dx<0?1:-1));x0=null;},{passive:true});
+  // theme
+  const root=document.documentElement, tb=document.getElementById('theme');
+  const KEY='aibc-theme';
+  const saved=localStorage.getItem(KEY);
+  if(saved) root.setAttribute('data-theme',saved);
+  else if(matchMedia('(prefers-color-scheme: light)').matches) root.setAttribute('data-theme','light');
+  tb.onclick=()=>{const t=root.getAttribute('data-theme')==='light'?'dark':'light';root.setAttribute('data-theme',t);localStorage.setItem(KEY,t);};
+  go(0);
+})();
+</script>
+</body>
+</html>

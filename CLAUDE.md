@@ -120,3 +120,9 @@ intentionally keep seed data — see the README table.
 - **Don't hand-edit `uv.lock`.** `pyproject.toml` is the source of truth.
 - Optional backends (nats/boto3/anthropic) are lazy-imported; local mode must
   keep booting with only the base + dev groups installed.
+- **Branch prefix drives versioning.** `.github/workflows/version-bump.yml`
+  auto-tags on merge to `main` from the branch name: `feature/` → minor,
+  `fix/` → patch, and **`docs/` / `chore/` → no bump** (documentation and
+  housekeeping ship no runtime change, so they must not move the version).
+  Executive/marketing collateral lives in `executive_pagers/` — land it on a
+  `docs/` branch.

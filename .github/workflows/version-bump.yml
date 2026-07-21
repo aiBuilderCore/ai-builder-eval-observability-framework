@@ -3,8 +3,14 @@ name: version-bump
 # Auto-tag a new version every time a PR is merged into main.
 #
 #   branch contains 'feature/'  -> minor bump   (also the default when neither
-#                                                 'feature/' nor 'fix/' appears)
+#                                                 'feature/', 'fix/' nor 'docs/'
+#                                                 appears)
 #   branch contains 'fix/'      -> patch bump
+#   branch contains 'docs/'     -> NO bump       (documentation-only; skip tag)
+#   branch contains 'chore/'    -> NO bump       (housekeeping; skip tag)
+#
+# Documentation and chore branches ship no runtime change, so they must not move
+# the version. Merge them behind a 'docs/' or 'chore/' prefix to skip tagging.
 #
 # Roll-over: a component climbs until it reaches ROLLOVER (50), then it resets to
 # 0 and carries into the next-higher component:
@@ -60,12 +66,21 @@ jobs:
           patch="${rest#*.}"
 
           # Decide the bump from the merged branch name (substring match).
+          # docs/ and chore/ branches carry no runtime change -> skip tagging.
           case "$HEAD_REF" in
+            *docs/*)    bump=none ;;
+            *chore/*)   bump=none ;;
             *feature/*) bump=minor ;;
             *fix/*)     bump=patch ;;
             *)          bump=minor ;;
           esac
           echo "branch '$HEAD_REF' -> $bump bump"
+
+          if [ "$bump" = "none" ]; then
+            echo "documentation / chore branch — no version bump"
+            echo "### No version bump — \`${HEAD_REF}\` is a docs/chore branch" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           if [ "$bump" = "patch" ]; then
             patch=$((patch + 1))
