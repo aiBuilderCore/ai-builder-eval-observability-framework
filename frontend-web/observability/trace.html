@@ -89,9 +89,25 @@
     <h1 id="head-title">Loading trace…</h1>
     <p class="subtitle" id="head-subtitle"></p>
     <div class="meta-pills" id="head-pills"></div>
-    <div class="prompt-callout" id="prompt-callout" hidden>
-      <span class="prompt-callout__label">User prompt</span>
-      <p class="prompt-callout__text" id="prompt-callout-text"></p>
+    <div class="exchange" id="exchange" hidden>
+      <div class="exchange__turn exchange__turn--user">
+        <span class="exchange__avatar exchange__avatar--user" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M4 20c0-3.6 3.6-6 8-6s8 2.4 8 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </span>
+        <div class="exchange__body">
+          <div class="exchange__role">User prompt</div>
+          <div class="exchange__bubble" id="prompt-callout-text"></div>
+        </div>
+      </div>
+      <div class="exchange__turn exchange__turn--agent" id="response-turn" hidden>
+        <span class="exchange__avatar exchange__avatar--agent" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="exchange__body">
+          <div class="exchange__role">Agent response <span class="exchange__meta" id="response-meta"></span></div>
+          <div class="exchange__bubble" id="response-callout-text"></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -101,8 +117,8 @@
       <div class="section-head">
         <h2><em>Span tree</em></h2>
         <div class="actions">
-          <span style="color:var(--text-faint);">Every LLM call, tool call, retrieval, and inline judge for this conversation.
-            <abbr title="Spans use OpenInference span kinds + OTel GenAI semconv. EVALUATOR spans are the inline judge verdicts, linked to the run they scored.">what's a span?</abbr>
+          <span style="color:var(--text-faint);">Every LLM call, tool call, and retrieval the agent made on this turn.
+            <abbr title="Spans use OpenInference span kinds + OTel GenAI semconv. Judge verdicts are computed out-of-band by the evaluation service and shown below under Judge verdicts — they are not spans in this tree.">what's a span?</abbr>
           </span>
         </div>
       </div>
@@ -116,12 +132,12 @@
       <div id="session-host"></div>
 
       <div class="section-head">
-        <h2>Inline <em>verdicts</em></h2>
-        <div class="actions"><span style="color:var(--text-faint);">EVALUATOR spans · same <code>(judge_id @ version)</code> Evaluation uses</span></div>
+        <h2>Judge <em>verdicts</em></h2>
+        <div class="actions"><span style="color:var(--text-faint);">Out-of-band verdicts from the evaluation service · same <code>(judge_id @ version)</code> Evaluation uses</span></div>
       </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-3);box-shadow:0 1px 3px var(--shadow);" id="verdicts">
-        <div class="verdict-row" style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);">
-          <div>Judge</div><div>Score</div><div>Threshold</div><div style="text-align:right;">Pass</div>
+      <div class="verdict-table" id="verdicts">
+        <div class="verdict-row verdict-row--head">
+          <div>Judge</div><div class="num">Score</div><div class="num">Threshold</div><div class="verdict-pass-col">Verdict</div>
         </div>
         <div id="verdict-rows"></div>
       </div>
@@ -254,11 +270,42 @@
     document.getElementById('head-title').innerHTML =
       personaName + ' <span class="qualifier">— ' + B.escapeHtml(statusWord) + ' trace</span>';
 
-    // Always surface the verbatim prompt in the bounded callout (the h1 no longer
-    // carries it).
+    // Render the headline exchange — the verbatim user prompt and the
+    // application/adapter's reply — as a bounded chat pair (the h1 no longer
+    // carries the prompt).
     if (run.question) {
       document.getElementById('prompt-callout-text').textContent = run.question;
-      document.getElementById('prompt-callout').hidden = false;
+      document.getElementById('exchange').hidden = false;
+    }
+
+    // Agent response — the application/adapter's reply. The span waterfall hides
+    // the reply text (it lives inside a span's attrs), so surface it here. Prefer
+    // the last agent turn (`role: "agent"`, `text` = the /chat completion); fall
+    // back to the completion captured on the last LLM/PROMPT span.
+    const agentTurns = (run.turns || []).filter(t => t.role === 'agent' || t.role === 'assistant');
+    const lastAgent = agentTurns.length ? agentTurns[agentTurns.length - 1] : null;
+    let responseText = lastAgent ? (lastAgent.text || '') : '';
+    if (!responseText) {
+      const outSpan = [...(run.spans || [])].reverse().find(s => s.attrs &&
+        (s.attrs['output.value'] || s.attrs['gen_ai.completion'] || s.attrs['llm.output_messages']));
+      if (outSpan) {
+        const a = outSpan.attrs;
+        const raw = a['output.value'] || a['gen_ai.completion'] || a['llm.output_messages'];
+        responseText = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+      }
+    }
+    if (responseText) {
+      document.getElementById('response-callout-text').textContent = responseText;
+      if (lastAgent) {
+        const bits = [];
+        if (lastAgent.latency_ms) bits.push((lastAgent.latency_ms / 1000).toFixed(2) + 's');
+        if (lastAgent.tokens && (lastAgent.tokens.in != null || lastAgent.tokens.out != null)) {
+          bits.push('↓' + (lastAgent.tokens.in || 0) + ' ↑' + (lastAgent.tokens.out || 0) + ' tok');
+        }
+        document.getElementById('response-meta').textContent = bits.length ? '· ' + bits.join(' · ') : '';
+      }
+      document.getElementById('response-turn').hidden = false;
+      document.getElementById('exchange').hidden = false;
     }
 
     const personaMeta = run.persona ? B.escapeHtml(run.persona.id) + ' v' + (run.persona.version || 1) : '—';
@@ -270,13 +317,13 @@
       'session.id <b>' + B.escapeHtml(run.session_id) + '</b>' +
       (run.trail_class ? ' · <span class="trail-tag" data-cat="' + run.trail_class.split('.')[0].replace('_coordination', 'planning') + '">' + B.escapeHtml(run.trail_class) + '</span>' : '');
 
-    const spans = run.spans || [];
-    const evalCount = spans.filter(s => s.kind === 'EVALUATOR').length;
+    const spans = (run.spans || []).filter(s => s.kind !== 'EVALUATOR');
+    const verdictCount = (run.verdicts || []).length;
     const primaryPills = spans.length
       ? `<span class="pill pill--accent"><b>${spans.length}</b> spans</span>
-         <span class="pill"><b>${evalCount}</b> EVALUATOR</span>`
+         <span class="pill"><b>${verdictCount}</b> judge verdicts</span>`
       : `<span class="pill pill--accent"><b>${(run.turns || []).length}</b> turns</span>
-         <span class="pill"><b>${(run.verdicts || []).length}</b> inline verdicts</span>`;
+         <span class="pill"><b>${verdictCount}</b> judge verdicts</span>`;
     document.getElementById('head-pills').innerHTML = `
       ${primaryPills}
       <span class="pill">batch_id <b>${batch.batch_id}</b></span>
@@ -319,7 +366,7 @@
     const usedKinds = Array.from(new Set(spans.map(s => s.kind)));
     document.getElementById('legend').innerHTML = usedKinds.map(k => `
       <span><span class="swatch" style="background: var(--span-${k});"></span>${B.SPAN_KIND_LABELS[k] || k}</span>
-    `).join('') + (evalCount > 0 ? '<span style="margin-left:auto;color:rgba(235,235,235,0.55);">EVALUATOR spans are bordered green; numbers in the bar are <code style="color:#fff;background:transparent;border:0;">evaluator.score</code></span>' : '');
+    `).join('');
 
     // span click handler
     document.getElementById('chart-host').addEventListener('click', (e) => {
@@ -341,14 +388,22 @@
     });
 
     // ---- verdicts ----
-    document.getElementById('verdict-rows').innerHTML = (run.verdicts || []).map(v => `
-      <div class="verdict-row">
-        <div class="name">${B.escapeHtml(v.judge)}</div>
-        <div class="score">${v.score.toFixed(3)}</div>
-        <div class="threshold">≥ ${v.threshold.toFixed(2)}</div>
-        <div class="pass" data-pass="${v.pass}">${v.pass ? '✓ pass' : '✗ fail'}</div>
-      </div>
-    `).join('') || '<div class="verdict-row"><div style="color:var(--text-faint);grid-column:1/-1;text-align:center;font-family:var(--font-mono);">No inline verdicts captured for this run.</div></div>';
+    document.getElementById('verdict-rows').innerHTML = (run.verdicts || []).map(v => {
+      const pct = Math.max(0, Math.min(1, v.score)) * 100;
+      const thPct = Math.max(0, Math.min(1, v.threshold)) * 100;
+      return `
+      <div class="verdict-row" data-pass="${v.pass}">
+        <div class="verdict-judge"><span class="verdict-dot"></span>${B.escapeHtml(v.judge)}</div>
+        <div class="num verdict-score">
+          <span class="verdict-score__val">${v.score.toFixed(2)}</span>
+          <span class="verdict-meter" title="score ${v.score.toFixed(3)} · threshold ${v.threshold.toFixed(2)}">
+            <i style="width:${pct.toFixed(1)}%"></i><u style="left:${thPct.toFixed(1)}%"></u>
+          </span>
+        </div>
+        <div class="num verdict-threshold">≥ ${v.threshold.toFixed(2)}</div>
+        <div class="verdict-pass-col"><span class="verdict-badge" data-pass="${v.pass}">${v.pass ? '✓ Pass' : '✗ Fail'}</span></div>
+      </div>`;
+    }).join('') || '<div class="verdict-row verdict-row--empty">No judge verdicts captured for this run.</div>';
 
     // ---- root-cause callout ----
     const failingVerdicts = (run.verdicts || []).filter(v => !v.pass);

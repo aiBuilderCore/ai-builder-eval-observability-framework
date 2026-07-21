@@ -199,16 +199,18 @@
     batches.forEach(b => {
       totalRuns += b.run_count || 0;
       (b.runs || []).forEach(r => {
-        totalSpans += (r.spans || []).length;
-        // Judge verdicts are real backend data on each run; they also surface as
-        // the EVALUATOR spans appended to the trace's OpenInference span tree.
+        // Agent-execution spans only — evaluation is out-of-band, not spans.
+        totalSpans += (r.spans || []).filter(s => s.kind !== 'EVALUATOR').length;
+        // Judge verdicts are real backend data on each run, computed out-of-band
+        // by the evaluation service (shown in the run's Inline-verdicts table).
         totalEval += (r.verdicts || []).length;
       });
     });
     document.getElementById('pill-batches').textContent = batches.length;
     document.getElementById('pill-runs').textContent = totalRuns;
     // Spans are the real reconstructed agent lifecycle (AGENT·LLM·RETRIEVER·TOOL·
-    // GUARDRAIL·EVALUATOR), one per real turn / tool call / verdict — exact, not ~.
+    // GUARDRAIL), one per real turn / tool call — exact, not ~. Evaluation is
+    // out-of-band, so verdicts are counted separately, not as spans.
     document.getElementById('pill-spans').textContent = totalSpans;
     document.getElementById('pill-eval').textContent = totalEval;
 
