@@ -28,7 +28,9 @@
 .loop .stage__reuse {
   margin-top: 0.6rem; font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.04em; color: var(--accent);
+  display: inline-flex; align-items: center; gap: 5px;
 }
+.stage__reuse-icon { width: 12px; height: 12px; flex-shrink: 0; }
 
 /* ── Two-column body: incident queue + policy rail ───────────────────────── */
 .sh-body {
@@ -73,6 +75,18 @@
   font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint);
 }
 
+/* Pillar tags (Explainability, Reliability, …) are quiet metadata, not chips.
+   The shared chrome `.tag` rule paints them as bordered grey boxes with no
+   padding/radius (self-heal defines no `.tag` base); here they sit on plain
+   rows AND the accent-soft summary card, where a grey box reads as an artefact.
+   Render them as borderless, pill-padded soft labels that work on both. */
+html.aibc-chrome .incident__tags .tag {
+  display: inline-flex; align-items: center;
+  padding: 1px 8px; border-radius: 999px;
+  border: 0; background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--accent); font-size: 10px; letter-spacing: 0.04em;
+}
+
 /* Remediation Registry — the fixed action vocabulary. */
 .sh-registry { display: flex; flex-wrap: wrap; gap: 7px; padding: 0.2rem 0 0.1rem; }
 
@@ -105,10 +119,14 @@
   width: min(620px, 100%); background: var(--surface);
   border: 1px solid var(--border-strong); border-radius: var(--r-4);
   box-shadow: 0 24px 60px var(--shadow-strong); overflow: hidden;
+  /* Cap height so the head stays pinned and only the body scrolls (A6). */
+  max-height: calc(100vh - 2 * clamp(1rem, 5vh, 3.5rem));
+  display: flex; flex-direction: column;
 }
 .sh-modal__head {
   display: flex; align-items: flex-start; gap: 0.75rem;
   padding: 1.1rem 1.25rem 0.9rem; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 1; flex-shrink: 0;
 }
 .sh-modal__titles { min-width: 0; flex: 1 1 auto; }
 .sh-modal__title {
@@ -123,7 +141,7 @@
   cursor: pointer; font-size: 15px; line-height: 1;
 }
 .sh-modal__x:hover { background: var(--surface-alt); color: var(--text); }
-.sh-modal__body { padding: 1.1rem 1.25rem 1.35rem; }
+.sh-modal__body { padding: 1.1rem 1.25rem 1.35rem; overflow-y: auto; flex: 1 1 auto; }
 
 .sh-summary {
   padding: 0.85rem 1rem; border-radius: var(--r-2);
@@ -276,3 +294,75 @@
 .sh-diagnosis__hint {
   margin: 0.55rem 0 0; font-size: 11.5px; line-height: 1.5; color: var(--text-faint);
 }
+
+/* A2 · Attribution headline — cause class · judge · span · signal, as a compact
+   definition grid above the verbatim evidence. */
+.sh-attr {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
+  margin: 0.55rem 0 0.2rem; padding: 0.6rem 0.75rem; border-radius: var(--r-2);
+  background: var(--surface-alt); border: 1px solid var(--border);
+}
+.sh-attr__k {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-faint); align-self: baseline;
+}
+.sh-attr__v { font-family: var(--font-mono); font-size: 11px; color: var(--text); }
+
+/* A3 · offline (echo) model badge — the completion is synthetic, say so. */
+.sh-diag__off {
+  font-style: normal; color: var(--warn); text-transform: uppercase;
+  font-size: 8.5px; letter-spacing: 0.06em; margin-left: 5px;
+  padding: 0 4px; border: 1px solid var(--warn); border-radius: 4px;
+}
+
+/* A4 · the flagged completion is the failure — tint it like a diff's minus row. */
+.sh-diag__v--bad { border-left: 3px solid var(--err); color: var(--text); background: var(--err-bg); }
+
+/* A1 · flagged-vs-passing completion contrast reuses the .fixdiff grammar. */
+.sh-diag--diff .fixdiff { margin-top: 0.35rem; white-space: pre-wrap; }
+.sh-diag--diff .fixdiff__row {
+  white-space: pre-wrap; word-break: break-word;
+  display: grid; grid-template-columns: 52px 1fr; gap: 8px; align-items: baseline;
+}
+.sh-diag--diff .fixdiff__mark {
+  margin: 0; font-size: 8.5px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 2px 0; text-align: left;
+}
+
+/* C1 · governance line — which policy governs the incident + what it will do. */
+.sh-gov {
+  margin: 0.6rem 0 0; display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted);
+}
+.sh-gov__k {
+  text-transform: uppercase; font-size: 9px; letter-spacing: 0.08em; color: var(--accent);
+}
+.sh-gov b { color: var(--text); }
+.sh-gov--none { color: var(--text-faint); }
+
+/* B4 · refined Active-policies card — structured scope, not just raw DSL. */
+.pol { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+.pol:first-child { padding-top: 0.1rem; }
+.pol:last-child { border-bottom: 0; padding-bottom: 0.1rem; }
+.pol__head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.pol__name { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--text); }
+.pol__mode {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.02em;
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
+.pol__mode--warn { color: var(--warn); background: var(--warn-bg); }
+.pol__mode--ok   { color: var(--ok);   background: var(--ok-bg); }
+.pol__mode--idle { color: var(--text-faint); background: var(--surface-alt); }
+.pol__judges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.5rem; }
+.pol__judge {
+  font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted);
+  background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: 5px; padding: 1px 6px;
+}
+.pol__meta { margin: 0.5rem 0 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
+.pol__src { margin-top: 0.5rem; }
+.pol__src summary {
+  cursor: pointer; font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent);
+}
+.pol__src .dsl { margin-top: 0.5rem; }

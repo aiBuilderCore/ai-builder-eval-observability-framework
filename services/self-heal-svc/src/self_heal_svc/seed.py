@@ -20,50 +20,87 @@ SEED_ACTIONS: list[dict] = [
 ]
 
 # ── Policy DSL — declarative ship-vs-escalate contracts ──────────────────────
+# Scope is STRUCTURED: `dimensions` lists the judge names/dimensions a policy
+# governs and `agent` optionally scopes it (case-insensitive substring; None =
+# any agent). The breach detector matches on those fields, not on a substring of
+# `trigger` — so every built-in judge in `eeof_core.models.judge_catalog` that can
+# fire is covered by exactly one policy. `trigger`/`dsl` are display-only.
+def _dsl(name, on, gate, notify):
+    """Render one policy's highlighted DSL source lines from its structured parts."""
+    lines = [
+        f'<span class="k">policy</span> <span class="s">"{name}"</span> {{',
+        f'  <span class="k">on</span> {on}',
+        '  <span class="k">diagnose with</span> rca_agent <span class="k">and</span> simulate',
+        f"  {gate}",
+        f'  <span class="k">notify</span> <span class="s">"{notify}"</span>',
+        "}",
+    ]
+    return lines
+
+
 SEED_POLICIES: list[dict] = [
     {
-        "name": "client_assist_v3",
-        "trigger": "hallucination_rate > 0.10 from support_agent",
-        "band": 0.85,
-        "always_ticket": False,
-        "notify": "#ai-quality",
-        "dsl": [
-            '<span class="k">policy</span> <span class="s">"client_assist_v3"</span> {',
-            '  <span class="k">on</span> hallucination_rate &gt; <span class="n">0.10</span> <span class="k">from</span> support_agent',
-            '  <span class="k">diagnose with</span> rca_agent <span class="k">and</span> simulate',
-            '  <span class="k">if</span> confidence &gt;= <span class="n">0.85</span> <span class="k">then</span> ship_fix',
-            '  <span class="k">else</span> open_ticket <span class="k">and</span> notify <span class="s">"#ai-quality"</span>',
-            "}",
-        ],
-    },
-    {
-        "name": "rag_quality_v2",
-        "trigger": "context_overflow_rate > 0.02 from knowledge_search",
-        "band": 0.80,
-        "always_ticket": False,
-        "notify": "#ai-quality",
-        "dsl": [
-            '<span class="k">policy</span> <span class="s">"rag_quality_v2"</span> {',
-            '  <span class="k">on</span> context_overflow_rate &gt; <span class="n">0.02</span> <span class="k">from</span> knowledge_search',
-            '  <span class="k">diagnose with</span> rca_agent <span class="k">and</span> simulate',
-            '  <span class="k">if</span> confidence &gt;= <span class="n">0.80</span> <span class="k">then</span> apply(<span class="s">"re-rank tune"</span>)',
-            '  <span class="k">else</span> escalate',
-            "}",
-        ],
-    },
-    {
         "name": "finance_guardrail_v1",
-        "trigger": "no_financial_advice_breach > 0.005 from retirement_401k",
+        "trigger": "no_financial_advice · regulatory_disclosure · numeric_accuracy from retire*",
+        "dimensions": ["no_financial_advice", "regulatory_disclosure", "numeric_accuracy"],
+        "agent": "retire",
         "band": None,
         "always_ticket": True,
         "notify": "#compliance",
-        "dsl": [
-            '<span class="k">policy</span> <span class="s">"finance_guardrail_v1"</span> {',
-            '  <span class="k">on</span> no_financial_advice_breach &gt; <span class="n">0.005</span> <span class="k">from</span> retirement_401k',
-            '  <span class="k">diagnose with</span> rca_agent <span class="k">and</span> simulate',
-            '  <span class="k">always</span> open_ticket <span class="k">and</span> notify <span class="s">"#compliance"</span>',
-            "}",
+        "dsl": _dsl(
+            "finance_guardrail_v1",
+            'breach <span class="k">in</span> [no_financial_advice, regulatory_disclosure, numeric_accuracy] <span class="k">from</span> agent~<span class="s">"retire"</span>',
+            '<span class="k">always</span> open_ticket',
+            "#compliance",
+        ),
+    },
+    {
+        "name": "safety_trust_v1",
+        "trigger": "refusal_correctness · toxicity · pii_leakage · demographic_fairness from any agent",
+        "dimensions": ["refusal_correctness", "toxicity", "pii_leakage", "demographic_fairness"],
+        "agent": None,
+        "band": None,
+        "always_ticket": True,
+        "notify": "#trust-safety",
+        "dsl": _dsl(
+            "safety_trust_v1",
+            'breach <span class="k">in</span> [refusal_correctness, toxicity, pii_leakage, demographic_fairness]',
+            '<span class="k">always</span> open_ticket',
+            "#trust-safety",
+        ),
+    },
+    {
+        "name": "reliability_gate_v2",
+        "trigger": "hallucination · faithfulness · factual_consistency · answer_relevance · coherence_multiturn · helpfulness",
+        "dimensions": [
+            "hallucination", "faithfulness", "factual_consistency",
+            "answer_relevance", "coherence_multiturn", "helpfulness",
         ],
+        "agent": None,
+        "band": 0.85,
+        "always_ticket": False,
+        "notify": "#ai-quality",
+        "dsl": _dsl(
+            "reliability_gate_v2",
+            'breach <span class="k">in</span> [hallucination, faithfulness, factual_consistency, answer_relevance, coherence_multiturn, helpfulness]',
+            '<span class="k">if</span> confidence &gt;= <span class="n">0.85</span> <span class="k">then</span> ship_fix <span class="k">else</span> open_ticket',
+            "#ai-quality",
+        ),
+    },
+    {
+        "name": "agent_ops_v1",
+        "trigger": "tool_call_correctness · role_adherence from any agent",
+        "dimensions": ["tool_call_correctness", "role_adherence"],
+        "agent": None,
+        "band": 0.80,
+        "always_ticket": False,
+        "notify": "#ai-quality",
+        "dsl": _dsl(
+            "agent_ops_v1",
+            'breach <span class="k">in</span> [tool_call_correctness, role_adherence]',
+            '<span class="k">if</span> confidence &gt;= <span class="n">0.80</span> <span class="k">then</span> ship_fix <span class="k">else</span> escalate',
+            "#ai-quality",
+        ),
     },
 ]
 
@@ -179,6 +216,9 @@ SEED_INCIDENTS: list[dict] = [
         "id": "INC-988", "glyph": "chat", "agent": "Support Agent",
         "failure": "Refund-policy hallucination", "pillars": ["Reliability", "Safety"],
         "stage": "remediate", "age": "3 hours ago", "status": "resolved",
+        # Real open→close timestamps (≈16m, matching the timeline) so the derived
+        # median-MTTR KPI has genuine data to aggregate — not a fabricated constant.
+        "opened_at": "2026-07-21T09:00:00Z", "resolved_at": "2026-07-21T09:16:00Z",
         "dispo": "Auto-resolved · verified", "dispo_class": "ok",
         "policy": "client_assist_v3", "band": 0.85, "confidence": 0.91,
         "action": "Prompt rewrite · KB update",

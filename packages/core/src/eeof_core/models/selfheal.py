@@ -79,14 +79,25 @@ class SelfHealIncident(BaseModel):
     timeline: list[TimelineStep] = Field(default_factory=list)
     fix: Fix | None = None
     traces: list[IncidentTrace] = Field(default_factory=list)
+    baseline_trace: IncidentTrace | None = None  # a real PASSING trace for the same
+    # judge, when one exists in the run — lets RCA contrast a good vs. flagged answer
     opened_at: str = Field(default_factory=iso)
+    resolved_at: str | None = None  # stamped on auto-close/approve → feeds median MTTR
 
 
 class Policy(BaseModel):
-    """Declarative remediation policy — the ship-vs-escalate contract (Policy DSL)."""
+    """Declarative remediation policy — the ship-vs-escalate contract (Policy DSL).
+
+    `dimensions` + `agent` are the *structured* scope the matcher reads (a policy
+    governs a breach when the breached judge dimension is listed and the agent is
+    unscoped or matches). `trigger`/`dsl` stay for human-readable display only —
+    they are no longer substring-scanned for matching.
+    """
 
     name: str
-    trigger: str                 # e.g. "hallucination_rate > 0.10 from support_agent"
+    trigger: str                 # human-readable summary, e.g. "hallucination > thr from support_agent"
+    dimensions: list[str] = Field(default_factory=list)  # judge names/dimensions governed
+    agent: str | None = None     # agent scope (case-insensitive substring); None => any agent
     band: float | None = None    # confidence threshold to auto-ship; None => always escalate
     always_ticket: bool = False  # regulated agents: human sign-off regardless of score
     notify: str = ""             # channel to notify on escalate/ticket

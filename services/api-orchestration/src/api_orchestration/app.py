@@ -283,6 +283,7 @@ class EvalSubmit(BaseModel):
     mode: str = "panel"
     aggregation: str = "majority"
     mitigations: list[str] = Field(default_factory=list)
+    policy: str | None = None  # Self-Heal policy to govern this run's incidents
 
 
 @api.post("/evaluation/jobs", status_code=202)
@@ -310,6 +311,7 @@ async def create_eval(
         "judge_refs": refs,
         "judge_rubrics": rubrics,
         "aggregation": req.aggregation,
+        "policy": req.policy,  # frozen into the envelope → governs this run's incidents
     }
     return await submit_job(
         p, kind="evaluation.score", stage="eval", inputs=inputs, idempotency_key=idempotency_key

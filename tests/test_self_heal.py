@@ -41,7 +41,7 @@ async def test_seed_is_idempotent_and_populated():
     await ensure_seeded(TENANT)  # second call must not duplicate
     incs = await list_incidents(TENANT)
     assert len(incs) == 6
-    assert len(await list_policies(TENANT)) == 3
+    assert len(await list_policies(TENANT)) == 4
 
 
 @pytest.mark.asyncio
@@ -49,7 +49,7 @@ async def test_summary_counts_open_incidents():
     s = await summary(TENANT)
     # 6 seeded, one resolved (INC-988) => 5 open.
     assert s.open_incidents == 5
-    assert s.active_policies == 3
+    assert s.active_policies == 4
 
 
 @pytest.mark.asyncio
@@ -132,3 +132,57 @@ async def test_breach_opens_a_real_incident_detect_only():
     assert again == []
     rows2 = await get_table().query(keys.heal_incident_pk(tenant), "HEAL_INCIDENT#")
     assert len(rows2) == 1
+
+
+@pytest.mark.asyncio
+async def test_policy_matches_by_structured_scope_and_captures_baseline():
+    """With policies seeded, a breach is matched to the governing policy by its
+    structured dimensions + agent scope, and a real passing trace is captured as
+    the RCA baseline (mixed pass/fail group)."""
+    from eeof_core.models import VerdictSet
+    from eeof_core.self_heal_detect import detect_incidents
+
+    tenant = "acme-policy"
+    await ensure_seeded(tenant)  # loads the 4 built-in policies
+    vs = VerdictSet(
+        id=new_id("verdict_set"), tenant=tenant, workspace=WS,
+        run_ids=["sim_run1"], judge_refs=["no_financial_advice@v1"],
+    )
+    # 3 fail + 2 pass (0.60 budget < 0.10 → breach); the passes seed the baseline.
+    verdicts = (
+        [_verdict(vs.id, "no_financial_advice", False, 0.40, i) for i in range(3)]
+        + [_verdict(vs.id, "no_financial_advice", True, 0.95, 10 + i) for i in range(2)]
+    )
+    await detect_incidents(tenant, vs, verdicts, "RetireWell (guardrail-regression)")
+    inc = await get_incident(tenant, "inc_" + __import__("hashlib").sha256(
+        f"{vs.id}:no_financial_advice".encode()).hexdigest()[:12])
+    assert inc is not None
+    # finance_guardrail_v1 governs no_financial_advice, scoped to agent ~"retire".
+    assert inc.policy == "finance_guardrail_v1"
+    assert inc.band is None  # regulated agent → always escalate, no auto-ship band
+    assert inc.baseline_trace is not None and "pass" in inc.baseline_trace.meta
+
+
+@pytest.mark.asyncio
+async def test_median_mttr_is_real_or_dash():
+    """MTTR is computed from opened_at→resolved_at, never a fabricated constant:
+    a clean tenant with no resolved incidents reports '—'."""
+    from datetime import timedelta
+
+    from eeof_core.models import SelfHealIncident
+    from eeof_core.models.common import iso, utcnow
+    from self_heal_svc.store import _median_mttr
+
+    assert _median_mttr([]) == "—"
+    opened = utcnow()
+    incs = [
+        SelfHealIncident(
+            id="i1", agent="a", failure="f", status="resolved",
+            opened_at=iso(opened), resolved_at=iso(opened + timedelta(minutes=12)),
+        ),
+        SelfHealIncident(
+            id="i2", agent="a", failure="f", status="resolved",
+            opened_at=iso(opened), resolved_at=iso(opened + timedelta(minutes=8)),
+        ),
+    ]
+    assert _median_mttr(incs) == "10m"  # median of 8m and 12m

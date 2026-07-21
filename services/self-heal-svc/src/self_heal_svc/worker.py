@@ -10,6 +10,7 @@ Deterministic and side-effect-free in the demo (it mutates only the incident row
 from __future__ import annotations
 
 from eeof_core.models import Job
+from eeof_core.models.common import iso
 from eeof_core.worker import BaseWorker
 
 from .store import get_incident, save_incident
@@ -43,6 +44,7 @@ class RemediationWorker(BaseWorker):
         inc.status = "resolved"
         inc.dispo = "Auto-resolved · verified"
         inc.dispo_class = "ok"
+        inc.resolved_at = iso()  # close timestamp → feeds real median MTTR
         if inc.fix is not None and inc.fix.verified is None:
             inc.fix.verified = f"{inc.fix.metric.projected} over post-ship sessions"
         await save_incident(job.tenant, inc)

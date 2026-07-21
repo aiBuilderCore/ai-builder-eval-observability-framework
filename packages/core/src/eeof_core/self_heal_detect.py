@@ -82,19 +82,75 @@ def _incident_id(vset_id: str, dim: str) -> str:
     return f"inc_{h}"
 
 
-async def _match_policy(tenant: str, dim: str) -> tuple[str | None, float | None]:
-    """Best-effort: match the breached dimension to a governing policy by scanning
-    real `heal_policy` rows' triggers. Returns (policy_name, band) or (None, None)
-    when self-heal policies have not been seeded yet."""
+def _is_stub_rationale(r: str) -> bool:
+    """The echo/offline provider emits a placeholder rationale that reads as
+    unfinished in the RCA view. Detect it so we can phrase the note honestly
+    instead of quoting an empty verdict."""
+    rl = (r or "").lower()
+    return not rl or "echo" in rl or "offline judge verdict" in rl
+
+
+async def _match_policy(
+    tenant: str, dim: str, agent_name: str, preferred: str | None = None
+) -> dict | None:
+    """Match the breached dimension to the governing policy using the policy's
+    STRUCTURED scope (`dimensions` + optional `agent`), not a substring of the
+    human-readable trigger. `preferred` — a policy bound to the run at submit time —
+    wins when it also governs this dimension. Returns the policy data dict, or None
+    when no seeded policy governs this breach class."""
     try:
         rows = await get_table().query(keys.heal_policy_pk(tenant), "HEAL_POLICY#")
     except Exception:
-        return None, None
-    for r in rows:
-        data = r.get("data", {})
-        if dim in (data.get("trigger") or ""):
-            return data.get("name"), data.get("band")
-    return None, None
+        return None
+    base = dim.split("@")[0]
+    agent_l = (agent_name or "").lower()
+    policies = [r.get("data", {}) for r in rows]
+
+    def governs(data: dict) -> bool:
+        dims = data.get("dimensions") or []
+        # Structured match; fall back to the legacy trigger substring for any
+        # policy row written before dimensions existed.
+        if base not in dims and base not in (data.get("trigger") or ""):
+            return False
+        scope = data.get("agent")
+        return not scope or scope.lower() in agent_l
+
+    if preferred:
+        for data in policies:
+            if data.get("name") == preferred and governs(data):
+                return data
+    # An agent-scoped policy (e.g. the regulated-agent guardrail) outranks a
+    # generic unscoped one when both govern the dimension.
+    scoped = [d for d in policies if d.get("agent") and governs(d)]
+    if scoped:
+        return scoped[0]
+    for data in policies:
+        if governs(data):
+            return data
+    return None
+
+
+def _governance_note(policy: dict | None) -> str:
+    """One-line ship-vs-escalate summary derived from the governing policy — the
+    RCA view's 'what the policy will do about it' line (real, not fabricated)."""
+    if not policy:
+        return (
+            "No policy governs this breach class yet — triage is manual until one "
+            "is bound (see Active policies)."
+        )
+    name, notify = policy.get("name"), policy.get("notify") or "the on-call channel"
+    if policy.get("always_ticket"):
+        return (
+            f"Governed by policy “{name}” → always open a ticket to {notify}; a human "
+            "signs off (regulated / high-severity class, never auto-ships)."
+        )
+    band = policy.get("band")
+    if band is not None:
+        return (
+            f"Governed by policy “{name}” → auto-ship in-band if candidate confidence "
+            f"≥ {band:.2f}, else escalate to {notify}."
+        )
+    return f"Governed by policy “{name}” → escalate to {notify}."
 
 
 async def detect_incidents(
@@ -102,9 +158,14 @@ async def detect_incidents(
     vset: VerdictSet,
     verdicts: list[Verdict],
     agent_name: str,
+    bound_policy: str | None = None,
 ) -> list[str]:
     """Open a Self-Heal incident for every judge dimension that breached its
-    guardrail in this verdict set. Idempotent. Returns the opened incident ids."""
+    guardrail in this verdict set. Idempotent. Returns the opened incident ids.
+
+    `bound_policy` is the policy the evaluation run was submitted under (frozen into
+    the job envelope); it takes precedence over scope-matching when it governs the
+    breached dimension, which is how a policy is 'applied to a specific run'."""
     by_dim: dict[str, list[Verdict]] = defaultdict(list)
     for v in verdicts:
         by_dim[v.dimension].append(v)
@@ -131,7 +192,9 @@ async def detect_incidents(
 
         pillar = JUDGE_PILLARS.get(dim.split("@")[0], "Reliability")
         glyph = _DIM_GLYPH.get(dim.split("@")[0], _GLYPH.get(pillar, "chat"))
-        policy, band = await _match_policy(tenant, dim)
+        policy_row = await _match_policy(tenant, dim, agent_name, bound_policy)
+        policy = policy_row.get("name") if policy_row else None
+        band = policy_row.get("band") if policy_row else None
 
         # Real flagged traces — the sessions that actually failed this judge.
         traces = [
@@ -143,7 +206,30 @@ async def detect_incidents(
             )
             for v in fails[:6]
         ]
+        # A real PASSING trace for the same judge, if the run produced one — RCA
+        # contrasts a good answer against the flagged one (no fabricated baseline).
+        passing = [v for v in group if v.passed]
+        baseline_trace = None
+        if passing:
+            b = passing[0]
+            baseline_trace = IncidentTrace(
+                id=b.trace_id,
+                agent=agent_name,
+                intent=(b.persona_name or "unknown persona"),
+                meta=f"score {b.score:.2f} · {dim} pass",
+            )
         rationale = next((v.rationale for v in fails if v.rationale), "")
+        # Policy-driven RCA: real rationale (when the judge left one) + the governing
+        # policy's ship-vs-escalate intent + the registry candidate for this class.
+        action = _proposed_action(dim)
+        if rationale and not _is_stub_rationale(rationale):
+            diag = f"Diagnosing from the real judge rationale: “{rationale}”."
+        else:
+            diag = (
+                "Diagnosing the breached transcripts — the judge left no usable "
+                "rationale (offline/echo scoring)."
+            )
+        rca_note = f"{diag} {_governance_note(policy_row)} Registry candidate: {action}."
 
         inc = SelfHealIncident(
             id=inc_id,
@@ -159,7 +245,7 @@ async def detect_incidents(
             policy=policy,
             band=band,
             confidence=None,
-            action=_proposed_action(dim),
+            action=action,
             incident_from=vset.id,
             timeline=[
                 TimelineStep(
@@ -171,12 +257,7 @@ async def detect_incidents(
                     ),
                 ),
                 TimelineStep(
-                    stage="rca", status="active", when="just now",
-                    note=(
-                        "Diagnosing from the real judge rationale: "
-                        f"“{rationale}”" if rationale else
-                        "Diagnosing the breached transcripts — no rationale on record."
-                    ),
+                    stage="rca", status="active", when="just now", note=rca_note,
                 ),
                 TimelineStep(
                     stage="simulate", status="queued", when="queued",
@@ -189,6 +270,7 @@ async def detect_incidents(
             ],
             fix=None,
             traces=traces,
+            baseline_trace=baseline_trace,
         )
         gsipk, gsisk = keys.heal_incident_gsi(tenant, inc.status, inc.opened_at)
         await table.put({

@@ -52,6 +52,20 @@
     return '<span class="chip chip--' + inc.dispoClass + '">' + esc(inc.dispo) + "</span>";
   }
 
+  // C1 · one-line governance summary — which policy governs this incident and what
+  // it will do (auto-ship vs. escalate). Derived from the incident's policy + band.
+  function governanceLine(inc) {
+    if (!inc.policy) {
+      return '<p class="sh-gov sh-gov--none"><span class="sh-gov__k">policy</span>' +
+        "No governing policy — manual triage until one is bound.</p>";
+    }
+    var intent = inc.band == null
+      ? "always escalate for human sign-off"
+      : "auto-ship at confidence ≥ " + inc.band.toFixed(2) + ", else escalate";
+    return '<p class="sh-gov"><span class="sh-gov__k">policy</span>' +
+      "<b>" + esc(inc.policy) + "</b> → " + esc(intent) + "</p>";
+  }
+
   function renderKpis() {
     // Prefer the live /self-heal/summary rollup; otherwise derive strictly from
     // whatever incidents/policies are loaded (empty ⇒ 0 / "—"). Never fabricate.
@@ -129,15 +143,39 @@
       : '<span class="sh-empty__sub">Loading the remediation registry from the edge…</span>';
   }
 
+  function policyMode(p) {
+    if (p.always_ticket) return { cls: "warn", label: "always escalate" };
+    if (p.band != null) return { cls: "ok", label: "auto-ship ≥ " + p.band.toFixed(2) };
+    return { cls: "idle", label: "escalate" };
+  }
+
   function renderPolicies() {
-    document.getElementById("policies").innerHTML = SH.policies.length
-      ? SH.policies.map(function (p) {
-          return (
-            '<p class="dsl__name">' + esc(p.name) + "</p>" +
-            '<pre class="dsl">' + p.lines.map(function (l) { return l[0]; }).join("\n") + "</pre>"
-          );
-        }).join("")
-      : '<span class="sh-empty__sub">Loading policies from the edge…</span>';
+    if (!SH.policies.length) {
+      document.getElementById("policies").innerHTML =
+        '<span class="sh-empty__sub">Loading policies from the edge…</span>';
+      return;
+    }
+    document.getElementById("policies").innerHTML = SH.policies.map(function (p) {
+      var mode = policyMode(p);
+      var dims = (p.dimensions || []).map(function (d) {
+        return '<span class="pol__judge">' + esc(d) + "</span>";
+      }).join("");
+      var meta = [];
+      meta.push("agent " + (p.agent ? esc(p.agent) + "*" : "any"));
+      if (p.notify) meta.push("notify " + esc(p.notify));
+      return (
+        '<div class="pol">' +
+        '  <div class="pol__head">' +
+        '    <span class="pol__name">' + esc(p.name) + "</span>" +
+        '    <span class="pol__mode pol__mode--' + mode.cls + '">' + esc(mode.label) + "</span>" +
+        "  </div>" +
+        (dims ? '<div class="pol__judges">' + dims + "</div>" : "") +
+        '  <p class="pol__meta">' + meta.join(" · ") + "</p>" +
+        '  <details class="pol__src"><summary>Policy DSL</summary>' +
+        '<pre class="dsl">' + p.lines.map(function (l) { return l[0]; }).join("\n") + "</pre></details>" +
+        "</div>"
+      );
+    }).join("");
   }
 
   // ── Incident modal ─────────────────────────────────────────────────────────
@@ -257,45 +295,114 @@
     return turns.length ? turns[turns.length - 1].text : "";
   }
 
+  // Clean a captured model label for display. The provider layer records the
+  // fallback CHAIN (e.g. "fallback(groq → echo)") on the span; a reviewer wants
+  // the model the agent effectively ran under — the last live link — not the
+  // internal chain string. Flag echo as offline so a generic completion reads honestly.
+  function cleanModel(raw) {
+    if (!raw) return { label: "—", offline: false };
+    var m = String(raw);
+    var inner = /^fallback\((.*)\)$/i.exec(m.trim());
+    if (inner) m = inner[1];
+    var links = m.split(/→|->|,/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var eff = links.length ? links[links.length - 1] : m.trim();
+    var offline = /echo/i.test(eff);
+    return { label: eff, offline: offline };
+  }
+
+  // Pull the system prompt / user turn / completion off a trace's OpenInference
+  // PROMPT+LLM spans — the verbatim record of what the agent ran under.
+  function readAgentView(detail) {
+    var spans = (detail && detail.spans) || [];
+    var prompt = pickSpan(spans, "PROMPT"), llm = pickSpan(spans, "LLM");
+    if (!prompt && !llm) return null;
+    var pa = (prompt && prompt.attrs) || {}, la = (llm && llm.attrs) || {};
+    var view = {
+      system: pa["input.value"] || la["llm.system"] || "",
+      completion: la["output.value"] || la["llm.output_messages.0.message.content"] || "",
+      user: lastUserMessage(la, detail),
+      model: cleanModel(la["gen_ai.request.model"]),
+      params: la["llm.invocation_parameters"] || "",
+      spanKinds: spans.map(function (s) { return s.kind; }),
+    };
+    if (!view.system && !view.completion && !view.user) return null;
+    return view;
+  }
+
   // RCA diagnosis: lazily pull the exemplar flagged trace and surface *exactly*
   // what the agent ran under — the verbatim system prompt (guardrails in effect),
   // the user prompt, and the completion — captured on the trace's OpenInference
-  // PROMPT/LLM spans. This is the "understand completely what's going wrong" view:
-  // for a guardrail regression, the weakened system prompt is visible right here.
+  // PROMPT/LLM spans. When the run produced a PASSING trace for the same judge, we
+  // also fetch it and contrast the two completions (A1) — a real good-vs-flagged
+  // diff, not a fabricated baseline. Above it, a one-line attribution (A2).
   function hydrateDiagnosis(inc) {
     var host = document.getElementById("sh-diagnosis");
     if (!host) return;
     if (!window.EEOF || !inc.traces || !inc.traces.length) return; // seed/offline → stay hidden
     var tid = inc.traces[0].id;
+    var flaggedMeta = inc.traces[0].meta || "";
+    var baseId = inc.baseline_trace && inc.baseline_trace.id;
     host.hidden = false;
     host.innerHTML =
       '<p class="sh-eyebrow" style="margin-top:1.4rem;">RCA · what the agent saw</p>' +
       '<p class="sh-diagnosis__loading">Loading the flagged trace…</p>';
-    EEOF.get("/simulation/traces/" + encodeURIComponent(tid)).then(function (detail) {
-      var spans = (detail && detail.spans) || [];
-      var prompt = pickSpan(spans, "PROMPT"), llm = pickSpan(spans, "LLM");
-      if (!prompt && !llm) { host.hidden = true; return; }
-      var pa = (prompt && prompt.attrs) || {}, la = (llm && llm.attrs) || {};
-      var system = pa["input.value"] || la["llm.system"] || "";
-      var completion = la["output.value"] || la["llm.output_messages.0.message.content"] || "";
-      var user = lastUserMessage(la, detail);
-      var model = la["gen_ai.request.model"] || "—";
-      var params = la["llm.invocation_parameters"] || "";
-      if (!system && !completion && !user) { host.hidden = true; return; }
-      host.innerHTML =
+
+    var jobs = [EEOF.get("/simulation/traces/" + encodeURIComponent(tid))];
+    if (baseId) jobs.push(EEOF.get("/simulation/traces/" + encodeURIComponent(baseId)).catch(function () { return null; }));
+
+    Promise.all(jobs).then(function (res) {
+      var view = readAgentView(res[0]);
+      if (!view) { host.hidden = true; return; }
+      var base = res[1] ? readAgentView(res[1]) : null;
+
+      // A2 · attribution headline — cause class (pillar), breached judge, the
+      // failing span the breach was produced on, and the real failing score.
+      var pillar = (inc.pillars && inc.pillars[0]) || "Reliability";
+      var dim = inc.failure.replace(/ guardrail breach$/, "");
+      var failSpan = view.spanKinds.indexOf("LLM") >= 0 ? "LLM span" :
+        (view.spanKinds.indexOf("PROMPT") >= 0 ? "PROMPT span" : "agent span");
+      var scoreM = /score\s+([0-9.]+)/.exec(flaggedMeta);
+      var scoreTxt = scoreM ? "judge score " + scoreM[1] + " (below gate)" : "judge guardrail breached";
+      var modelTag = esc(view.model.label) + (view.model.offline ? ' <em class="sh-diag__off">offline</em>' : "");
+
+      var html =
         '<p class="sh-eyebrow" style="margin-top:1.4rem;">RCA · what the agent saw ' +
         '<span class="sh-diagnosis__trace">' + esc(tid) + "</span></p>" +
-        '<div class="sh-diagnosis__grid">' +
-        '  <div class="sh-diag"><span class="sh-diag__k">System prompt in effect · model ' + esc(model) +
-        '</span><pre class="sh-diag__v sh-diag__v--prompt">' + esc(system || "(not captured)") + "</pre></div>" +
-        '  <div class="sh-diag"><span class="sh-diag__k">User prompt</span>' +
-        '<pre class="sh-diag__v">' + esc(user || "(not captured)") + "</pre></div>" +
-        '  <div class="sh-diag"><span class="sh-diag__k">Agent completion</span>' +
-        '<pre class="sh-diag__v">' + esc(completion || "(not captured)") + "</pre></div>" +
+        '<div class="sh-attr">' +
+        '  <span class="sh-attr__k">cause class</span><span class="sh-attr__v">' + esc(pillar) + "</span>" +
+        '  <span class="sh-attr__k">judge</span><span class="sh-attr__v">' + esc(dim) + "</span>" +
+        '  <span class="sh-attr__k">span</span><span class="sh-attr__v">' + failSpan + "</span>" +
+        '  <span class="sh-attr__k">signal</span><span class="sh-attr__v">' + esc(scoreTxt) + "</span>" +
         "</div>" +
+        '<div class="sh-diagnosis__grid">' +
+        '  <div class="sh-diag"><span class="sh-diag__k">System prompt in effect · model ' + modelTag +
+        '</span><pre class="sh-diag__v sh-diag__v--prompt">' + esc(view.system || "(not captured)") + "</pre></div>" +
+        '  <div class="sh-diag"><span class="sh-diag__k">User prompt</span>' +
+        '<pre class="sh-diag__v">' + esc(view.user || "(not captured)") + "</pre></div>";
+
+      // A1 · per-judge completion contrast when a real passing trace exists.
+      // Framed strictly by THIS judge's verdict (failed vs. passed), not good-vs-bad:
+      // passing one judge is not the same as a better answer overall.
+      if (base && base.completion) {
+        html +=
+          '  <div class="sh-diag sh-diag--diff">' +
+          '<span class="sh-diag__k">Completion · this judge — failed vs. passed <span class="sh-diagnosis__trace">' + esc(baseId) + "</span></span>" +
+          '<div class="fixdiff">' +
+          '  <div class="fixdiff__row fixdiff__row--before"><span class="fixdiff__mark">failed</span>' + esc(view.completion || "(not captured)") + "</div>" +
+          '  <div class="fixdiff__row fixdiff__row--after"><span class="fixdiff__mark">passed</span>' + esc(base.completion) + "</div>" +
+          "</div></div>";
+      } else {
+        html +=
+          '  <div class="sh-diag"><span class="sh-diag__k">Agent completion · flagged</span>' +
+          '<pre class="sh-diag__v sh-diag__v--bad">' + esc(view.completion || "(not captured)") + "</pre></div>";
+      }
+
+      html += "</div>" +
         '<p class="sh-diagnosis__hint">Captured verbatim from the flagged trace’s OpenInference LLM span' +
-        (params ? " (" + esc(params) + ")" : "") +
-        ". Compare the guardrail text above against a passing trace to attribute the breach.</p>";
+        (view.params ? " (" + esc(view.params) + ")" : "") +
+        (base ? ". Both rows are real traces from this run: the top failed <b>" + esc(dim) + "</b>, the bottom passed it. The contrast is per-judge — a pass here is not necessarily a better answer overall (other guardrails may still flag it)."
+              : ". Compare the guardrail text above against a passing trace to attribute the breach.") + "</p>";
+      host.innerHTML = html;
     }).catch(function () { host.hidden = true; });
   }
 
@@ -314,11 +421,10 @@
       '  <div class="sh-summary">' +
       '    <div class="sh-summary__row"><span class="sh-summary__id">' + esc(inc.id) + "</span>" +
       '      <span class="sh-summary__time">' + esc(inc.age) + "</span></div>" +
-      '    <p class="sh-summary__agent">' + esc(inc.agent) + "</p>" +
-      '    <p class="sh-summary__failure">' + esc(inc.failure) + "</p>" +
       '    <span class="incident__tags">' +
       inc.pillars.map(function (p) { return '<span class="tag">' + esc(p) + "</span>"; }).join("") +
       "    </span>" +
+      governanceLine(inc) +
       "  </div>" +
       '  <p class="sh-eyebrow">Closed-loop progress</p>' +
       '  <ul class="tl">' + inc.timeline.map(tlItem).join("") + "</ul>" +
@@ -349,18 +455,36 @@
       }).join("") +
       "</div>";
     dialog.setAttribute("data-inc", inc.id);
+    lastFocused = document.activeElement;
     modal.hidden = false;
     modal.classList.add("is-open");
     document.body.style.overflow = "hidden";
     if (history.replaceState) history.replaceState(null, "", "#" + inc.id);
     hydrateDiagnosis(inc);
+    // Move focus into the dialog so keyboard/SR users aren't stranded behind the backdrop.
+    var first = dialog.querySelector("[data-close]");
+    if (first) first.focus();
   }
+
+  var lastFocused = null;
 
   function closeModal() {
     modal.classList.remove("is-open");
     modal.hidden = true;
     document.body.style.overflow = "";
     if (history.replaceState) history.replaceState(null, "", location.pathname + location.search);
+    if (lastFocused && lastFocused.focus) lastFocused.focus();
+    lastFocused = null;
+  }
+
+  // Keep Tab focus inside the open dialog.
+  function trapFocus(e) {
+    if (e.key !== "Tab" || !modal.classList.contains("is-open")) return;
+    var f = dialog.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
 
   var ACT_MSG = {
@@ -395,6 +519,7 @@
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
+    else trapFocus(e);
   });
   document.getElementById("new-policy").addEventListener("click", function () {
     window.alert("New-policy authoring is stubbed in the mock — policies are read-only here.");
@@ -440,7 +565,17 @@
   }
   function mapPolicy(p) {
     // The DSL renderer expects `lines` as [[html]]; the API returns `dsl` as [html].
-    return { name: p.name, lines: (p.dsl || []).map(function (l) { return [l]; }) };
+    // Structured scope (dimensions/agent/band/…) drives the refined policy card.
+    return {
+      name: p.name,
+      lines: (p.dsl || []).map(function (l) { return [l]; }),
+      dimensions: p.dimensions || [],
+      agent: p.agent || null,
+      band: (p.band === undefined ? null : p.band),
+      always_ticket: !!p.always_ticket,
+      notify: p.notify || "",
+      trigger: p.trigger || "",
+    };
   }
 
   var poll = null;

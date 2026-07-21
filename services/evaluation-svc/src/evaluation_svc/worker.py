@@ -207,8 +207,12 @@ class EvalWorker(BaseWorker):
 
         # Breach → Self-Heal: open an incident for any judge that failed its
         # guardrail on this run. Derived entirely from the real verdicts above.
+        # A `policy` frozen into the job envelope at submit governs this run's
+        # incidents (see api-orchestration EvalSubmit.policy).
         agent_name = await self._agent_name(job.tenant, run_ids)
-        await detect_incidents(job.tenant, vset, verdicts, agent_name)
+        await detect_incidents(
+            job.tenant, vset, verdicts, agent_name, bound_policy=inputs.get("policy")
+        )
 
         return {
             "verdict_set_id": vs_id, "pass_rate": pass_rate, "verdicts": len(verdicts),
