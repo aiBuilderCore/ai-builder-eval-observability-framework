@@ -26,6 +26,7 @@ from eeof_core.models import (
     MonitorDraft,
     PersonaDraft,
     PersonaRef,
+    PolicyDraft,
     Principal,
     RunRequest,
     SeedSet,
@@ -449,6 +450,11 @@ async def heal_incident_action(
 @api.get("/self-heal/policies")
 async def heal_policies(p: Principal = Depends(principal)):
     return await proxy("self-heal", "GET", "/self-heal/policies", p)
+
+
+@api.post("/self-heal/policies", status_code=201)
+async def heal_create_policy(draft: PolicyDraft, p: Principal = Depends(principal)):
+    return await proxy("self-heal", "POST", "/self-heal/policies", p, json=draft.model_dump())
 
 
 @api.get("/self-heal/registry")

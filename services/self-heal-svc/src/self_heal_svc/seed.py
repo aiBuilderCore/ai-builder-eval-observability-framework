@@ -38,6 +38,46 @@ def _dsl(name, on, gate, notify):
     return lines
 
 
+def build_policy(
+    name: str,
+    dimensions: list[str],
+    agent: str | None,
+    band: float | None,
+    always_ticket: bool,
+    notify: str,
+) -> dict:
+    """Build a full policy dict (incl. rendered DSL + human trigger) from an author's
+    structured scope — used by the create endpoint. All author-supplied text is
+    HTML-escaped before it lands in the DSL spans (the UI renders DSL as innerHTML)."""
+    import html
+
+    dims_txt = ", ".join(html.escape(d) for d in dimensions)
+    on = 'breach <span class="k">in</span> [' + dims_txt + "]"
+    if agent:
+        on += ' <span class="k">from</span> agent~<span class="s">"' + html.escape(agent) + '"</span>'
+    if always_ticket:
+        gate = '<span class="k">always</span> open_ticket'
+    elif band is not None:
+        gate = (
+            '<span class="k">if</span> confidence &gt;= <span class="n">'
+            + f"{band:.2f}" + '</span> <span class="k">then</span> ship_fix '
+            '<span class="k">else</span> open_ticket'
+        )
+    else:
+        gate = "<span class=\"k\">escalate</span>"
+    scope = f" from {agent}*" if agent else " from any agent"
+    return {
+        "name": name,
+        "trigger": " · ".join(dimensions) + scope,
+        "dimensions": dimensions,
+        "agent": agent,
+        "band": band,
+        "always_ticket": always_ticket,
+        "notify": notify,
+        "dsl": _dsl(html.escape(name), on, gate, html.escape(notify or "the on-call channel")),
+    }
+
+
 SEED_POLICIES: list[dict] = [
     {
         "name": "finance_guardrail_v1",

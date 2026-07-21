@@ -163,6 +163,40 @@ async def test_policy_matches_by_structured_scope_and_captures_baseline():
     assert inc.baseline_trace is not None and "pass" in inc.baseline_trace.meta
 
 
+@pytest.mark.asyncio
+async def test_author_policy_round_trips_and_governs():
+    """A newly authored policy persists with its structured scope and shows up in
+    the list — so the breach detector can match against it."""
+    from eeof_core.models import Policy
+
+    from self_heal_svc.seed import build_policy
+    from self_heal_svc.store import save_policy
+
+    tenant = "acme-newpol"
+    await ensure_seeded(tenant)
+    pol = Policy.model_validate(build_policy(
+        "safety_gate_v9", ["toxicity", "pii_leakage"], "support", None, True, "#trust",
+    ))
+    await save_policy(tenant, pol)
+    saved = [p for p in await list_policies(tenant) if p.name == "safety_gate_v9"]
+    assert saved, "authored policy should be listed"
+    s = saved[0]
+    assert s.dimensions == ["toxicity", "pii_leakage"]
+    assert s.agent == "support" and s.always_ticket and s.band is None
+    assert s.dsl  # rendered DSL present
+
+
+def test_build_policy_escapes_author_input():
+    """Author-supplied text is HTML-escaped before landing in DSL spans (the UI
+    renders DSL as innerHTML) — no injection."""
+    from self_heal_svc.seed import build_policy
+
+    p = build_policy('x"<b>evil</b>', ["toxicity"], "<i>", 0.9, False, "#c<d>")
+    dsl = "\n".join(p["dsl"])
+    assert "<b>" not in dsl and "<i>" not in dsl and "<d>" not in dsl
+    assert "&lt;b&gt;" in dsl  # the raw tag was escaped, not dropped
+
+
 def test_playbook_covers_every_judge_and_is_trace_grounded():
     """Every built-in judge has an agent-side recommendation, the fallback is
     sensible, and no entry embeds fabricated code (we only have the trace)."""

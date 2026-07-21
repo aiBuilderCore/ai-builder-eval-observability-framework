@@ -105,6 +105,20 @@ class Policy(BaseModel):
     dsl: list[str] = Field(default_factory=list)  # rendered source lines (with highlight spans)
 
 
+class PolicyDraft(BaseModel):
+    """Author-supplied fields for a new policy — the service derives `trigger`/`dsl`.
+
+    Structured scope only; the ship-vs-escalate contract is `always_ticket` (human
+    sign-off) XOR `band` (auto-ship threshold)."""
+
+    name: str
+    dimensions: list[str] = Field(default_factory=list)  # judge dimensions governed
+    agent: str | None = None     # agent scope (case-insensitive substring); None => any
+    band: float | None = None    # auto-ship confidence threshold; None => escalate
+    always_ticket: bool = False  # human sign-off regardless of score
+    notify: str = ""
+
+
 class RemediationAction(BaseModel):
     """One entry in the fixed vocabulary of safe remediation actions."""
 

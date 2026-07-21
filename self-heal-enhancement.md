@@ -84,12 +84,14 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[?]` needs decision
   agent. Make matching structured (dimension + agent + comparator + threshold)
   instead of `dim in trigger`.
 
-- [x] **B3 · Confirm/settle front↔back wiring.** Policies ARE wired read-only:
-  `seed.py` → `store.list_policies` → `GET /self-heal/policies` → frontend LIVE
-  adapter maps `dsl→lines` (`app.js:441`). Gaps: "＋ New policy" is stubbed
-  (`app.js:399`) and the DSL is pre-rendered HTML in the seed (not parsed). Decide:
-  keep read-only, or make policies first-class (structured model + authoring). This
-  gates B1/B2 and Track D.
+- [x] **B3 · New-policy authoring (was a stub alert).** "＋ New policy" now opens a
+  real authoring form (name · governed-judge picker · agent scope · escalate-vs-
+  auto-ship band · notify) → `POST /self-heal/policies` (edge-proxied) → `PolicyDraft`
+  → `build_policy` renders the DSL (author text HTML-escaped) → persisted via
+  `save_policy` → list + KPI refresh. Server validates (name/dimensions required,
+  band 0–1, duplicate → 409); the form surfaces the edge's message (drilling through
+  the proxy's nested `detail`). The new policy immediately governs matching breaches
+  (structured B1/B2 matching). Verified end-to-end in-browser.
 
 ---
 

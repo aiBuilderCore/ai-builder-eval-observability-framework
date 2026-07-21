@@ -580,8 +580,108 @@
     else trapFocus(e);
   });
   document.getElementById("new-policy").addEventListener("click", function () {
-    window.alert("New-policy authoring is stubbed in the mock — policies are read-only here.");
+    if (typeof SH.createPolicy === "function") openPolicyForm();
+    else window.alert("New-policy authoring needs the live edge — it's read-only offline.");
   });
+
+  // ── New-policy authoring form ────────────────────────────────────────────────
+  function openPolicyForm() {
+    var dims = Object.keys(SH.playbook || {});
+    if (!dims.length) {
+      dims = [
+        "helpfulness", "faithfulness", "answer_relevance", "hallucination",
+        "refusal_correctness", "coherence_multiturn", "role_adherence",
+        "factual_consistency", "toxicity", "tool_call_correctness",
+        "no_financial_advice", "regulatory_disclosure", "numeric_accuracy",
+        "pii_leakage", "demographic_fairness",
+      ];
+    }
+    var overlay = document.createElement("div");
+    overlay.className = "sh-modal is-open";
+    overlay.id = "policy-modal";
+    overlay.innerHTML =
+      '<div class="sh-modal__dialog sh-modal__dialog--form" role="dialog" aria-modal="true" aria-label="New policy">' +
+      '  <div class="sh-modal__head">' +
+      '    <div class="sh-modal__titles"><h2 class="sh-modal__title">New policy</h2>' +
+      '      <p class="sh-modal__sub">Govern which breaches auto-ship vs. escalate.</p></div>' +
+      '    <button class="sh-modal__x" type="button" data-pclose aria-label="Close">×</button>' +
+      "  </div>" +
+      '  <div class="sh-modal__body">' +
+      '    <form id="pform" novalidate>' +
+      '      <label class="pf__l" for="pf-name">Name</label>' +
+      '      <input class="pf__i" id="pf-name" name="name" autocomplete="off" placeholder="e.g. safety_gate_v1" />' +
+      '      <label class="pf__l">Governed judges</label>' +
+      '      <div class="pf__judges">' +
+      dims.map(function (d) {
+        return '<label class="pf__chk"><input type="checkbox" name="dim" value="' + esc(d) + '"> ' + esc(d) + "</label>";
+      }).join("") +
+      "      </div>" +
+      '      <label class="pf__l" for="pf-agent">Agent scope <span class="pf__opt">optional</span></label>' +
+      '      <input class="pf__i" id="pf-agent" name="agent" autocomplete="off" placeholder="any agent — or a fragment like “retire”" />' +
+      '      <label class="pf__l">Decision</label>' +
+      '      <div class="pf__modes">' +
+      '        <label class="pf__radio"><input type="radio" name="mode" value="escalate" checked> Always escalate <span class="pf__hint">human sign-off</span></label>' +
+      '        <label class="pf__radio"><input type="radio" name="mode" value="ship"> Auto-ship at confidence ≥ <input type="number" name="band" class="pf__num" min="0" max="1" step="0.01" value="0.85" disabled></label>' +
+      "      </div>" +
+      '      <label class="pf__l" for="pf-notify">Notify channel</label>' +
+      '      <input class="pf__i" id="pf-notify" name="notify" autocomplete="off" placeholder="#ai-quality" />' +
+      '      <p class="pf__err" id="pf-err" hidden></p>' +
+      '      <div class="sh-actions">' +
+      '        <button type="submit" class="btn btn--primary">Create policy</button>' +
+      '        <button type="button" class="btn" data-pclose>Cancel</button>' +
+      "      </div>" +
+      "    </form>" +
+      "  </div>" +
+      "</div>";
+    document.body.appendChild(overlay);
+    document.body.style.overflow = "hidden";
+    var form = overlay.querySelector("#pform");
+    var errEl = overlay.querySelector("#pf-err");
+    var bandInput = overlay.querySelector('input[name="band"]');
+    var nameInput = overlay.querySelector("#pf-name");
+    if (nameInput) nameInput.focus();
+
+    function close() {
+      overlay.remove();
+      if (!modal.classList.contains("is-open")) document.body.style.overflow = "";
+    }
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay || e.target.closest("[data-pclose]")) close();
+    });
+    overlay.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+    overlay.querySelectorAll('input[name="mode"]').forEach(function (r) {
+      r.addEventListener("change", function () {
+        bandInput.disabled = overlay.querySelector('input[name="mode"]:checked').value !== "ship";
+      });
+    });
+    function fail(msg) { errEl.textContent = msg; errEl.hidden = false; }
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = form.name.value.trim();
+      var dimsSel = Array.prototype.slice
+        .call(form.querySelectorAll('input[name="dim"]:checked'))
+        .map(function (c) { return c.value; });
+      var mode = form.querySelector('input[name="mode"]:checked').value;
+      if (!name) return fail("Give the policy a name.");
+      if (!dimsSel.length) return fail("Select at least one judge to govern.");
+      var band = null, alwaysTicket = true;
+      if (mode === "ship") {
+        band = parseFloat(form.band.value);
+        alwaysTicket = false;
+        if (isNaN(band) || band < 0 || band > 1) return fail("Confidence band must be between 0 and 1.");
+      }
+      errEl.hidden = true;
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true; btn.textContent = "Creating…";
+      SH.createPolicy({
+        name: name, dimensions: dimsSel, agent: form.agent.value.trim() || null,
+        band: band, always_ticket: alwaysTicket, notify: form.notify.value.trim(),
+      }).then(close).catch(function (err) {
+        btn.disabled = false; btn.textContent = "Create policy";
+        fail((err && err.message) || "Create failed against the edge.");
+      });
+    });
+  }
 
   function renderAll() {
     renderKpis();
@@ -663,6 +763,28 @@
       }
     } catch (e) { /* transient edge blip — keep last good render */ }
   }
+
+  // Author a policy against the live edge, then refresh the list + KPI count.
+  // Surfaces the edge's `detail` message (e.g. duplicate name) to the form.
+  SH.createPolicy = async function (draft) {
+    try {
+      await EEOF.post("/self-heal/policies", draft);
+    } catch (e) {
+      // req() throws "<status> <json>"; the edge proxy nests `detail` inside
+      // `detail`, so drill through until we reach the human string.
+      var msg = (e && e.message) || "create failed";
+      var m = /^\d+\s+(.*)$/.exec(msg);
+      if (m) {
+        try {
+          var d = JSON.parse(m[1]);
+          while (d && typeof d === "object") d = d.detail;
+          msg = (typeof d === "string" && d) || m[1];
+        } catch (_) { msg = m[1]; }
+      }
+      throw new Error(msg);
+    }
+    await hydrate();
+  };
 
   // Human verdict → live endpoint. approve ships async (202 + job); the poll
   // picks up the resolved incident. ticket/reject mutate synchronously.

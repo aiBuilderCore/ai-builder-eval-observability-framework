@@ -141,6 +141,15 @@ async def list_policies(tenant: str) -> list[Policy]:
     return [Policy.model_validate(r["data"]) for r in rows]
 
 
+async def save_policy(tenant: str, policy: Policy) -> None:
+    await get_table().put({
+        "PK": keys.heal_policy_pk(tenant),
+        "SK": keys.heal_policy_sk(policy.name),
+        "type": "heal_policy",
+        "data": policy.model_dump(mode="json"),
+    })
+
+
 async def list_actions(tenant: str) -> list[RemediationAction]:
     await ensure_seeded(tenant)
     rows = await get_table().query(keys.heal_action_pk(tenant), "HEAL_ACTION#")
