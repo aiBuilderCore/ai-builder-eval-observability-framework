@@ -11,6 +11,7 @@ toggle persists in `localStorage` (`aibc-theme`); no external data or tracking.
 | File | Format | Audience | Contents |
 |---|---|---|---|
 | `verity-executive.html` | **Combined one-pager** (two tabs) | Executive / leadership | Both decks below, condensed to a single screen each and switchable in-page. **Primary deliverable.** |
+| `verity-executive.pptx` | **2-slide deck** | Executive / leadership | PowerPoint of the combined pager — slide 1 = Executive Brief, slide 2 = Technical Overview. Same dark aesthetic. |
 | `verity-executive-narrative.html` | Slider deck (7 slides) | Executive / board | The narrative arc — problem → solution → how it works → business value → competitive landscape. |
 | `verity-technical-overview.html` | Slider deck (6 slides) | Technical leadership | High-level technical view — what Verity offers, features, UX across features, benefits. |
 
