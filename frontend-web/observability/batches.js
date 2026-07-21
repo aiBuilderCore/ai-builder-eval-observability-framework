@@ -476,11 +476,13 @@
   }
 
   // ---- Span tree (Gantt-style) ----------------------------------
-  // Renders an SVG span chart for a run. EVALUATOR spans are visually
-  // distinct (green outline) so the "judge verdict reachable from run
-  // trace" relationship reads at a glance.
+  // Renders an SVG span chart for a run — the agent's real execution waterfall
+  // only. Evaluation runs out-of-band (a separate service scores the finished
+  // trace), so EVALUATOR is not part of this tree; verdicts live in their own
+  // table. Any stray EVALUATOR span is filtered out defensively.
   function renderSpanTree(spans, opts) {
-    if (!spans || !spans.length) return '<p class="span-empty">No span tree captured for this run.</p>';
+    spans = (spans || []).filter(s => s.kind !== 'EVALUATOR');
+    if (!spans.length) return '<p class="span-empty">No span tree captured for this run.</p>';
     const w = (opts && opts.w) || 880;
     const rowH = 30;
     const labelW = 320;

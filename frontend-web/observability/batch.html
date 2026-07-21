@@ -94,8 +94,8 @@
         <div class="actions"><span style="color:var(--text-faint);">across every run in this batch</span></div>
       </div>
       <p class="viz-caption">
-        Every LLM call, tool call, retrieval, and inline judge (<abbr title="EVALUATOR spans are the inline judge verdicts, linked back to the run they scored.">EVALUATOR</abbr>)
-        in this batch, grouped by <b>OpenInference span kind</b>. Click a bar to filter the runs table below.
+        Every LLM call, tool call, and retrieval the agents made in this batch, grouped by <b>OpenInference span kind</b>.
+        Judge verdicts are computed out-of-band and are not spans, so they don't appear here. Click a bar to filter the runs table below.
       </p>
       <div class="kind-hist" id="kind-hist"></div>
 
@@ -109,9 +109,10 @@
       <table class="runs-table" aria-label="Runs in this batch">
         <thead>
           <tr>
-            <th>Run · question</th>
+            <th>Trace</th>
+            <th>Question</th>
             <th>Persona</th>
-            <th>Verdicts (inline judges)</th>
+            <th>Judge verdicts</th>
             <th class="num">Duration</th>
             <th>Status</th>
           </tr>
@@ -184,11 +185,13 @@
       'Each run has a trace; built-in judges emit inline verdicts linked to that trace.' +
       (batch.regression_note ? ' <span style="color:var(--signal-warn);"><b>Note:</b> ' + B.escapeHtml(batch.regression_note) + '</span>' : '');
 
+    // Agent-execution spans only. Evaluation is out-of-band, so any stray
+    // EVALUATOR span is excluded from the span-volume count, the histogram and
+    // the kind filter below.
+    (batch.runs || []).forEach(r => { if (r.spans) r.spans = r.spans.filter(s => s.kind !== 'EVALUATOR'); });
     const totalSpans = (batch.runs || []).reduce((m, r) => m + (r.spans ? r.spans.length : 0), 0);
-    // Inline judge verdicts: real EVALUATOR spans when present, else the real
-    // per-run verdict count (live runs carry verdicts but no span geometry).
-    const evalSpans = (batch.runs || []).reduce((m, r) =>
-      m + (r.spans && r.spans.length ? r.spans.filter(s => s.kind === 'EVALUATOR').length : (r.verdicts ? r.verdicts.length : 0)), 0);
+    // Judge verdicts: the real per-run out-of-band verdict count.
+    const evalSpans = (batch.runs || []).reduce((m, r) => m + (r.verdicts ? r.verdicts.length : 0), 0);
     // Identifiers only — the run/pass/span counts live in the summary tiles
     // below, so we don't repeat them here.
     document.getElementById('head-pills').innerHTML = `
@@ -222,7 +225,7 @@
       <div class="tile">
         <div class="label">Judge verdicts</div>
         <div class="value">${evalSpans}</div>
-        <div class="meta">${Object.keys(batch.judge_pass_rates || {}).length} judges · inline EVALUATOR spans</div>
+        <div class="meta">${Object.keys(batch.judge_pass_rates || {}).length} judges · out-of-band evaluation</div>
       </div>
     `;
 
@@ -291,9 +294,11 @@
 
     // ---- kind histogram ----
     const kh = batch.kind_histogram || {};
-    const maxCount = Math.max.apply(null, Object.values(kh).concat([1]));
+    // EVALUATOR is out-of-band, not a span kind — never chart it here.
+    const kindRows = Object.entries(kh).filter(([kind]) => kind !== 'EVALUATOR');
+    const maxCount = Math.max.apply(null, kindRows.map(e => e[1]).concat([1]));
     document.getElementById('kind-hist').innerHTML =
-      Object.entries(kh)
+      kindRows
         .sort((a, b) => b[1] - a[1])
         .map(([kind, n]) => `
           <div class="kind-hist__row" data-kind="${kind}" style="cursor:pointer;">
@@ -304,6 +309,22 @@
 
     // ---- run rows + filter state ----
     let activeFilter = null; // { type: 'cohort'|'kind', value }
+
+    // Conversation grouping: runs sharing a session.id are turns of one
+    // conversation. This is how a single trace is traced back to the whole
+    // conversation — the batch IS the sim run, so we never repeat sim_id per row.
+    const sessionGroups = {};
+    (batch.runs || []).forEach(r => {
+      const sid = r.session_id || r.run_id;
+      (sessionGroups[sid] = sessionGroups[sid] || []).push(r);
+    });
+    Object.values(sessionGroups).forEach(g => g.sort((a, b) => (a.turn || 0) - (b.turn || 0)));
+    function convoInfo(r) {
+      const g = sessionGroups[r.session_id || r.run_id] || [r];
+      if (g.length < 2) return null;
+      return { pos: g.findIndex(x => x.run_id === r.run_id) + 1, total: g.length };
+    }
+    const shortId = (id) => !id ? '' : (id.length <= 14 ? id : id.slice(0, 13) + '…');
 
     function renderRows() {
       const rows = document.getElementById('rows');
@@ -344,23 +365,42 @@
             <div class="verdict-tally verdict-tally--fail">${failed.length} of ${vs.length} judges failed · ${passedN} passed</div>
             <div class="verdicts">${chips} ${more}</div>`;
         }
-        const turn = r.turn ? ` · turn ${r.turn}` : '';
-        const persona = r.persona
-          ? `<div>${B.escapeHtml(r.persona.name)}<br/><span style="color:var(--text-faint);">${B.escapeHtml(r.persona.id)} v${r.persona.version || 1}</span></div>`
-          : '—';
+        // Persona: name + id v-version, but the live adapter falls back name→id
+        // when the API omits a display name, which reads as a duplicated line.
+        // Collapse to one line when name and id are the same value.
+        let persona = '—';
+        if (r.persona) {
+          const pid = B.escapeHtml(r.persona.id);
+          const pname = B.escapeHtml(r.persona.name);
+          const pver = ' v' + (r.persona.version || 1);
+          persona = (pname && pname !== pid)
+            ? `<div>${pname}<br/><span style="color:var(--text-faint);">${pid}${pver}</span></div>`
+            : `<div>${pid}${pver}</div>`;
+        }
         const openUrl = `./trace.html?batch=${encodeURIComponent(batch.batch_id)}&run=${encodeURIComponent(r.run_id)}`;
+        // Trace id as a copyable ⌗ chip (same theme as the jobs table). The
+        // conversation affordance below traces this single trace back to the
+        // full multi-turn conversation via the trace viewer's Session strip.
+        const convo = convoInfo(r);
+        const convoLine = convo
+          ? `<a class="convo-tag" href="${openUrl}" title="Turn ${convo.pos} of a ${convo.total}-turn conversation — open the trace to walk every turn">turn ${convo.pos}/${convo.total} · conversation →</a>`
+          : '';
+        const traceCell = `
+          <span class="job-id-chip" title="${B.escapeHtml(r.trace_id)}">
+            <span class="job-id-chip__hash" aria-hidden="true">⌗</span>
+            <span class="job-id-chip__val">${B.escapeHtml(shortId(r.trace_id))}</span>
+            <button class="job-id-chip__copy" type="button" data-copy="${B.escapeHtml(r.trace_id)}" title="Copy trace_id" aria-label="Copy trace_id"></button>
+          </span>${convoLine ? `<div class="trace-convo">${convoLine}</div>` : ''}`;
         return `
-          <tr onclick="if(event.button===0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.target.closest('a')) location.href='${openUrl}'">
-            <td>
-              <a class="question-link question" href="${openUrl}">${B.escapeHtml(r.question)}</a>
-              <div class="persona">${B.escapeHtml(r.run_id)}${turn} · session.id <b style="color:var(--text);">${B.escapeHtml(r.session_id)}</b></div>
-            </td>
+          <tr onclick="if(event.button===0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.target.closest('a') && !event.target.closest('.job-id-chip')) location.href='${openUrl}'">
+            <td>${traceCell}</td>
+            <td><a class="question-link question" href="${openUrl}">${B.escapeHtml(r.question)}</a></td>
             <td><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);">${persona}</span></td>
             <td><div class="verdicts">${verdicts || '—'}</div></td>
             <td class="num"><span style="font-family:var(--font-mono);font-size:13px;color:var(--text);">${(r.duration_ms / 1000).toFixed(2)}s</span></td>
             <td><span class="run-status" data-st="${r.status}"><span class="dot"></span>${r.status}</span></td>
           </tr>`;
-      }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No runs match this filter.</td></tr>';
+      }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No runs match this filter.</td></tr>';
 
       const hint = document.getElementById('runs-filter-hint');
       const clear = document.getElementById('clear-filter');
@@ -374,6 +414,19 @@
     }
 
     renderRows();
+
+    // Copy trace_id from its chip without triggering row navigation.
+    document.getElementById('rows').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.job-id-chip__copy');
+      if (!btn) return;
+      e.stopPropagation();
+      e.preventDefault();
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy);
+        btn.classList.add('is-copied');
+        setTimeout(() => btn.classList.remove('is-copied'), 1200);
+      } catch { /* clipboard unavailable — no-op */ }
+    });
 
     // Cohort chip + histogram bar wiring
     document.getElementById('cohort-chips').addEventListener('click', function (e) {

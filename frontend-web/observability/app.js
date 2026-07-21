@@ -955,14 +955,14 @@
       const durationMs = turns.reduce((m, x) => m + (x.latency_ms || 0), 0);
       const tokensTotal = turns.reduce(
         (m, x) => m + ((x.tokens && (x.tokens.in || 0) + (x.tokens.out || 0)) || 0), 0);
-      // Real OpenInference span tree for this run. Preferred source is the agent's
-      // own emitted spans (`detail.spans`): a timed AGENT→PROMPT/LLM/TOOL/RETRIEVER/
-      // GUARDRAIL waterfall with W3C ids and OTel GenAI semconv attrs, stitched
-      // across turns by the simulation worker. Falls back to the `span_kinds`
-      // histogram, then to reconstruction from turns, for uninstrumented targets
-      // or older traces. EVALUATOR spans are the real inline judge verdicts,
-      // appended after the agent lifecycle. Every span maps to a real backend
-      // event — nothing fabricated.
+      // Real OpenInference span tree for this run: the agent's own emitted spans
+      // (`detail.spans`) — a timed AGENT→PROMPT/LLM/TOOL/RETRIEVER/GUARDRAIL
+      // waterfall with W3C ids and OTel GenAI semconv attrs, stitched across turns
+      // by the simulation worker. Falls back to the `span_kinds` histogram, then to
+      // reconstruction from turns, for uninstrumented targets or older traces.
+      // Evaluation is out-of-band (a separate service scores the finished trace),
+      // so its verdicts are NOT spans here — they surface in the run's `verdicts`
+      // (the trace viewer's Inline-verdicts table), never fabricated onto the tree.
       let spans = [];
       const realSpans = Array.isArray(detail.spans) ? detail.spans : [];
       if (realSpans.length) {
@@ -991,19 +991,8 @@
           });
         }
       }
-      // Inline judge verdicts as EVALUATOR spans — parented to the trace's first
-      // root (the agent run they scored) with a short synthetic duration so they
-      // read on the waterfall, laid just after the agent lifecycle finishes.
-      const rootId = (spans.find((s) => !s.parent_id) || {}).id || null;
-      const evalStart = spans.reduce((m, s) => Math.max(m, (s.start_ms || 0) + (s.duration_ms || 0)), 0);
-      mapped.forEach((v, i) => spans.push({
-        id: `ev_${i}`, parent_id: rootId, kind: "EVALUATOR", name: v.judge,
-        start_ms: evalStart + i * 40, duration_ms: 80,
-        attrs: {
-          "openinference.span.kind": "EVALUATOR",
-          "evaluator.score": v.score, "evaluator.pass": v.pass,
-        },
-      }));
+      // Evaluation verdicts are NOT appended as spans — they are out-of-band
+      // (the evaluation service scores the finished trace) and ride on `verdicts`.
       return {
         run_id: t.id, trace_id: t.id, session_id: detail.session_id_used || t.id,
         persona: { id: persona.id, name: persona.name || persona.id, version: persona.version || 1 },
@@ -1030,9 +1019,11 @@
       : (vs ? vs.pass_count : 0);
     const runCount = rows.length || b.traces || run.completed || 0;
     // Complete span-kind histogram across every run: the real agent lifecycle
-    // (AGENT · LLM · RETRIEVER · TOOL · GUARDRAIL · EVALUATOR), not EVALUATOR alone.
+    // (AGENT · LLM · RETRIEVER · TOOL · GUARDRAIL). Evaluation is out-of-band, so
+    // EVALUATOR is intentionally absent — this histogram is agent execution only.
     const kindHist = {};
     rows.forEach((r) => (r.spans || []).forEach((s) => {
+      if (s.kind === "EVALUATOR") return;
       kindHist[s.kind] = (kindHist[s.kind] || 0) + 1;
     }));
     return {
